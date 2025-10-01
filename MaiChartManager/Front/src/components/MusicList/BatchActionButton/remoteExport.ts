@@ -61,7 +61,7 @@ export default async (setStep: (step: STEP) => void, musicList: MusicXmlWithABJa
         }
         let filename = entry.filename;
         if (action === OPTIONS.ConvertToMaidata || action === OPTIONS.ConvertToMaidataIgnoreVideo) {
-          filename = `${music.name}/${filename}`;
+          filename = `${music.id}/${filename}`;
         }
         const fileHandle = await getSubDirFile(folderHandle, filename);
         const writable = await fileHandle.createWritable();
