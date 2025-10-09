@@ -80,5 +80,5 @@ export default async (setStep: (step: STEP) => void, musicList: MusicXmlWithABJa
 }
 
 const sanitizeFilename = (filename: string) => {
-  return filename.replace(/[\/:*?"<>|]/g, '_');
+  return filename.replace(/[\/:*?"<>|]/g, '_').replace(/[.\s]+$/, '');
 }

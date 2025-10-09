@@ -4,6 +4,7 @@ using MaiChartManager.Utils;
 using MaiLib;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualBasic.FileIO;
+using NAudio.Lame;
 using SimaiSharp;
 using Vanara.Windows.Forms;
 using Xabe.FFmpeg;
@@ -354,12 +355,6 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
         await maidataStream.WriteAsync(Encoding.UTF8.GetBytes(simaiFile.ToString()));
         maidataStream.Close();
 
-
-        var soundEntry = zipArchive.CreateEntry("track.mp3");
-        await using var soundStream = soundEntry.Open();
-        AudioConvert.ConvertWavPathToMp3Stream(await AudioConvert.GetCachedWavPath(id), soundStream);
-        soundStream.Close();
-
         // copy jacket
         var img = music.GetMusicJacketPngData();
         if (img is not null)
@@ -371,6 +366,20 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
             await imageStream.WriteAsync(img);
             imageStream.Close();
         }
+
+        var soundEntry = zipArchive.CreateEntry("track.mp3");
+        await using var soundStream = soundEntry.Open();
+        var tag = new ID3TagData
+        {
+            Title = music.Name,
+            Artist = music.Artist,
+            Album = genre?.GenreName,
+            Track = music.Id.ToString(),
+            Comment = version?.GenreName,
+            AlbumArt = img,
+        };
+        AudioConvert.ConvertWavPathToMp3Stream(await AudioConvert.GetCachedWavPath(id), soundStream, tag);
+        soundStream.Close();
 
         if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
         {
