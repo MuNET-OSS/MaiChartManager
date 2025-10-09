@@ -20,7 +20,7 @@ public class CueConvertController(StaticSettings settings, ILogger<CueConvertCon
             return NotFound();
         }
 
-        return PhysicalFile(cachePath, "audio/wav");
+        return PhysicalFile(cachePath, "audio/wav", enableRangeProcessing: true);
     }
 
     [HttpPut]
