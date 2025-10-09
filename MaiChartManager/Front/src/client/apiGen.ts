@@ -1838,6 +1838,27 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     /**
      * No description
      *
+     * @tags VideoConvertTool
+     * @name VideoConvertTool
+     * @request POST:/MaiChartManagerServlet/VideoConvertToolApi
+     */
+    VideoConvertTool: (
+      query?: {
+        noScale?: boolean;
+        yuv420p?: boolean;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<void, any>({
+        path: `/MaiChartManagerServlet/VideoConvertToolApi`,
+        method: "POST",
+        query: query,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags VrcProcess
      * @name GenAllMusicPreviewMp3ForVrc
      * @request POST:/MaiChartManagerServlet/GenAllMusicPreviewMp3ForVrcApi
