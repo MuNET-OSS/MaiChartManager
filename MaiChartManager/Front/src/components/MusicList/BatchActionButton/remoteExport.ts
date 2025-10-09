@@ -61,7 +61,7 @@ export default async (setStep: (step: STEP) => void, musicList: MusicXmlWithABJa
         }
         let filename = entry.filename;
         if (action === OPTIONS.ConvertToMaidata || action === OPTIONS.ConvertToMaidataIgnoreVideo) {
-          filename = `${music.name}/${filename}`;
+          filename = `${sanitizeFilename(music.name!)}${music.id! > 1e4 && music.id! < 2e4 ? ' [DX]' : ''}/${filename}`;
         }
         const fileHandle = await getSubDirFile(folderHandle, filename);
         const writable = await fileHandle.createWritable();
@@ -77,4 +77,8 @@ export default async (setStep: (step: STEP) => void, musicList: MusicXmlWithABJa
   }
 
   setStep(STEP.None);
+}
+
+const sanitizeFilename = (filename: string) => {
+  return filename.replace(/[\/:*?"<>|]/g, '_');
 }
