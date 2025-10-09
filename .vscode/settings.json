@@ -1,5 +1,6 @@
 {
     "dotrush.roslyn.projectOrSolutionFiles": [
         "d:\\Projects\\mai\\Sitreamai\\Sitreamai.sln"
-    ]
+    ],
+    "dotnet.defaultSolution": "Sitreamai.sln"
 }

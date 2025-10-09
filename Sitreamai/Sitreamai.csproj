@@ -24,6 +24,7 @@
       <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.8"/>
       <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="9.0.8"/>
     <PackageReference Include="NAudio" Version="2.2.1" />
+      <PackageReference Include="NAudio.Lame" Version="2.1.0"/>
     <PackageReference Include="NAudio.Vorbis" Version="1.5.0" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
     <PackageReference Include="YAXLib" Version="2.15.0" />

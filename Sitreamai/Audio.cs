@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Reflection;
+using NAudio.Lame;
 using NAudio.Wave;
 using VGAudio;
 using VGAudio.Cli;
@@ -94,11 +95,15 @@ public static class Audio
 
         var stream = new MemoryStream();
         WaveFileWriter.WriteWavFileToStream(stream, sample.ToWaveProvider16()); // 淦
-        stream.Position = 0; // 淦 x2
+        stream.Position = 0;                                                    // 淦 x2
         return stream;
     }
 
-    public static byte[] ConvertFile(Stream s, FileType encodeType, FileType convertToType, bool loop,
+    public static byte[] ConvertFile(
+        Stream s,
+        FileType encodeType,
+        FileType convertToType,
+        bool loop,
         ulong encryptionKey = 0)
     {
         ConvertStatics.SetLoop(loop, 0, 0);
@@ -147,5 +152,27 @@ public static class Audio
         var entry = acb.GetAfs2Entry(wave.AwbId);
         using MemoryStream stream = new MemoryStream(entry.bytes);
         return ConvertStream.ConvertFile(new Options(), stream, GetFileType(wave.EncodeType), FileType.Wave);
+    }
+
+    // 从MP4视频文件中提取音频轨道并保存为WAV文件
+    public static void ExtractAudioFromMp4(string mp4Path, string outputWavPath)
+    {
+        using (var reader = new MediaFoundationReader(mp4Path))
+        {
+            // MediaFoundationReader 会自动解码视频中的音频流（如AAC）为PCM
+            WaveFileWriter.CreateWaveFile(outputWavPath, reader);
+        }
+    }
+
+    // 将 WAV 字节数据转换为 MP3 文件
+    public static void ConvertWavBytesToMp3(byte[] wavData, string mp3Path)
+    {
+        // 将 WAV 字节数据写入内存流
+        using var wavStream = new MemoryStream(wavData);
+        using var reader = new WaveFileReader(wavStream);
+
+        // 创建 MP3 文件并编码
+        using var writer = new LameMP3FileWriter(mp3Path, reader.WaveFormat, 256);
+        reader.CopyTo(writer);
     }
 }

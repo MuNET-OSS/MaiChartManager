@@ -813,6 +813,20 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     /**
      * No description
      *
+     * @tags AudioConvertTool
+     * @name AudioConvertTool
+     * @request POST:/MaiChartManagerServlet/AudioConvertToolApi
+     */
+    AudioConvertTool: (params: RequestParams = {}) =>
+      this.request<void, any>({
+        path: `/MaiChartManagerServlet/AudioConvertToolApi`,
+        method: "POST",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags Chart
      * @name EditChartLevel
      * @request POST:/MaiChartManagerServlet/EditChartLevelApi/{assetDir}/{id}/{level}

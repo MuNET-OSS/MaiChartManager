@@ -13,6 +13,7 @@ import ImportCreateChartButton from "@/components/ImportCreateChartButton";
 import { HardwareAccelerationStatus, LicenseStatus } from "@/client/apiGen";
 import CopyToButton from "@/components/CopyToButton";
 import TransitionOpacity from '@/components/TransitionOpacity';
+import Tools from '@/components/Tools';
 
 export default defineComponent({
   setup() {
@@ -92,6 +93,7 @@ export default defineComponent({
                 <MusicSelectedTopRightToolbar />
                 <ImportCreateChartButton />
               </>}
+            <Tools />
             <VersionInfo />
           </NFlex>
           <NScrollbar class="grow-1">
