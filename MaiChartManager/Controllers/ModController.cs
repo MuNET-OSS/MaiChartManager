@@ -250,7 +250,9 @@ public class ModController(StaticSettings settings, ILogger<ModController> logge
         if (System.IO.File.Exists(AquaMaiConfigPath))
         {
             Directory.CreateDirectory(AquaMaiConfigBackupDirPath);
-            System.IO.File.Move(AquaMaiConfigPath, Path.Combine(AquaMaiConfigBackupDirPath, $"{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.toml"));
+            var backupPath = Path.Combine(AquaMaiConfigBackupDirPath, $"{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.toml");
+            var originalContent = System.IO.File.ReadAllBytes(AquaMaiConfigPath);
+            System.IO.File.WriteAllBytes(backupPath, originalContent);
         }
 
         System.IO.File.WriteAllText(Path.Combine(StaticSettings.GamePath, "AquaMai.toml"), serializer.Serialize(configEdit));
