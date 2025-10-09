@@ -10,7 +10,7 @@ export default defineComponent({
     type: {type: String, required: true},
   },
   setup(props) {
-    return () => !!props.conflicts.length && <NPopover trigger="hover">
+    return () => <NPopover trigger="hover">
       {{
         trigger: () => props.type === 'up' ?
           // @ts-ignore

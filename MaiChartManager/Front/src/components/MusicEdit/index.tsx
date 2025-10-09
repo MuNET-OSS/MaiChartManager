@@ -2,7 +2,7 @@ import { computed, defineComponent, onMounted, PropType, ref, watch } from "vue"
 import { Chart, GenreXml, MusicXmlWithABJacket } from "@/client/apiGen";
 import { addVersionList, genreList, globalCapture, selectedADir, selectedMusic as info, selectMusicId, updateAddVersionList, updateGenreList, updateMusicList } from "@/store/refs";
 import api from "@/client/api";
-import { NButton, NFlex, NForm, NFormItem, NInput, NInputNumber, NSelect, NTabPane, NTabs, SelectOption, useDialog, useMessage } from "naive-ui";
+import { NButton, NFlex, NForm, NFormItem, NInput, NInputNumber, NSelect, NSwitch, NTabPane, NTabs, SelectOption, useDialog, useMessage } from "naive-ui";
 import JacketBox from "../JacketBox";
 import dxIcon from "@/assets/dxIcon.png";
 import stdIcon from "@/assets/stdIcon.png";
@@ -38,6 +38,7 @@ const Component = defineComponent({
     watch(() => info.value?.addVersionId, sync('addVersionId', api.EditMusicAddVersion));
     watch(() => info.value?.utageKanji, sync('utageKanji', api.EditMusicUtageKanji));
     watch(() => info.value?.comment, sync('comment', api.EditMusicComment));
+    watch(() => info.value?.longMusic, sync('longMusic', api.EditMusicLong));
 
     return () => info.value && <NForm showFeedback={false} labelPlacement="top" disabled={selectedADir.value === 'A000'}>
         <div class="grid cols-[1fr_12em] gap-5">
@@ -53,7 +54,11 @@ const Component = defineComponent({
                     </div>
                 </NFlex>
                 <NFormItem label="歌曲名称">
-                    <NInput v-model:value={info.value.name}/>
+                    <div class="flex items-center gap-2 w-full">
+                        <NInput v-model:value={info.value.name} class="w-0 grow"/>
+                        <NSwitch v-model:value={info.value.longMusic}/>
+                        LongMusic
+                    </div>
                 </NFormItem>
                 <NFormItem label="作者">
                     <NInput v-model:value={info.value.artist}/>

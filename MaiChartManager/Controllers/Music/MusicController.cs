@@ -98,6 +98,16 @@ public class MusicController(StaticSettings settings, ILogger<MusicController> l
             music.AddVersionId = value;
         }
     }
+    
+    [HttpPost]
+    public void EditMusicLong(int id, [FromBody] bool value, string assetDir)
+    {
+        var music = settings.GetMusic(id, assetDir);
+        if (music != null)
+        {
+            music.LongMusic = value;
+        }
+    }
 
     [HttpPost]
     public void SaveMusic(int id, string assetDir)

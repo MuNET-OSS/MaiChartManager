@@ -346,7 +346,17 @@ public class MusicXml
         set
         {
             Modified = true;
-            RootNode.SelectSingleNode("version").InnerText = value ? "true" : "false";
+            RootNode.SelectSingleNode("disable").InnerText = value ? "true" : "false";
+        }
+    }
+
+    public bool LongMusic
+    {
+        get => RootNode.SelectSingleNode("longMusic")?.InnerText == "1";
+        set
+        {
+            Modified = true;
+            RootNode.SelectSingleNode("longMusic").InnerText = value ? "1" : "0";
         }
     }
 

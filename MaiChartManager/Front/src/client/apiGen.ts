@@ -252,6 +252,7 @@ export interface MusicXmlWithABJacket {
   /** @format float */
   bpm?: number;
   disable?: boolean;
+  longMusic?: boolean;
   charts?: Chart[] | null;
   assetBundleJacket?: string | null;
   pseudoAssetBundleJacket?: string | null;
@@ -1561,6 +1562,22 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
     EditMusicAddVersion: (id: number, assetDir: string, data: number, params: RequestParams = {}) =>
       this.request<void, any>({
         path: `/MaiChartManagerServlet/EditMusicAddVersionApi/${assetDir}/${id}`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Music
+     * @name EditMusicLong
+     * @request POST:/MaiChartManagerServlet/EditMusicLongApi/{assetDir}/{id}
+     */
+    EditMusicLong: (id: number, assetDir: string, data: boolean, params: RequestParams = {}) =>
+      this.request<void, any>({
+        path: `/MaiChartManagerServlet/EditMusicLongApi/${assetDir}/${id}`,
         method: "POST",
         body: data,
         type: ContentType.Json,
