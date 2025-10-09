@@ -1,10 +1,12 @@
 import { defineComponent, PropType, ref } from "vue";
 import { MusicXmlWithABJacket } from "@/client/apiGen";
-import { NButton, NFlex, NPopover, NRadio, NRadioGroup, useMessage, useNotification } from "naive-ui";
+import { NButton, NFlex, NPopover, NRadio, NRadioGroup, NSelect, useMessage, useNotification } from "naive-ui";
 import { STEP } from "@/components/MusicList/BatchActionButton/index";
 import api from "@/client/api";
 import { showNeedPurchaseDialog, updateMusicList, version } from "@/store/refs";
 import remoteExport from "@/components/MusicList/BatchActionButton/remoteExport";
+import TransitionVertical from "@/components/TransitionVertical.vue";
+import { useStorage } from "@vueuse/core";
 
 export enum OPTIONS {
   None,
@@ -17,6 +19,12 @@ export enum OPTIONS {
   CreateNewOptMa2_103,
 }
 
+export enum MAIDATA_SUBDIR {
+  None,
+  Genre,
+  Version,
+}
+
 export default defineComponent({
   props: {
     selectedMusic: Array as PropType<MusicXmlWithABJacket[]>,
@@ -24,6 +32,8 @@ export default defineComponent({
   },
   setup(props) {
     const selectedOption = ref(OPTIONS.None);
+    // 导出为 Maidata 的子目录选项
+    const selectedMaidataSubdir = useStorage('selectedMaidataSubdir', MAIDATA_SUBDIR.None);
     const load = ref(false);
     const notify = useNotification();
 
@@ -57,7 +67,7 @@ export default defineComponent({
             showNeedPurchaseDialog.value = true
             break;
           }
-          remoteExport(props.continue as any, props.selectedMusic!, selectedOption.value, notify);
+          remoteExport(props.continue as any, props.selectedMusic!, selectedOption.value, notify, selectedMaidataSubdir.value);
           break;
       }
     }
@@ -107,6 +117,11 @@ export default defineComponent({
           <NRadio value={OPTIONS.ConvertToMaidataIgnoreVideo}>
             转换为 Maidata（无 BGA）
           </NRadio>
+
+          <TransitionVertical>
+            {(selectedOption.value === OPTIONS.ConvertToMaidata || selectedOption.value === OPTIONS.ConvertToMaidataIgnoreVideo) &&
+              <NSelect v-model:value={selectedMaidataSubdir.value} options={[{label: '平铺文件夹', value: MAIDATA_SUBDIR.None}, {label: '按流派分组', value: MAIDATA_SUBDIR.Genre}, {label: '按版本分组', value: MAIDATA_SUBDIR.Version}]}/>}
+          </TransitionVertical>
         </NFlex>
       </NRadioGroup>
       <NFlex justify="end">

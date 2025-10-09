@@ -6,3 +6,4 @@ riderModule.iml
 .vs
 *.user
 /MaiChartManager/Resources/AquaMai.dll
+node_modules
