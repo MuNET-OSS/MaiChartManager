@@ -13,6 +13,8 @@ import AcbAwb from "@/components/MusicEdit/AcbAwb";
 import GenreInput from "@/components/GenreInput";
 import VersionInput from "@/components/VersionInput";
 import { captureException } from "@sentry/vue"
+import noJacket from "@/assets/noJacket.webp";
+import { getUrl } from "@/client/api";
 
 const Component = defineComponent({
   setup() {
@@ -39,6 +41,19 @@ const Component = defineComponent({
     watch(() => info.value?.utageKanji, sync('utageKanji', api.EditMusicUtageKanji));
     watch(() => info.value?.comment, sync('comment', api.EditMusicComment));
     watch(() => info.value?.longMusic, sync('longMusic', api.EditMusicLong));
+
+    onMounted(()=>{
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: info.value?.name || '',
+          artist: info.value?.artist || '',
+          album: genreList.value.find(genre => genre.id === info.value?.genreId)?.genreName || '',
+          artwork: [
+            { src: info.value?.hasJacket ? getUrl(`GetJacketApi/${selectedADir.value}/${info.value?.id}?${(info.value as any).updateTime}`) : noJacket,  type: 'image/png' },
+          ]
+        });
+      }
+    })
 
     return () => info.value && <NForm showFeedback={false} labelPlacement="top" disabled={selectedADir.value === 'A000'}>
         <div class="grid cols-[1fr_12em] gap-5">
