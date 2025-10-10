@@ -3,7 +3,7 @@ using SingleInstanceCore;
 using System.Text.Json;
 using Windows.ApplicationModel;
 using Windows.ApplicationModel.Activation;
-using MaiChartManager.Controllers.Music;
+using MaiChartManager.Utils;
 using Microsoft.Web.WebView2.Core;
 using Xabe.FFmpeg;
 
@@ -44,7 +44,7 @@ public class AppMain : ISingleInstance
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
             ApplicationConfiguration.Initialize();
             FFmpeg.SetExecutablesPath(StaticSettings.exeDir);
-            MovieConvertController.CheckHardwareAcceleration();
+            VideoConvert.CheckHardwareAcceleration();
 
             Directory.CreateDirectory(StaticSettings.appData);
             Directory.CreateDirectory(StaticSettings.tempPath);

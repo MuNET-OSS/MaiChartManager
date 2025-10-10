@@ -69,6 +69,7 @@ export default defineComponent({
       } catch (e: any) {
         if (e?.name === 'AbortError') return;
         console.log(e);
+        if (e.message === '未选择文件') return;
         globalCapture(e, "视频转换出错");
       } finally {
         step.value = STEP.None;

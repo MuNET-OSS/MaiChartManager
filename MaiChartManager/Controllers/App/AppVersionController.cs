@@ -1,4 +1,4 @@
-﻿using MaiChartManager.Controllers.Music;
+﻿using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MaiChartManager.Controllers.App;
@@ -7,11 +7,11 @@ namespace MaiChartManager.Controllers.App;
 [Route("MaiChartManagerServlet/[action]Api")]
 public class AppVersionController(StaticSettings settings, ILogger<AppVersionController> logger) : ControllerBase
 {
-    public record AppVersionResult(string Version, int GameVersion, IapManager.LicenseStatus License, MovieConvertController.HardwareAccelerationStatus HardwareAcceleration, string H264Encoder);
+    public record AppVersionResult(string Version, int GameVersion, IapManager.LicenseStatus License, VideoConvert.HardwareAccelerationStatus HardwareAcceleration, string H264Encoder);
 
     [HttpGet]
     public AppVersionResult GetAppVersion()
     {
-        return new AppVersionResult(Application.ProductVersion, settings.gameVersion, IapManager.License, MovieConvertController.HardwareAcceleration, MovieConvertController.H264Encoder);
+        return new AppVersionResult(Application.ProductVersion, settings.gameVersion, IapManager.License, VideoConvert.HardwareAcceleration, VideoConvert.H264Encoder);
     }
 }
