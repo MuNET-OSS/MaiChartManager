@@ -16,8 +16,8 @@ export default defineComponent({
     const videoConvertRef = ref<{ trigger: () => void }>();
 
     const options = [
-      { label: "音频转换", key: DROPDOWN_OPTIONS.AudioConvert },
-      { label: "视频转换（MP4 转 DAT）", key: DROPDOWN_OPTIONS.VideoConvert },
+      { label: "音频转换（ACB + AWB）", key: DROPDOWN_OPTIONS.AudioConvert },
+      { label: "视频转换（DAT）", key: DROPDOWN_OPTIONS.VideoConvert },
     ]
 
     const handleOptionClick = async (key: DROPDOWN_OPTIONS) => {

@@ -384,25 +384,17 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
         if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
         {
             string? pvMp4Path = null;
-            if (Path.GetExtension(movieUsmPath).Equals(".dat", StringComparison.InvariantCultureIgnoreCase))
+            var ext = Path.GetExtension(movieUsmPath).ToLowerInvariant();
+            
+            if (ext == ".dat" || ext == ".usm")
             {
                 var tmpDir = Directory.CreateTempSubdirectory();
                 logger.LogInformation("Temp dir: {tmpDir}", tmpDir.FullName);
-                var movieUsm = Path.Combine(tmpDir.FullName, "movie.usm");
-                FileSystem.CopyFile(movieUsmPath, movieUsm, UIOption.OnlyErrorDialogs);
-                WannaCRI.WannaCRI.UnpackUsm(movieUsm, Path.Combine(tmpDir.FullName, "output"));
-                var outputIvfFile = Directory.EnumerateFiles(Path.Combine(tmpDir.FullName, @"output\movie.usm\videos")).FirstOrDefault();
-                if (outputIvfFile is not null)
-                {
-                    pvMp4Path = Path.Combine(tmpDir.FullName, "pv.mp4");
-                    await FFmpeg.Conversions.New()
-                        .AddParameter("-i " + outputIvfFile.Escape())
-                        .AddParameter("-c:v copy")
-                        .SetOutput(pvMp4Path)
-                        .Start();
-                }
+                pvMp4Path = Path.Combine(tmpDir.FullName, "pv.mp4");
+                
+                await VideoConvert.ConvertUsmToMp4(movieUsmPath, pvMp4Path);
             }
-            else if (Path.GetExtension(movieUsmPath).Equals(".mp4", StringComparison.InvariantCultureIgnoreCase))
+            else if (ext == ".mp4")
             {
                 pvMp4Path = movieUsmPath;
             }

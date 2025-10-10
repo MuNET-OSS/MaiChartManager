@@ -101,7 +101,7 @@ export default defineComponent({
         onUpdateShow={() => step.value = STEP.None}
       >{{
         default: () => <NFlex vertical size="large">
-          <div>将 MP4 视频转换为 DAT 格式（USM 容器）</div>
+          <div>以下选项仅对通用格式转换为 USM 生效</div>
           <NCheckbox v-model:checked={videoConvertOptions.value.noScale}>
             不要缩放视频到 1080 宽度
           </NCheckbox>
