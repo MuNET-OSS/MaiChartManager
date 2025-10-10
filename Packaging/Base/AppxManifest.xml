@@ -8,7 +8,7 @@
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   IgnorableNamespaces="win32dependencies"
 >
-  <Identity Name="22369479C5405.MaiChartManager" Publisher="CN=86A51452-7790-46C3-9A4B-1207C2C97940" Version="1.5.5.0"
+  <Identity Name="22369479C5405.MaiChartManager" Publisher="CN=86A51452-7790-46C3-9A4B-1207C2C97940" Version="1.6.0.0"
     ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>MaiChartManager</DisplayName>

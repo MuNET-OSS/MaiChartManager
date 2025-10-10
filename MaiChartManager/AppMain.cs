@@ -11,7 +11,7 @@ namespace MaiChartManager;
 
 public class AppMain : ISingleInstance
 {
-    public const string Version = "1.5.5";
+    public const string Version = "1.6.0";
     public static Browser? BrowserWin { get; set; }
 
     private Launcher _launcher;
