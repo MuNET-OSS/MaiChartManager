@@ -228,7 +228,7 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
         var abJacketTarget = Path.Combine(StaticSettings.StreamingAssets, assetDir, "AssetBundleImages", "jacket", $"ui_jacket_{newNonDxId:000000}.ab");
         var acbawbTarget = Path.Combine(StaticSettings.StreamingAssets, assetDir, "SoundData", $"music{newNonDxId:000000}");
         var movieTarget = Path.Combine(StaticSettings.StreamingAssets, assetDir, "MovieData", $"{newNonDxId:000000}");
-        var newMusicDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{newNonDxId:000000}");
+        var newMusicDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{newId:000000}");
         DeleteIfExists(abJacketTarget, abJacketTarget + ".manifest", acbawbTarget + ".acb", acbawbTarget + ".awb", movieTarget + ".dat", movieTarget + ".mp4", newMusicDir);
         var abiDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, @"AssetBundleImages\jacket");
         Directory.CreateDirectory(abiDir);
