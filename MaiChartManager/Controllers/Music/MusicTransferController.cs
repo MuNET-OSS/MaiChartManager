@@ -234,22 +234,18 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
         Directory.CreateDirectory(abiDir);
 
         // jacket
-        if (music.JacketPath is not null)
+        var jacketSourcePng = music.JacketPath is not null ? music.JacketPath : music.PseudoAssetBundleJacket;
+        if (jacketSourcePng is not null)
         {
-            var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}{Path.GetExtension(music.JacketPath)}");
+            // 如果music.JacketPath或music.PseudoAssetBundleJacket不为空，则直接执行移动逻辑即可
+            var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}{Path.GetExtension(jacketSourcePng)}");
             DeleteIfExists(localJacketTarget);
-            logger.LogInformation("Move jacket: {music.JacketPath} -> {localJacketTarget}", music.JacketPath, localJacketTarget);
-            FileSystem.MoveFile(music.JacketPath, localJacketTarget, UIOption.OnlyErrorDialogs);
-        }
-        else if (music.PseudoAssetBundleJacket is not null)
-        {
-            var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}{Path.GetExtension(music.PseudoAssetBundleJacket)}");
-            DeleteIfExists(localJacketTarget);
-            logger.LogInformation("Move jacket: {music.PseudoAssetBundleJacket} -> {localJacketTarget}", music.PseudoAssetBundleJacket, localJacketTarget);
-            FileSystem.MoveFile(music.PseudoAssetBundleJacket, localJacketTarget, UIOption.OnlyErrorDialogs);
+            logger.LogInformation("Move jacket: {jacketSourcePng} -> {localJacketTarget}", jacketSourcePng, localJacketTarget);
+            FileSystem.MoveFile(jacketSourcePng, localJacketTarget, UIOption.OnlyErrorDialogs);
         }
         else if (music.AssetBundleJacket is not null)
         {
+            // 否则需要执行转换逻辑
             var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}.png");
             logger.LogInformation("Convert jacket: {music.AssetBundleJacket} -> {abJacketTarget}", music.AssetBundleJacket, abJacketTarget);
             System.IO.File.WriteAllBytes(localJacketTarget, music.GetMusicJacketPngData()!);
