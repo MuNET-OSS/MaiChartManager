@@ -234,14 +234,14 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
         Directory.CreateDirectory(abiDir);
 
         // jacket
-        var jacketSourcePng = music.JacketPath is not null ? music.JacketPath : music.PseudoAssetBundleJacket;
-        if (jacketSourcePng is not null)
+        var jacketSourcePath = music.JacketPath is not null ? music.JacketPath : music.PseudoAssetBundleJacket;
+        if (jacketSourcePath is not null)
         {
             // 如果music.JacketPath或music.PseudoAssetBundleJacket不为空，则直接执行移动逻辑即可
-            var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}{Path.GetExtension(jacketSourcePng)}");
+            var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}{Path.GetExtension(jacketSourcePath)}");
             DeleteIfExists(localJacketTarget);
-            logger.LogInformation("Move jacket: {jacketSourcePng} -> {localJacketTarget}", jacketSourcePng, localJacketTarget);
-            FileSystem.MoveFile(jacketSourcePng, localJacketTarget, UIOption.OnlyErrorDialogs);
+            logger.LogInformation("Move jacket: {jacketSourcePng} -> {localJacketTarget}", jacketSourcePath, localJacketTarget);
+            FileSystem.MoveFile(jacketSourcePath, localJacketTarget, UIOption.OnlyErrorDialogs);
         }
         else if (music.AssetBundleJacket is not null)
         {
