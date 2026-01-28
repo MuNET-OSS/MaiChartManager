@@ -191,10 +191,17 @@ public partial class ImportChartController(StaticSettings settings, ILogger<Stat
     public record ImportChartCheckResult(bool Accept, IEnumerable<ImportChartMessage> Errors, float MusicPadding, bool IsDx, string? Title, float first, float bar);
 
     [HttpPost]
-    public ImportChartCheckResult ImportChartCheck(IFormFile file)
+    public ImportChartCheckResult ImportChartCheck(IFormFile file, [FromForm] bool isReplacement = false)
     {
         var errors = new List<ImportChartMessage>();
         var fatal = false;
+
+        if (isReplacement)
+        {
+            // 替换谱面的操作也需要检查的过程，但检查的逻辑和导入谱面时可以说是一模一样的，故直接共用逻辑
+            // 唯一的区别是给用户一个警告，明确说明直接替换谱面功能的适用范围
+            errors.Add(new ImportChartMessage(Locale.NotesReplacementWarning, MessageLevel.Warning));
+        }
 
         try
         {

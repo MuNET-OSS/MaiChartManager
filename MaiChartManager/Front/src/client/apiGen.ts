@@ -266,6 +266,7 @@ export interface MusicXmlWithABJacket {
   subLockType?: number;
   disable?: boolean;
   longMusic?: boolean;
+  shiftMethod?: string | null;
   charts?: Chart[] | null;
   assetBundleJacket?: string | null;
   pseudoAssetBundleJacket?: string | null;
@@ -965,6 +966,7 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       data: {
         /** @format binary */
         file?: File;
+        shift?: ShiftMethod;
       },
       params: RequestParams = {},
     ) =>
@@ -1236,6 +1238,8 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       data: {
         /** @format binary */
         file?: File;
+        /** @default false */
+        isReplacement?: boolean;
       },
       params: RequestParams = {},
     ) =>

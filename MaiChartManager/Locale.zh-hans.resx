@@ -285,4 +285,7 @@
     <data name="LauncherOpenToLanDesc" xml:space="preserve">
       <value>开机自动以服务器模式运行并最小化到托盘</value>
     </data>
+    <data name="NotesReplacementWarning" xml:space="preserve">
+      <value>注意！本“替换谱面”功能仅限用于：谱面音符内容在原来的基础上发生修改，且音频内容未变、&amp;first偏移量未变、谱面中第一个音符的时刻未变的情况。否则，您需要删除整个谱面后重新导入。</value>
+    </data>
 </root>

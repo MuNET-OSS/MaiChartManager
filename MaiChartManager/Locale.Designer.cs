@@ -631,6 +631,15 @@ namespace MaiChartManager {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Caution! This &quot;Replace Chart&quot; function should only be used when modifying the note content of the existing chart, while the audio remains unchanged, the &amp;first offset remains unchanged, and the timing of the first note remains unchanged. Otherwise, you will need to delete the entire chart and re-import it..
+        /// </summary>
+        internal static string NotesReplacementWarning {
+            get {
+                return ResourceManager.GetString("NotesReplacementWarning", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Please enter activation code.
         /// </summary>
         internal static string OfflineActivationPrompt {

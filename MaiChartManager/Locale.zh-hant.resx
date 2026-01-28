@@ -285,4 +285,7 @@
     <data name="LauncherOpenToLanDesc" xml:space="preserve">
       <value>開機自動以伺服器模式運作並最小化到托盤</value>
     </data>
+    <data name="NotesReplacementWarning" xml:space="preserve">
+      <value>>請注意！本「替換譜面」功能僅限用於：譜面音符內容在原來的基礎上發生修改，且音訊內容未變、&amp;first偏移量未變、譜面中第一個音符的時刻未變的情況。否則，您需要刪除整個譜面後重新匯入。</value>
+    </data>
 </root>
