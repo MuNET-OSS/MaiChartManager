@@ -126,6 +126,7 @@ music:
     replaceChartConfirm: 确认要替换 {level} 谱面吗？
     replaceChartFailed: 替换谱面失败
     replaceChartSuccess: 替换谱面成功
+    notValidChartFile: 谱面文件必须是.ma2或maidata.txt
   batch:
     title: 批量操作
     batchAndSearch: 批量操作与搜索
@@ -418,6 +419,7 @@ error:
   feedbackError: 反馈错误
   file:
     notSelected: 未选择文件
+  unsupportedFileType: 不支持的文件类型
 message:
   notice: 提示
   saveSuccess: 保存成功

@@ -133,6 +133,7 @@ music:
     replaceChartConfirm: Confirm to replace {level}?
     replaceChartFailed: Failed to replace chart
     replaceChartSuccess: Chart replaced successfully
+    notValidChartFile: Chart file must be .ma2 or maidata.txt.
   batch:
     title: Batch Actions
     batchAndSearch: Batch Actions & Search
@@ -456,6 +457,7 @@ error:
     confirm: Got it
   file:
     notSelected: No file selected
+  unsupportedFileType: 'Unsupported file type'
 message:
   notice: Notice
   saveSuccess: Saved successfully

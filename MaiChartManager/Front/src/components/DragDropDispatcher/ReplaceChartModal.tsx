@@ -1,10 +1,13 @@
 import { t } from '@/locales';
 import { globalCapture, selectedADir, selectedLevel, selectedMusic, selectMusicId, updateMusicList } from '@/store/refs';
-import { NButton, NFlex, NModal, useMessage } from 'naive-ui';
-import { defineComponent, PropType, ref, computed, watch, shallowRef } from 'vue';
+import { NButton, NFlex, NModal, useDialog, useMessage } from 'naive-ui';
+import { defineComponent, shallowRef } from 'vue';
 import JacketBox from '../JacketBox';
 import { DIFFICULTY, LEVEL_COLOR } from '@/consts';
 import api from '@/client/api';
+
+export let prepareReplaceChart = async (fileHandle?: FileSystemFileHandle) => {
+}
 
 export const replaceChartFileHandle = shallowRef<FileSystemFileHandle | null>(null);
 
@@ -13,6 +16,33 @@ export default defineComponent({
   // },
   setup(props, { emit }) {
     const message = useMessage();
+    const dialog = useDialog();
+
+    prepareReplaceChart = async (fileHandle?: FileSystemFileHandle) => {
+      if (!fileHandle) {
+        [fileHandle] = await window.showOpenFilePicker({
+          id: 'chart',
+          startIn: 'downloads',
+          types: [
+            {
+              description: t('music.edit.supportedFileTypes'),
+              accept: {
+                "application/x-supported": [".ma2", ".txt"], // 没办法限定只匹配maidata.txt，就只好先把一切txt都作为匹配
+              },
+            },
+          ],
+        });
+      }
+      if (!fileHandle) return // 用户未选择文件
+      const name = fileHandle.name
+      if (!(name.endsWith(".ma2") || name == "maidata.txt")) {
+        dialog.error({title: t('error.unsupportedFileType'), content: t('music.edit.notValidChartFile')})
+        return
+      }
+      // TODO：对ma2和maidata.txt分类讨论，后者执行ImportCheck
+      console.log(fileHandle.name)
+      replaceChartFileHandle.value = fileHandle
+    }
 
     const replaceChart = async () => {
       if (!replaceChartFileHandle.value) return;
