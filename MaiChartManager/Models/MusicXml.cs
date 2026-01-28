@@ -377,16 +377,7 @@ public partial class MusicXml
         set
         {
             Modified = true;
-            var node = RootNode.SelectSingleNode(utageKanjiNode);
-            if (node is null)
-            {
-                node = xmlDoc.CreateNode(XmlNodeType.Element, utageKanjiNode, null);
-                node.InnerText = value;
-                RootNode.AppendChild(node);
-                return;
-            }
-
-            RootNode.SelectSingleNode(utageKanjiNode).InnerText = value;
+            SelectSingleNodeOrCreate(RootNode, utageKanjiNode).InnerText = value;
         }
     }
 
@@ -398,16 +389,7 @@ public partial class MusicXml
         set
         {
             Modified = true;
-            var node = RootNode.SelectSingleNode(commentNode);
-            if (node is null)
-            {
-                node = xmlDoc.CreateNode(XmlNodeType.Element, commentNode, null);
-                node.InnerText = value;
-                RootNode.AppendChild(node);
-                return;
-            }
-
-            RootNode.SelectSingleNode(commentNode).InnerText = value;
+            SelectSingleNodeOrCreate(RootNode, commentNode).InnerText = value;
         }
     }
 
@@ -464,6 +446,18 @@ public partial class MusicXml
                 RootNode.AppendChild(node);
             }
             node.InnerText = value ? "1" : "0";
+        }
+    }
+    
+    // 以下是游戏本体不会使用、而是由MCM使用的扩展字段，统一放到"X-MCM"下。
+    
+    public string ShiftMethod
+    {
+        get => RootNode.SelectSingleNode("X-MCM/shiftMethod")?.InnerText;
+        set
+        {
+            Modified = true;
+            SelectSingleNodeOrCreate(RootNode, "X-MCM/shiftMethod").InnerText = value;
         }
     }
 
@@ -570,5 +564,23 @@ public partial class MusicXml
     {
         Modified = false;
         xmlDoc.Save(FilePath);
+    }
+
+    private XmlNode SelectSingleNodeOrCreate(XmlNode parent, string xpath)
+    {
+        var node = parent.SelectSingleNode(xpath);
+        if (node is not null) return node;
+        // 由于xmlDoc.CreateNode不支持xpath，因此当xpath有多层时，必须对每一层依次分别创建
+        foreach (var s in xpath.Split('/'))
+        {
+            node = parent.SelectSingleNode(s);
+            if (node is null)
+            {
+                node = xmlDoc.CreateNode(XmlNodeType.Element, s, null);
+                parent.AppendChild(node);
+            }
+            parent = node; // 继续下一层的处理
+        }
+        return node;
     }
 }

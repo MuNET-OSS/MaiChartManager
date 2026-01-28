@@ -559,6 +559,7 @@ public partial class ImportChartController(StaticSettings settings, ILogger<Stat
         music.AddVersionId = addVersionId;
         music.GenreId = genreId;
         music.Version = version;
+        music.ShiftMethod = shift.ToString();
         float wholebpm;
         if (float.TryParse(maiData.GetValueOrDefault("wholebpm"), out wholebpm))
             music.Bpm = wholebpm;
