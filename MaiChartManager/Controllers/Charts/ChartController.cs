@@ -105,5 +105,17 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
         file.CopyTo(stream);
         targetChart.Problems.Clear();
         stream.Close();
+        
+        // 检查新谱面ma2的音符数量是否有变化，如果有修正之
+        string fileContent;
+        using (var reader = new StreamReader(file.OpenReadStream()))
+        {
+            fileContent = reader.ReadToEnd();
+        }
+        var newMaxNotes = ImportChartController.ParseTNumAllFromMa2(fileContent);
+        if (newMaxNotes != 0 && targetChart.MaxNotes != newMaxNotes)
+        {
+            targetChart.MaxNotes = newMaxNotes;
+        }
     }
 }

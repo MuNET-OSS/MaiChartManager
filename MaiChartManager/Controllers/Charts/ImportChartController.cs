@@ -569,7 +569,7 @@ public partial class ImportChartController(StaticSettings settings, ILogger<Stat
     }
 
 
-    private static int ParseTNumAllFromMa2(string ma2Content)
+    public static int ParseTNumAllFromMa2(string ma2Content)
     {
         var lines = ma2Content.Split('\n');
         // 从后往前读取，因为 T_NUM_ALL 在文件最后
