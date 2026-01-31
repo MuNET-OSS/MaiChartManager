@@ -6,6 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json.Serialization;
 using System.Windows.Forms;
 using idunno.Authentication.Basic;
+using MaiChartManager.Services;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.Extensions.FileProviders;
@@ -111,6 +112,7 @@ public static class ServerManager
 
         builder.Services
             .AddSingleton<StaticSettings>()
+            .AddSingleton<MaidataImportService>()
             .AddEndpointsApiExplorer()
             .AddSwaggerGen(options => { options.CustomSchemaIds(type => type.Name == "Config" ? type.FullName : type.Name); })
             .Configure<FormOptions>(x =>

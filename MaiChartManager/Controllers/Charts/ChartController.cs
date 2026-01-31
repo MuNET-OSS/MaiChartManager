@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using MaiChartManager.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace MaiChartManager.Controllers.Charts;
 
@@ -96,7 +97,7 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
 
     [HttpPost]
     public void ReplaceChart(int id, int level, IFormFile file, string assetDir, 
-        [FromForm] ImportChartController.ShiftMethod? shift)
+        [FromForm] ShiftMethod? shift)
     {
         var music = settings.GetMusic(id, assetDir);
         if (music == null || file == null) return;
@@ -114,7 +115,7 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
         {
             fileContent = reader.ReadToEnd();
         }
-        var newMaxNotes = ImportChartController.ParseTNumAllFromMa2(fileContent);
+        var newMaxNotes = MaidataImportService.ParseTNumAllFromMa2(fileContent);
         if (newMaxNotes != 0 && targetChart.MaxNotes != newMaxNotes)
         {
             targetChart.MaxNotes = newMaxNotes;
