@@ -9,6 +9,8 @@ import VersionInput from "@/components/VersionInput";
 import { UTAGE_GENRE } from "@/consts";
 import MusicIdConflictNotifier from "@/components/MusicIdConflictNotifier";
 import { useI18n } from 'vue-i18n';
+import ImportAlert from "@/components/ImportCreateChartButton/ImportChartButton/ImportAlert";
+import ShiftModeSelector from "@/components/ImportCreateChartButton/ImportChartButton/ShiftModeSelector";
 
 export default defineComponent({
   props: {
@@ -41,49 +43,7 @@ export default defineComponent({
       v-model:show={show.value}
     >{{
       default: () => <NFlex vertical size="large">
-        <NScrollbar class="max-h-24vh">
-          <NFlex vertical>
-            {
-              props.errors.map((error, i) => {
-                if ('first' in error) {
-                  if (error.padding > 0 && props.tempOptions.shift === ShiftMethod.Legacy) {
-                    return <NAlert key={i} type="info" title={error.name}>{t('chart.import.addPadding', {padding: error.padding.toFixed(3)})}</NAlert>
-                  }
-                  if (error.padding < 0 && props.tempOptions.shift === ShiftMethod.Legacy) {
-                    return <NAlert key={i} type="info" title={error.name}>{t('chart.import.trimPadding', {padding: (-error.padding).toFixed(3)})}</NAlert>
-                  }
-                  if (error.first > 0 && props.tempOptions.shift === ShiftMethod.NoShift) {
-                    return <NAlert key={i} type="info" title={error.name}>{t('chart.import.trimFirst', {first: error.first.toFixed(3)})}</NAlert>
-                  }
-                  if (error.first < 0 && props.tempOptions.shift === ShiftMethod.NoShift) {
-                    return <NAlert key={i} type="info" title={error.name}>{t('chart.import.addFirst', {first: (-error.first).toFixed(3)})}</NAlert>
-                  }
-                  return <></>
-                }
-                let type: "default" | "info" | "success" | "warning" | "error" = "default";
-                switch (error.level) {
-                  case MessageLevel.Info:
-                    type = 'info';
-                    break;
-                  case MessageLevel.Warning:
-                    type = 'warning';
-                    break;
-                  case MessageLevel.Fatal:
-                    type = 'error';
-                    break;
-                }
-                return <NAlert key={i} type={type} title={error.name} class={`${error.isPaid && 'cursor-pointer'}`}
-                  // @ts-ignore
-                               onClick={() => error.isPaid && (showNeedPurchaseDialog.value = true)}
-                >
-                  <div class="whitespace-pre-wrap">
-                    {error.message}
-                  </div>
-                </NAlert>
-              })
-            }
-          </NFlex>
-        </NScrollbar>
+        <ImportAlert errors={props.errors} tempOptions={props.tempOptions}></ImportAlert>
         {!!props.meta.length && <>
             {t('chart.import.assignId')}
             <NScrollbar class="max-h-24vh">
@@ -109,38 +69,7 @@ export default defineComponent({
             <NCollapse>
                 <NCollapseItem title={t('chart.import.option.advancedOptions')}>
                     <NFlex vertical>
-                        <NFormItem label={t('chart.import.option.shiftMode')} labelPlacement="left" showFeedback={false}>
-                            <NFlex vertical class="w-full">
-                                <NFlex class="h-34px" align="center">
-                                    <NRadioGroup v-model:value={props.tempOptions.shift}>
-                                        <NPopover trigger="hover">
-                                          {{
-                                            trigger: () => <NRadio value={ShiftMethod.Bar} label={t('chart.import.option.shiftByBar')}/>,
-                                            default: () => <div>
-                                              {t('chart.import.option.shiftByBarDesc')}
-                                            </div>
-                                          }}
-                                        </NPopover>
-                                        <NPopover trigger="hover">
-                                          {{
-                                            trigger: () => <NRadio value={ShiftMethod.Legacy} label={t('chart.import.option.shiftLegacy')}/>,
-                                            default: () => <div>
-                                              {t('chart.import.option.shiftLegacyDesc')}
-                                            </div>
-                                          }}
-                                        </NPopover>
-                                        <NPopover trigger="hover">
-                                          {{
-                                            trigger: () => <NRadio value={ShiftMethod.NoShift} label={t('chart.import.option.shiftNoMove')}/>,
-                                            default: () => <div>
-                                              {t('chart.import.option.shiftNoMoveDesc')}
-                                            </div>
-                                          }}
-                                        </NPopover>
-                                    </NRadioGroup>
-                                </NFlex>
-                            </NFlex>
-                        </NFormItem>
+                        <ShiftModeSelector tempOptions={props.tempOptions}></ShiftModeSelector>
                         <NCheckbox v-model:checked={props.savedOptions.noScale}>
                             {t('chart.import.option.noScale')}
                         </NCheckbox>
