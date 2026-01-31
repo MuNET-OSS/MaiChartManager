@@ -1,4 +1,5 @@
 ﻿using System.Text.RegularExpressions;
+using MaiChartManager.Models;
 using MaiChartManager.Utils;
 using MaiLib;
 using Microsoft.AspNetCore.Mvc;
@@ -362,22 +363,12 @@ public partial class ImportChartController(StaticSettings settings, ILogger<Stat
     [GeneratedRegex(@"Original Stack.*", RegexOptions.Singleline)]
     private static partial Regex MaiLibErrMsgRegex();
 
-    [HttpPost]
-    // 创建完 Music 后调用
-    public ImportChartResult ImportChart(
-        [FromForm] int id,
-        IFormFile file,
-        [FromForm] bool ignoreLevelNum,
-        [FromForm] int addVersionId,
-        [FromForm] int genreId,
-        [FromForm] int version,
-        [FromForm] string assetDir,
-        [FromForm] ShiftMethod shift,
-        [FromForm] bool debug = false)
+    public ImportChartResult ImportMaidata(MusicXml music, IFormFile file, ShiftMethod shift, 
+        bool ignoreLevelNum, bool debug)
     {
+        var id = music.Id;
         var isUtage = id > 100000;
         var errors = new List<ImportChartMessage>();
-        var music = settings.GetMusic(id, assetDir);
         var kvps = new SimaiFile(file.OpenReadStream()).ToKeyValuePairs();
         var maiData = new Dictionary<string, string>();
         foreach (var (key, value) in kvps)
@@ -563,16 +554,39 @@ public partial class ImportChartController(StaticSettings settings, ILogger<Stat
 
         music.Name = maiData["title"];
         music.Artist = maiData.GetValueOrDefault("artist") ?? "";
-        music.AddVersionId = addVersionId;
-        music.GenreId = genreId;
-        music.Version = version;
         music.ShiftMethod = shift.ToString();
         float wholebpm;
         if (float.TryParse(maiData.GetValueOrDefault("wholebpm"), out wholebpm))
             music.Bpm = wholebpm;
-        music.Save();
-        music.Refresh();
+        
         return new ImportChartResult(errors, false);
+    }
+    
+    [HttpPost]
+    // 创建完 Music 后调用
+    public ImportChartResult ImportChart(
+        [FromForm] int id,
+        IFormFile file,
+        [FromForm] bool ignoreLevelNum,
+        [FromForm] int addVersionId,
+        [FromForm] int genreId,
+        [FromForm] int version,
+        [FromForm] string assetDir,
+        [FromForm] ShiftMethod shift,
+        [FromForm] bool debug = false)
+    {
+        var music = settings.GetMusic(id, assetDir);
+        var importMaidataResult = ImportMaidata(music, file, shift, ignoreLevelNum, debug);
+        if (!importMaidataResult.Fatal)
+        {
+            music.AddVersionId = addVersionId;
+            music.GenreId = genreId;
+            music.Version = version;
+            music.Save();
+            music.Refresh();
+        }
+
+        return importMaidataResult;
     }
 
 
