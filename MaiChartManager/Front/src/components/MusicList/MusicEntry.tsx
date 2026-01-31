@@ -2,12 +2,13 @@ import { computed, defineComponent, PropType } from "vue";
 import { MusicXmlWithABJacket } from "@/client/apiGen";
 import noJacket from '@/assets/noJacket.webp';
 import { NBadge, NFlex } from "naive-ui";
-import { DIFFICULTY, LEVEL_COLOR, LEVELS } from "@/consts";
+import { DIFFICULTY } from "@/consts";
 import ProblemsDisplay from "@/components/ProblemsDisplay";
 import { musicListAll, selectedADir } from "@/store/refs";
 import ConflictDisplay from "@/components/MusicList/ConflictDisplay";
 import { getUrl } from "@/client/api";
 import LongMusicIcon from "./LongMusicIcon";
+import LevelTagsDisplay from "@/components/LevelTagsDisplay";
 
 export default defineComponent({
   props: {
@@ -42,12 +43,7 @@ export default defineComponent({
             {props.music.id?.toString().padStart(6, '0')}
           </NFlex>
           <div class="text-ellipsis of-hidden ws-nowrap">{props.music.name}</div>
-          <NFlex class="pt-1 text-sm" size="small">
-            {
-              (props.music.charts || []).map((chart, index) =>
-                chart.enable && <div key={index} class="c-white rounded-full px-2" style={{ backgroundColor: LEVEL_COLOR[index!] }}>{LEVELS[chart.levelId!]}</div>)
-            }
-          </NFlex>
+          <LevelTagsDisplay charts={props.music.charts!}></LevelTagsDisplay>
         </div>
         <NFlex class="absolute right-0 bottom-0 mr-2 mb-2" size="small">
           {props.music.longMusic && <LongMusicIcon />}

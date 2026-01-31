@@ -127,6 +127,7 @@ music:
     replaceChartFailed: 替换谱面失败
     replaceChartSuccess: 替换谱面成功
     notValidChartFile: 谱面文件必须是.ma2或maidata.txt
+    replaceChartShiftModeHint: 请确保这里选择的延迟调整模式和导入谱面时使用的一致，否则会导致音符位置不正确！
   batch:
     title: 批量操作
     batchAndSearch: 批量操作与搜索
@@ -210,6 +211,7 @@ chart:
     option:
       advancedOptions: 高级选项
       shiftMode: 延迟调整模式
+      shiftModeLocked: 延迟调整模式已被锁定为最初导入谱面时所使用的模式，无法修改
       shiftByBar: 按小节
       shiftByBarDesc: |-
         如果谱面前面的休止符长度小于一小节，那就在前面加上一小节的空白

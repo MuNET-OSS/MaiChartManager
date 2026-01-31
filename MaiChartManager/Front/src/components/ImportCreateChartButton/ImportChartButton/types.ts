@@ -38,7 +38,7 @@ export type ImportChartMessageEx = (ImportChartMessage | FirstPaddingMessage) & 
 
 export const dummyMeta = {name: '', importStep: IMPORT_STEP.start} as ImportMeta
 
-export const defaultTempOptions = {
+export const defaultTempOptions: TempOptions = {
   shift: ShiftMethod.Bar,
 }
 
@@ -60,5 +60,8 @@ export const defaultSavedOptions = {
   yuv420p: true,
 }
 
-export type TempOptions = typeof defaultTempOptions;
+export type TempOptions = {
+  shift: ShiftMethod,
+  shiftLocked?: boolean
+};
 export type SavedOptions = typeof defaultSavedOptions;

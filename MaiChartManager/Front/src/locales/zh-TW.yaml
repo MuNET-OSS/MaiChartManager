@@ -127,6 +127,7 @@ music:
     replaceChartFailed: 替換譜面失敗
     replaceChartSuccess: 替換譜面成功
     notValidChartFile: 譜面檔案必須是 .ma2 或 maidata.txt。
+    replaceChartShiftModeHint: 請確保這裡選擇的延遲調整模式與匯入譜面時使用的一致，否則會導致音符位置不正確！
   batch:
     title: 批次操作
     batchAndSearch: 批次操作與搜尋
@@ -210,6 +211,7 @@ chart:
     option:
       advancedOptions: 進階選項
       shiftMode: 延遲調整模式
+      shiftModeLocked: 延遲調整模式已被鎖定為最初匯入譜面時所使用的模式，無法變更
       shiftByBar: 按小節
       shiftByBarDesc: |-
         如果譜面前面的休止符長度小於一小節，那就在前面加上一小節的空白

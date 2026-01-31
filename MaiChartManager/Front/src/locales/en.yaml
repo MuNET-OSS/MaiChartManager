@@ -134,6 +134,7 @@ music:
     replaceChartFailed: Failed to replace chart
     replaceChartSuccess: Chart replaced successfully
     notValidChartFile: Chart file must be .ma2 or maidata.txt.
+    replaceChartShiftModeHint: Make sure the delay adjustment mode selected here matches the one used when importing the chart, otherwise notes may be positioned incorrectly!
   batch:
     title: Batch Actions
     batchAndSearch: Batch Actions & Search
@@ -219,6 +220,7 @@ chart:
     option:
       advancedOptions: Advanced Options
       shiftMode: Delay Adjustment Mode
+      shiftModeLocked: The Delay Adjustment Mode is locked to the mode used when the chart was originally imported and cannot be changed.
       shiftByBar: By Bar
       shiftByBarDesc: >-
         If the rest at the beginning of the chart is less than one bar, add one
