@@ -211,7 +211,7 @@ public partial class MaidataImportService
     private record AllChartsEntry(string chartText, MaiChart simaiSharpChart);
     
     public ImportChartResult ImportMaidata(MusicXml music, IFormFile file, ShiftMethod shift, 
-        bool ignoreLevelNum, bool debug)
+        bool ignoreLevelNum, bool debug, bool isReplacement = false)
     {
         var id = music.Id;
         var isUtage = id > 100000;
@@ -269,14 +269,19 @@ public partial class MaidataImportService
             }
         }
 
+        foreach (var targetChart in music.Charts)
+        {
+            targetChart.Enable = false;
+        }
+
+        float bpm = 0f;
         foreach (var (level, chart) in allCharts)
         {
             // 宴会场只导入第一个谱面
             if (isUtage && music.Charts[0].Enable) break;
 
             // var levelPadding = CalcMusicPadding(chart, first);
-            var bpm = chart.simaiSharpChart.TimingChanges[0].tempo;
-            music.Bpm = bpm;
+            bpm = chart.simaiSharpChart.TimingChanges[0].tempo;
             // 一个小节多少秒
             var bar = 60 / bpm * 4;
 
@@ -399,13 +404,18 @@ public partial class MaidataImportService
             targetChart.Enable = true;
         }
 
-        music.Name = maiData["title"];
-        music.Artist = maiData.GetValueOrDefault("artist") ?? "";
-        music.ShiftMethod = shift.ToString();
-        float wholebpm;
-        if (float.TryParse(maiData.GetValueOrDefault("wholebpm"), out wholebpm))
-            music.Bpm = wholebpm;
-        
+        if (!isReplacement)
+        {
+            // 只在新建时设定曲目信息，替换时不设定
+            music.Name = maiData["title"];
+            music.Artist = maiData.GetValueOrDefault("artist") ?? "";
+            music.ShiftMethod = shift.ToString();
+            float wholebpm;
+            if (float.TryParse(maiData.GetValueOrDefault("wholebpm"), out wholebpm))
+                music.Bpm = wholebpm; // 优先使用&wholebpm
+            else music.Bpm = bpm; // 如果不存在，则使用谱面中开头声明的bpm
+        }
+
         return new ImportChartResult(errors, false);
     }
     

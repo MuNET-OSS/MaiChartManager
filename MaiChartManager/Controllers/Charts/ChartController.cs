@@ -5,7 +5,7 @@ namespace MaiChartManager.Controllers.Charts;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api/{assetDir}/{id:int}/{level:int}")]
-public class ChartController(StaticSettings settings, ILogger<StaticSettings> logger) : ControllerBase
+public class ChartController(StaticSettings settings, ILogger<StaticSettings> logger, MaidataImportService importService) : ControllerBase
 {
     [HttpPost]
     public void EditChartLevel(int id, int level, [FromBody] int value, string assetDir)
@@ -96,29 +96,53 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
     }
 
     [HttpPost]
-    public void ReplaceChart(int id, int level, IFormFile file, string assetDir, 
+    public ImportChartResult ReplaceChart(int id, int level, IFormFile file, string assetDir, 
         [FromForm] ShiftMethod? shift)
     {
         var music = settings.GetMusic(id, assetDir);
-        if (music == null || file == null) return;
-        // TODO 判断是MA2还是maidata.txt，走不同的逻辑
-        var targetChart = music.Charts[level];
-        targetChart.Path = $"{id:000000}_0{level}.ma2";
-        using var stream = System.IO.File.Open(Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{id:000000}", targetChart.Path), FileMode.Create);
-        file.CopyTo(stream);
-        targetChart.Problems.Clear();
-        stream.Close();
-        
-        // 检查新谱面ma2的音符数量是否有变化，如果有修正之
-        string fileContent;
-        using (var reader = new StreamReader(file.OpenReadStream()))
+        if (music == null || file == null) return new ImportChartResult([new ImportChartMessage("文件上传失败", MessageLevel.Fatal)], true);
+        if (file.FileName.EndsWith(".ma2"))
         {
-            fileContent = reader.ReadToEnd();
+            var targetChart = music.Charts[level];
+            targetChart.Path = $"{id:000000}_0{level}.ma2";
+            using var stream = System.IO.File.Open(Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{id:000000}", targetChart.Path), FileMode.Create);
+            file.CopyTo(stream);
+            targetChart.Problems.Clear();
+            stream.Close();
+            
+            // 检查新谱面ma2的音符数量是否有变化，如果有修正之
+            string fileContent;
+            using (var reader = new StreamReader(file.OpenReadStream()))
+            {
+                fileContent = reader.ReadToEnd();
+            }
+            var newMaxNotes = MaidataImportService.ParseTNumAllFromMa2(fileContent);
+            if (newMaxNotes != 0 && targetChart.MaxNotes != newMaxNotes)
+            {
+                targetChart.MaxNotes = newMaxNotes;
+            }
+
+            return new ImportChartResult([], false);
         }
-        var newMaxNotes = MaidataImportService.ParseTNumAllFromMa2(fileContent);
-        if (newMaxNotes != 0 && targetChart.MaxNotes != newMaxNotes)
+        else if (file.FileName.EndsWith("maidata.txt"))
         {
-            targetChart.MaxNotes = newMaxNotes;
-        }
+            if (level != -1) throw new NotImplementedException("使用maidata时暂不支持只替换单个难度谱面，只能同时替换全部的");
+            // 通过此前的谱面的定数是否为0，判断是否需要ignoreLevelNum
+            bool ignoreLevelNum = true;
+            foreach (var chart in music.Charts)
+            {
+                if (music.Id < 100000 && chart.Enable && chart.Level > 0) ignoreLevelNum = false; 
+            }
+            var importResult = importService.ImportMaidata(music, file, (ShiftMethod)shift, ignoreLevelNum, false, true);
+            if (!importResult.Fatal)
+            {
+                music.Save();
+                music.Refresh();
+            }
+
+            return importResult;
+        } 
+        // 正常来说是不会进到这里的，因为前端已经对文件名做了校验了，所以这个报错用户正常来说是看不到的，就不做i18n了。
+        else return new ImportChartResult([new ImportChartMessage("不支持的文件格式！", MessageLevel.Fatal)], true);
     }
 }

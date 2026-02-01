@@ -970,11 +970,12 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
       },
       params: RequestParams = {},
     ) =>
-      this.request<void, any>({
+      this.request<ImportChartResult, any>({
         path: `/MaiChartManagerServlet/ReplaceChartApi/${assetDir}/${id}/${level}`,
         method: "POST",
         body: data,
         type: ContentType.FormData,
+        format: "json",
         ...params,
       }),
 
