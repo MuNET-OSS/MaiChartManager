@@ -108,7 +108,6 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
             using var stream = System.IO.File.Open(Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{id:000000}", targetChart.Path), FileMode.Create);
             file.CopyTo(stream);
             targetChart.Problems.Clear();
-            stream.Close();
             
             // 检查新谱面ma2的音符数量是否有变化，如果有修正之
             string fileContent;
