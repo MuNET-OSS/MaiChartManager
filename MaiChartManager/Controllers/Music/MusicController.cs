@@ -27,6 +27,19 @@ public class MusicController(StaticSettings settings, ILogger<MusicController> l
             music.Name = value;
         }
     }
+    
+    [HttpPost]
+    public string EditMusicSortName(int id, [FromBody] string value, string assetDir)
+    {
+        var music = settings.GetMusic(id, assetDir);
+        if (music != null)
+        {
+            music.SortName = value;
+            return music.SortName; // 因为music.SortName的setter中会对内容做格式化、确保符合要求。所以把转化的结果返回前端供前端更新。
+        }
+
+        return "";
+    }
 
     [HttpPost]
     public void EditMusicArtist(int id, [FromBody] string value, string assetDir)

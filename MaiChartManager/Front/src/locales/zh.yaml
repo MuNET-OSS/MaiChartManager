@@ -82,6 +82,8 @@ music:
     addVersion: 追加版本
     utageType: 宴谱种类
     utageComment: 宴谱备注
+    sortName: 游戏内排序名
+    sortNameTips: 只能包含数字、大写字母、片假名（如有不合要求的字符，会被自动替换）
     jacket: 封面
     audioPreview: 试听
     editPreview: 编辑预览

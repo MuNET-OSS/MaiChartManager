@@ -251,6 +251,7 @@ export interface MusicXmlWithABJacket {
   nonDxId?: number;
   modified?: boolean;
   name?: string | null;
+  sortName?: string | null;
   /** @format int32 */
   genreId?: number;
   /** @format int32 */
@@ -1590,6 +1591,23 @@ export class Api<SecurityDataType extends unknown> extends HttpClient<SecurityDa
         method: "POST",
         body: data,
         type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Music
+     * @name EditMusicSortName
+     * @request POST:/MaiChartManagerServlet/EditMusicSortNameApi/{assetDir}/{id}
+     */
+    EditMusicSortName: (id: number, assetDir: string, data: string, params: RequestParams = {}) =>
+      this.request<string, any>({
+        path: `/MaiChartManagerServlet/EditMusicSortNameApi/${assetDir}/${id}`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
         ...params,
       }),
 
