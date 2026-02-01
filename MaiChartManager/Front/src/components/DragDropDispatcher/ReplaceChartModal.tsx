@@ -87,7 +87,7 @@ export default defineComponent({
           apiResp.value = result; // 用于在失败时显示错误信息
           show.value = "failed";
         }
-        await updateMusicList();
+        await updateMusicList(true);
       } catch (error) {
         globalCapture(error, t('music.edit.replaceChartFailed'));
         console.error(error);

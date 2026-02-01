@@ -1,6 +1,6 @@
 import { computed, defineComponent, onMounted, PropType, ref, watch } from "vue";
 import { Chart, GenreXml, MusicXmlWithABJacket } from "@/client/apiGen";
-import { addVersionList, genreList, globalCapture, selectedADir, selectedMusic as info, selectMusicId, updateAddVersionList, updateGenreList, updateMusicList, selectedLevel } from "@/store/refs";
+import { addVersionList, genreList, globalCapture, selectedADir, selectedMusic as info, selectMusicId, updateAddVersionList, updateGenreList, updateMusicList, selectedLevel, disableSync } from "@/store/refs";
 import api from "@/client/api";
 import { NButton, NFlex, NForm, NFormItem, NInput, NInputNumber, NSelect, NSwitch, NTabPane, NTabs, SelectOption, useDialog, useMessage } from "naive-ui";
 import JacketBox from "../JacketBox";
@@ -27,7 +27,7 @@ const Component = defineComponent({
     }
 
     const sync = (key: keyof MusicXmlWithABJacket, method: Function) => async () => {
-      if (!info.value) return;
+      if (disableSync.value || !info.value) return;
       info.value!.modified = true;
       await method(info.value.id!, info.value.assetDir, (info.value as any)[key]!);
     }

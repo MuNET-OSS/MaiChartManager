@@ -2,7 +2,7 @@ import { computed, defineComponent, PropType, watch } from "vue";
 import { Chart } from "@/client/apiGen";
 import { NButton, NFlex, NForm, NFormItem, NInput, NInputNumber, NSelect, NSwitch } from "naive-ui";
 import api from "@/client/api";
-import { selectedADir, selectedMusic } from "@/store/refs";
+import { disableSync, selectedADir, selectedMusic } from "@/store/refs";
 import { LEVELS } from "@/consts";
 import ProblemsDisplay from "@/components/ProblemsDisplay";
 import PreviewChartButton from "@/components/MusicEdit/PreviewChartButton";
@@ -28,7 +28,7 @@ export default defineComponent({
     })
 
     const sync = (key: keyof Chart, method: Function) => async () => {
-      if (!props.chart) return;
+      if (disableSync.value || !props.chart) return;
       selectedMusic.value!.modified = true;
       await method(props.songId, props.chartIndex, selectedADir.value, props.chart[key]!);
     }

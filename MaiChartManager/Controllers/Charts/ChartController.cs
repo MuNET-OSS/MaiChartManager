@@ -121,6 +121,7 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
             {
                 targetChart.MaxNotes = newMaxNotes;
             }
+            music.Save();
 
             return new ImportChartResult([], false);
         }
