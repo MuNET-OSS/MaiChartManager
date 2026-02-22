@@ -13,11 +13,11 @@ public enum MessageLevel
     Warning,
     Fatal
 }
-    
+
 public record ImportChartMessage(string Message, MessageLevel Level);
-    
+
 public record ImportChartResult(IEnumerable<ImportChartMessage> Errors, bool Fatal);
-    
+
 // v1.1.2 新增
 public enum ShiftMethod
 {
@@ -37,7 +37,6 @@ public enum ShiftMethod
     // noShiftChart = true, padding = -first
     NoShift
 }
-
 public partial class MaidataImportService
 {
     private readonly ILogger<MaidataImportService> logger;
@@ -46,7 +45,7 @@ public partial class MaidataImportService
     {
         this.logger = logger;
     }
-    
+
     [GeneratedRegex(@"^\([\d\.]+\)")]
     private static partial Regex BpmTagRegex();
 
@@ -60,7 +59,7 @@ public partial class MaidataImportService
         // 这里使用 {4},,,, 而不是 {1}, 因为要是谱面一开始根本没有写 {x} 的话，默认是 {4}。要是用了 {1}, 会覆盖默认的 {4}
         return string.Concat(bpm, "{4},,,,", maidata.AsSpan(bpm.Length));
     }
-    
+
     [GeneratedRegex(@"(\d){")]
     private static partial Regex SimaiError1();
 
@@ -86,7 +85,7 @@ public partial class MaidataImportService
         chart = SimaiError5().Replace(chart, "$1xq$2");
         return chart;
     }
-    
+
     public MaiChart TryParseChartSimaiSharp(string chartText, int level, List<ImportChartMessage> errors)
     {
         chartText = chartText.ReplaceLineEndings();
@@ -111,7 +110,7 @@ public partial class MaidataImportService
             throw;
         }
     }
-    
+
     [GeneratedRegex(@"\|\|.*$", RegexOptions.Multiline)]
     private static partial Regex SimaiCommentRegex();
 
@@ -124,7 +123,7 @@ public partial class MaidataImportService
 
     [GeneratedRegex(@"Original Stack.*", RegexOptions.Singleline)]
     private static partial Regex MaiLibErrMsgRegex();
-    
+
     public Chart? TryParseChart(string chartText, MaiChart? simaiSharpChart, int level, List<ImportChartMessage> errors)
     {
         chartText = chartText.ReplaceLineEndings();
@@ -195,7 +194,7 @@ public partial class MaidataImportService
             return null;
         }
     }
-    
+
     public static float CalcMusicPadding(MaiChart chart, float first)
     {
         // TimingChanges 对应的是所有的 {int}
@@ -207,16 +206,22 @@ public partial class MaidataImportService
         var firstTiming = chart.NoteCollections[0].time + first;
         return bar - firstTiming;
     }
-    
+
     private record AllChartsEntry(string chartText, MaiChart simaiSharpChart);
-    
-    public ImportChartResult ImportMaidata(MusicXml music, IFormFile file, ShiftMethod shift, 
-        bool ignoreLevelNum, bool debug, bool isReplacement = false)
+
+    public ImportChartResult ImportMaidata(
+        MusicXml music,
+        IFormFile file,
+        ShiftMethod shift,
+        bool ignoreLevelNum,
+        bool debug,
+        bool isReplacement = false)
     {
         var id = music.Id;
         var isUtage = id > 100000;
         var errors = new List<ImportChartMessage>();
-        var kvps = new SimaiFile(file.OpenReadStream()).ToKeyValuePairs();
+        using var stream = file.OpenReadStream();
+        var kvps = new SimaiFile(stream).ToKeyValuePairs();
         var maiData = new Dictionary<string, string>();
         foreach (var (key, value) in kvps)
         {
@@ -413,12 +418,12 @@ public partial class MaidataImportService
             float wholebpm;
             if (float.TryParse(maiData.GetValueOrDefault("wholebpm"), out wholebpm))
                 music.Bpm = wholebpm; // 优先使用&wholebpm
-            else music.Bpm = bpm; // 如果不存在，则使用谱面中开头声明的bpm
+            else music.Bpm = bpm;     // 如果不存在，则使用谱面中开头声明的bpm
         }
 
         return new ImportChartResult(errors, false);
     }
-    
+
     public static int ParseTNumAllFromMa2(string ma2Content)
     {
         var lines = ma2Content.Split('\n');

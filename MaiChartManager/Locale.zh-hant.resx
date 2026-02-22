@@ -288,4 +288,13 @@
     <data name="NotesReplacementWarning" xml:space="preserve">
       <value>>請注意！本「替換譜面」功能僅限用於：譜面音符內容在原來的基礎上發生修改，且音訊內容未變、&amp;first偏移量未變、譜面中第一個音符的時刻未變的情況。否則，您需要刪除整個譜面後重新匯入。</value>
     </data>
+  <data name="FileUploadFailed" xml:space="preserve">
+      <value>檔案上傳失敗</value>
+    </data>
+  <data name="MaidataReplaceAllOnly" xml:space="preserve">
+      <value>使用 maidata 時暫不支援只替換單個難度譜面，只能同時替換全部的</value>
+    </data>
+  <data name="UnsupportedChartFormat" xml:space="preserve">
+      <value>不支援的檔案格式</value>
+    </data>
 </root>

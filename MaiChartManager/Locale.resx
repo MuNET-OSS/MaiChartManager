@@ -296,4 +296,13 @@ If you notice any issues with the conversion result, you can try testing it in A
     <data name="NotesReplacementWarning" xml:space="preserve">
       <value>Caution! This "Replace Chart" function should only be used when modifying the note content of the existing chart, while the audio remains unchanged, the &amp;first offset remains unchanged, and the timing of the first note remains unchanged. Otherwise, you will need to delete the entire chart and re-import it.</value>
     </data>
+  <data name="FileUploadFailed" xml:space="preserve">
+      <value>File upload failed</value>
+    </data>
+  <data name="MaidataReplaceAllOnly" xml:space="preserve">
+      <value>Replacing individual difficulty charts is not supported when using maidata. All difficulties will be replaced at once.</value>
+    </data>
+  <data name="UnsupportedChartFormat" xml:space="preserve">
+      <value>Unsupported file format</value>
+    </data>
 </root>

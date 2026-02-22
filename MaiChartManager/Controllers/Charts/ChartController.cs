@@ -96,11 +96,15 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
     }
 
     [HttpPost]
-    public ImportChartResult ReplaceChart(int id, int level, IFormFile file, string assetDir, 
-        [FromForm] ShiftMethod? shift)
+    public ImportChartResult ReplaceChart(
+        int id,
+        int level,
+        IFormFile file,
+        string assetDir,
+        [FromForm] ShiftMethod shift)
     {
         var music = settings.GetMusic(id, assetDir);
-        if (music == null || file == null) return new ImportChartResult([new ImportChartMessage("文件上传失败", MessageLevel.Fatal)], true);
+        if (music == null || file == null) return new ImportChartResult([new ImportChartMessage(Locale.FileUploadFailed, MessageLevel.Fatal)], true);
         if (file.FileName.EndsWith(".ma2"))
         {
             var targetChart = music.Charts[level];
@@ -108,7 +112,7 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
             using var stream = System.IO.File.Open(Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{id:000000}", targetChart.Path), FileMode.Create);
             file.CopyTo(stream);
             targetChart.Problems.Clear();
-            
+
             // 检查新谱面ma2的音符数量是否有变化，如果有修正之
             string fileContent;
             using (var reader = new StreamReader(file.OpenReadStream()))
@@ -126,14 +130,14 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
         }
         else if (file.FileName.EndsWith("maidata.txt"))
         {
-            if (level != -1) throw new NotImplementedException("使用maidata时暂不支持只替换单个难度谱面，只能同时替换全部的");
+            if (level != -1) return new ImportChartResult([new ImportChartMessage(Locale.MaidataReplaceAllOnly, MessageLevel.Fatal)], true);
             // 通过此前的谱面的定数是否为0，判断是否需要ignoreLevelNum
             bool ignoreLevelNum = true;
             foreach (var chart in music.Charts)
             {
-                if (music.Id < 100000 && chart.Enable && chart.Level > 0) ignoreLevelNum = false; 
+                if (music.Id < 100000 && chart.Enable && chart.Level > 0) ignoreLevelNum = false;
             }
-            var importResult = importService.ImportMaidata(music, file, (ShiftMethod)shift, ignoreLevelNum, false, true);
+            var importResult = importService.ImportMaidata(music, file, shift, ignoreLevelNum, false, true);
             if (!importResult.Fatal)
             {
                 music.Save();
@@ -141,8 +145,7 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
             }
 
             return importResult;
-        } 
-        // 正常来说是不会进到这里的，因为前端已经对文件名做了校验了，所以这个报错用户正常来说是看不到的，就不做i18n了。
-        else return new ImportChartResult([new ImportChartMessage("不支持的文件格式！", MessageLevel.Fatal)], true);
+        }
+        else return new ImportChartResult([new ImportChartMessage(Locale.UnsupportedChartFormat, MessageLevel.Fatal)], true);
     }
 }

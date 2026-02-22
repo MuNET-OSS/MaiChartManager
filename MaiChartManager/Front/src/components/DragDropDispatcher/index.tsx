@@ -48,7 +48,7 @@ export default defineComponent({
         else if (file.kind === 'file' && (firstType.startsWith('image/') || file.name.endsWith('.jpeg') || file.name.endsWith('.jpg') || file.name.endsWith('.png'))) {
           uploadJacket(file);
         }
-        else if (file.kind === 'file' && (file.name.endsWith('.ma2') || file.name == "maidata.txt")) {
+        else if (file.kind === 'file' && (file.name.endsWith('.ma2') || file.name === "maidata.txt")) {
           prepareReplaceChart(file);
         }
       }

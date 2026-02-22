@@ -29,6 +29,10 @@ export default defineComponent({
       return apiResp.value?.errors?.map(it=>({...it, name: selectedMusic.value!.name!})) ?? []
     })
     const tempOption = ref<TempOptions>({...defaultTempOptions})
+    const showModal = computed({
+      get: () => !!show.value,
+      set: (val: boolean) => { if (!val) show.value = "" }
+    })
 
     // 注：本功能的逻辑是，如果选择的是ma2文件，则只替换指定难度的谱面；如果选择的是maidata，则替换整首歌的所有难度。
     prepareReplaceChart = async (fHandle?: FileSystemFileHandle) => {
@@ -109,7 +113,7 @@ export default defineComponent({
         preset="card"
         class="w-[min(90vw,50em)]"
         title={show.value !== "failed" ? t('music.edit.replaceChart') : t('music.edit.replaceChartFailed')}
-        show={!!show.value}
+        v-model:show={showModal.value}
       >{{
         default: () => <div class="flex flex-col gap-2">
           {show.value === "ma2" && <>

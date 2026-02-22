@@ -288,4 +288,13 @@
     <data name="NotesReplacementWarning" xml:space="preserve">
       <value>注意！本“替换谱面”功能仅限用于：谱面音符内容在原来的基础上发生修改，且音频内容未变、&amp;first偏移量未变、谱面中第一个音符的时刻未变的情况。否则，您需要删除整个谱面后重新导入。</value>
     </data>
+  <data name="FileUploadFailed" xml:space="preserve">
+      <value>文件上传失败</value>
+    </data>
+  <data name="MaidataReplaceAllOnly" xml:space="preserve">
+      <value>使用 maidata 时暂不支持只替换单个难度谱面，只能同时替换全部的</value>
+    </data>
+  <data name="UnsupportedChartFormat" xml:space="preserve">
+      <value>不支持的文件格式</value>
+    </data>
 </root>
