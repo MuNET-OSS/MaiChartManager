@@ -1,5 +1,8 @@
-﻿using System.IO.Compression;
+using System.IO.Compression;
+using System.Collections.Concurrent;
 using System.Text;
+using System.Security.Cryptography;
+using MaiChartManager.Models;
 using MaiChartManager.Utils;
 using MaiLib;
 using Microsoft.AspNetCore.Mvc;
@@ -17,6 +20,218 @@ namespace MaiChartManager.Controllers.Music;
 public class MusicTransferController(StaticSettings settings, ILogger<MusicTransferController> logger) : ControllerBase
 {
     public record RequestCopyToRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool removeEvents, bool legacyFormat);
+
+    private static int[] GetAudioCandidateIds(MusicXmlWithABJacket music)
+    {
+        return [music.CueId, music.Id, music.NonDxId];
+    }
+
+    private static string BuildAudioResolveErrorMessage(MusicXmlWithABJacket music)
+    {
+        var candidates = string.Join(", ", GetAudioCandidateIds(music)
+            .Select(it => (int)(Math.Abs((long)it) % 10000))
+            .Distinct()
+            .Select(it => it.ToString("000000")));
+        return $"Failed to resolve audio ACB/AWB for music {music.Id} ({music.Name}), cueId={music.CueId:000000}, nonDxId={music.NonDxId:000000}, candidates=[{candidates}].";
+    }
+
+    private static int GetBatchExportMaxConcurrency()
+    {
+        return Math.Max(1, Environment.ProcessorCount / 2);
+    }
+
+    private static readonly ConcurrentDictionary<string, string> FileHashCache = new(StringComparer.OrdinalIgnoreCase);
+
+    private static string GetFileHash(FileInfo fileInfo)
+    {
+        var cacheKey = $"{Path.GetFullPath(fileInfo.FullName)}|{fileInfo.Length}|{fileInfo.LastWriteTimeUtc.Ticks}";
+        return FileHashCache.GetOrAdd(cacheKey, _ =>
+        {
+            using var stream = System.IO.File.OpenRead(fileInfo.FullName);
+            return Convert.ToHexString(SHA256.HashData(stream));
+        });
+    }
+
+    private static bool IsFileUnchanged(string sourcePath, string destinationPath)
+    {
+        if (!System.IO.File.Exists(destinationPath))
+        {
+            return false;
+        }
+
+        var sourceInfo = new FileInfo(sourcePath);
+        var destinationInfo = new FileInfo(destinationPath);
+        if (sourceInfo.Length == destinationInfo.Length
+            && sourceInfo.LastWriteTimeUtc.Ticks == destinationInfo.LastWriteTimeUtc.Ticks)
+        {
+            return true;
+        }
+
+        return string.Equals(GetFileHash(sourceInfo), GetFileHash(destinationInfo), StringComparison.Ordinal);
+    }
+    private static bool CopyFileIfChanged(string sourcePath, string destinationPath)
+    {
+        if (IsFileUnchanged(sourcePath, destinationPath))
+        {
+            return false;
+        }
+
+        var destinationDir = Path.GetDirectoryName(destinationPath);
+        if (!string.IsNullOrWhiteSpace(destinationDir))
+        {
+            Directory.CreateDirectory(destinationDir);
+        }
+
+        System.IO.File.Copy(sourcePath, destinationPath, overwrite: true);
+        System.IO.File.SetLastWriteTimeUtc(destinationPath, System.IO.File.GetLastWriteTimeUtc(sourcePath));
+        return true;
+    }
+
+    private static void CopyDirectoryIfChanged(string sourceDirectory, string destinationDirectory)
+    {
+        Directory.CreateDirectory(destinationDirectory);
+        foreach (var sourceFile in Directory.EnumerateFiles(sourceDirectory, "*", System.IO.SearchOption.AllDirectories))
+        {
+            var relativePath = Path.GetRelativePath(sourceDirectory, sourceFile);
+            var destinationFile = Path.Combine(destinationDirectory, relativePath);
+            CopyFileIfChanged(sourceFile, destinationFile);
+        }
+    }
+
+    private void CopySharedFileIfNeeded(
+        string sourcePath,
+        string destinationPath,
+        ConcurrentDictionary<string, string> copiedSharedDestinations)
+    {
+        var normalizedSourcePath = Path.GetFullPath(sourcePath);
+        var normalizedDestinationPath = Path.GetFullPath(destinationPath);
+
+        if (!copiedSharedDestinations.TryAdd(normalizedDestinationPath, normalizedSourcePath))
+        {
+            if (copiedSharedDestinations.TryGetValue(normalizedDestinationPath, out var existingSourcePath)
+                && !string.Equals(existingSourcePath, normalizedSourcePath, StringComparison.OrdinalIgnoreCase))
+            {
+                logger.LogWarning(
+                    "Skip shared copy to {destination}: already copied from {existingSource}, current source is {currentSource}.",
+                    normalizedDestinationPath,
+                    existingSourcePath,
+                    normalizedSourcePath);
+            }
+
+            return;
+        }
+
+        try
+        {
+            var destinationDir = Path.GetDirectoryName(normalizedDestinationPath);
+            if (!string.IsNullOrWhiteSpace(destinationDir))
+            {
+                Directory.CreateDirectory(destinationDir);
+            }
+
+            CopyFileIfChanged(normalizedSourcePath, normalizedDestinationPath);
+        }
+        catch
+        {
+            copiedSharedDestinations.TryRemove(normalizedDestinationPath, out _);
+            throw;
+        }
+    }
+
+    private void CopyMusicToDirectory(
+        MusicXmlWithABJacket music,
+        string musicRootDir,
+        string jacketRootDir,
+        string soundRootDir,
+        string movieRootDir,
+        bool removeEvents,
+        bool legacyFormat,
+        ConcurrentDictionary<string, string> copiedSharedDestinations)
+    {
+        var musicDir = Path.GetDirectoryName(music.FilePath);
+        if (string.IsNullOrWhiteSpace(musicDir) || !Directory.Exists(musicDir))
+        {
+            logger.LogWarning("Skip export for music {musicId}: invalid source directory from file path {filePath}", music.Id, music.FilePath);
+            return;
+        }
+
+        // copy music
+        var musicDestDir = Path.Combine(musicRootDir, $"music{music.Id:000000}");
+        CopyDirectoryIfChanged(musicDir, musicDestDir);
+
+        if (removeEvents)
+        {
+            var xmlDoc = music.GetXmlWithoutEventsAndRights();
+            xmlDoc.Save(Path.Combine(musicDestDir, "Music.xml"));
+        }
+
+        if (legacyFormat)
+        {
+            var parser = new Ma2Parser();
+            foreach (var file in Directory.EnumerateFiles(musicDestDir, "*.ma2", new EnumerationOptions()
+            {
+                MatchCasing = MatchCasing.CaseInsensitive
+            }))
+            {
+                var originalContent = System.IO.File.ReadAllText(file);
+                var ma2Lines = new List<string>();
+                using (var reader = new StringReader(originalContent))
+                {
+                    string? line;
+                    while ((line = reader.ReadLine()) is not null)
+                    {
+                        ma2Lines.Add(line);
+                    }
+                }
+
+                var ma2_103 = parser.ChartOfToken(ma2Lines.ToArray()).Compose(ChartEnum.ChartVersion.Ma2_103);
+                if (!string.Equals(originalContent, ma2_103, StringComparison.Ordinal))
+                {
+                    System.IO.File.WriteAllText(file, ma2_103);
+                }
+            }
+        }
+
+        // copy jacket
+        if (music.JacketPath is not null)
+        {
+            var jacketDest = Path.Combine(jacketRootDir, $"ui_jacket_{music.NonDxId:000000}{Path.GetExtension(music.JacketPath)}");
+            CopySharedFileIfNeeded(music.JacketPath, jacketDest, copiedSharedDestinations);
+        }
+        else if (music.AssetBundleJacket is not null)
+        {
+            var jacketFileName = Path.GetFileName(music.AssetBundleJacket);
+            CopySharedFileIfNeeded(music.AssetBundleJacket, Path.Combine(jacketRootDir, jacketFileName), copiedSharedDestinations);
+            if (System.IO.File.Exists(music.AssetBundleJacket + ".manifest"))
+            {
+                CopySharedFileIfNeeded(music.AssetBundleJacket + ".manifest", Path.Combine(jacketRootDir, jacketFileName + ".manifest"), copiedSharedDestinations);
+            }
+        }
+        else if (music.PseudoAssetBundleJacket is not null)
+        {
+            var jacketFileName = Path.GetFileName(music.PseudoAssetBundleJacket);
+            CopySharedFileIfNeeded(music.PseudoAssetBundleJacket, Path.Combine(jacketRootDir, jacketFileName), copiedSharedDestinations);
+        }
+
+        // copy acbawb
+        if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out var resolvedAudioId, out var acb, out var awb)
+            && acb is not null
+            && awb is not null)
+        {
+            CopySharedFileIfNeeded(acb, Path.Combine(soundRootDir, $"music{resolvedAudioId:000000}.acb"), copiedSharedDestinations);
+            CopySharedFileIfNeeded(awb, Path.Combine(soundRootDir, $"music{resolvedAudioId:000000}.awb"), copiedSharedDestinations);
+        }
+        else
+        {
+            logger.LogWarning("{message}", BuildAudioResolveErrorMessage(music));
+        }
+
+        // copy movie data
+        if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
+        {
+            CopySharedFileIfNeeded(movie, Path.Combine(movieRootDir, $"{music.NonDxId:000000}{Path.GetExtension(movie)}"), copiedSharedDestinations);
+        }
+    }
 
     [HttpPost]
     [Route("/MaiChartManagerServlet/[action]Api")]
@@ -45,84 +260,88 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
             progress.UpdateProgress(0, (ulong)request.music.Length);
         }
 
-        for (var i = 0; i < request.music.Length; i++)
+        if (request.music.Length == 0)
         {
-            var musicId = request.music[i];
-            var music = settings.GetMusic(musicId.Id, musicId.AssetDir);
-            if (music is null) continue;
-            if (progress?.IsCancelled ?? false)
-            {
-                break;
-            }
-
-            if (progress is not null)
-            {
-                progress.Detail = music.Name;
-                progress.UpdateProgress((ulong)i, (ulong)request.music.Length);
-            }
-
-            // copy music
-            Directory.CreateDirectory(Path.Combine(dest, "music"));
-            FileSystem.CopyDirectory(Path.GetDirectoryName(music.FilePath), Path.Combine(dest, $@"music\music{music.Id:000000}"), UIOption.OnlyErrorDialogs);
-
-            if (request.removeEvents)
-            {
-                var xmlDoc = music.GetXmlWithoutEventsAndRights();
-                xmlDoc.Save(Path.Combine(dest, $@"music\music{music.Id:000000}\Music.xml"));
-            }
-
-            if (request.legacyFormat)
-            {
-                foreach (var file in Directory.EnumerateFiles(Path.Combine(dest, $@"music\music{music.Id:000000}"), "*.ma2", new EnumerationOptions() { MatchCasing = MatchCasing.CaseInsensitive }))
-                {
-                    var ma2 = System.IO.File.ReadAllLines(file);
-                    var ma2_103 = new Ma2Parser().ChartOfToken(ma2).Compose(ChartEnum.ChartVersion.Ma2_103);
-                    System.IO.File.WriteAllText(file, ma2_103);
-                }
-            }
-
-            // copy jacket
-            Directory.CreateDirectory(Path.Combine(dest, @"AssetBundleImages\jacket"));
-            if (music.JacketPath is not null)
-            {
-                FileSystem.CopyFile(music.JacketPath, Path.Combine(dest, $@"AssetBundleImages\jacket\ui_jacket_{music.NonDxId:000000}{Path.GetExtension(music.JacketPath)}"),
-                    UIOption.OnlyErrorDialogs);
-            }
-            else if (music.AssetBundleJacket is not null)
-            {
-                FileSystem.CopyFile(music.AssetBundleJacket, Path.Combine(dest, $@"AssetBundleImages\jacket\{Path.GetFileName(music.AssetBundleJacket)}"), UIOption.OnlyErrorDialogs);
-                if (System.IO.File.Exists(music.AssetBundleJacket + ".manifest"))
-                {
-                    FileSystem.CopyFile(music.AssetBundleJacket + ".manifest", Path.Combine(dest, $@"AssetBundleImages\jacket\{Path.GetFileName(music.AssetBundleJacket)}.manifest"),
-                        UIOption.OnlyErrorDialogs);
-                }
-            }
-            else if (music.PseudoAssetBundleJacket is not null)
-            {
-                FileSystem.CopyFile(music.PseudoAssetBundleJacket, Path.Combine(dest, $@"AssetBundleImages\jacket\{Path.GetFileName(music.PseudoAssetBundleJacket)}"), UIOption.OnlyErrorDialogs);
-            }
-
-            // copy acbawb
-            Directory.CreateDirectory(Path.Combine(dest, "SoundData"));
-            if (StaticSettings.AcbAwb.TryGetValue($"music{music.NonDxId:000000}.acb", out var acb))
-            {
-                FileSystem.CopyFile(acb, Path.Combine(dest, $@"SoundData\music{music.NonDxId:000000}.acb"), UIOption.OnlyErrorDialogs);
-            }
-
-            if (StaticSettings.AcbAwb.TryGetValue($"music{music.NonDxId:000000}.awb", out var awb))
-            {
-                FileSystem.CopyFile(awb, Path.Combine(dest, $@"SoundData\music{music.NonDxId:000000}.awb"), UIOption.OnlyErrorDialogs);
-            }
-
-            // copy movie data
-            if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
-            {
-                Directory.CreateDirectory(Path.Combine(dest, "MovieData"));
-                FileSystem.CopyFile(movie, Path.Combine(dest, $@"MovieData\{music.NonDxId:000000}{Path.GetExtension(movie)}"), UIOption.OnlyErrorDialogs);
-            }
+            progress?.Stop();
+            return;
         }
 
-        progress?.Stop();
+        var musicRootDir = Path.Combine(dest, "music");
+        var jacketRootDir = Path.Combine(dest, @"AssetBundleImages\jacket");
+        var soundRootDir = Path.Combine(dest, "SoundData");
+        var movieRootDir = Path.Combine(dest, "MovieData");
+        Directory.CreateDirectory(musicRootDir);
+        Directory.CreateDirectory(jacketRootDir);
+        Directory.CreateDirectory(soundRootDir);
+
+        var musicIndex = new Dictionary<(int Id, string AssetDir), MusicXmlWithABJacket>();
+        foreach (var music in settings.GetMusicList())
+        {
+            musicIndex.TryAdd((music.Id, music.AssetDir), music);
+        }
+
+        var cancellation = new CancellationTokenSource();
+        var progressLock = new object();
+        var completed = 0;
+        var maxConcurrency = GetBatchExportMaxConcurrency();
+        var progressStep = Math.Max(1, request.music.Length / 100);
+        var copiedSharedDestinations = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            Parallel.ForEach(request.music, new ParallelOptions
+            {
+                MaxDegreeOfParallelism = maxConcurrency,
+                CancellationToken = cancellation.Token
+            }, (musicId, state) =>
+            {
+                if (progress is not null)
+                {
+                    lock (progressLock)
+                    {
+                        if (progress.IsCancelled)
+                        {
+                            cancellation.Cancel();
+                            state.Stop();
+                            return;
+                        }
+                    }
+                }
+
+                string? currentMusicName = null;
+                if (!musicIndex.TryGetValue((musicId.Id, musicId.AssetDir), out var music))
+                {
+                    logger.LogWarning("Skip export: music {musicId} in {assetDir} not found.", musicId.Id, musicId.AssetDir);
+                }
+                else
+                {
+                    currentMusicName = music.Name;
+                    CopyMusicToDirectory(music, musicRootDir, jacketRootDir, soundRootDir, movieRootDir, request.removeEvents, request.legacyFormat, copiedSharedDestinations);
+                }
+
+                var done = Interlocked.Increment(ref completed);
+                if (progress is not null && (done % progressStep == 0 || done == request.music.Length))
+                {
+                    lock (progressLock)
+                    {
+                        if (currentMusicName is not null)
+                        {
+                            progress.Detail = currentMusicName;
+                        }
+
+                        progress.UpdateProgress((ulong)done, (ulong)request.music.Length);
+                    }
+                }
+            });
+        }
+        catch (OperationCanceledException)
+        {
+            logger.LogInformation("Batch export cancelled by user.");
+        }
+        finally
+        {
+            progress?.Stop();
+        }
     }
 
     [HttpGet]
@@ -130,12 +349,19 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
     {
         var music = settings.GetMusic(id, assetDir);
         if (music is null) return;
+        var musicDir = Path.GetDirectoryName(music.FilePath);
+        if (string.IsNullOrWhiteSpace(musicDir) || !Directory.Exists(musicDir))
+        {
+            var message = $"Invalid source directory for music {music.Id}: {music.FilePath}";
+            logger.LogError("{message}", message);
+            throw new DirectoryNotFoundException(message);
+        }
 
         var zipStream = HttpContext.Response.BodyWriter.AsStream();
         using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
 
         // copy music
-        foreach (var file in Directory.EnumerateFiles(Path.GetDirectoryName(music.FilePath)))
+        foreach (var file in Directory.EnumerateFiles(musicDir))
         {
             if (Path.GetFileName(file).Equals("Music.xml", StringComparison.InvariantCultureIgnoreCase) && removeEvents)
             {
@@ -147,7 +373,7 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
                 continue;
             }
 
-            if (legacyFormat)
+            if (legacyFormat && Path.GetExtension(file).Equals(".ma2", StringComparison.InvariantCultureIgnoreCase))
             {
                 var ma2 = System.IO.File.ReadAllLines(file);
                 var ma2_103 = new Ma2Parser().ChartOfToken(ma2).Compose(ChartEnum.ChartVersion.Ma2_103);
@@ -182,15 +408,14 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
         }
 
         // copy acbawb
-        if (StaticSettings.AcbAwb.TryGetValue($"music{music.NonDxId:000000}.acb", out var acb))
+        if (!AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out var resolvedAudioId, out var acb, out var awb) || acb is null || awb is null)
         {
-            zipArchive.CreateEntryFromFile(acb, $"SoundData/music{music.NonDxId:000000}.acb");
+            var message = BuildAudioResolveErrorMessage(music);
+            logger.LogError("{message}", message);
+            throw new FileNotFoundException(message);
         }
-
-        if (StaticSettings.AcbAwb.TryGetValue($"music{music.NonDxId:000000}.awb", out var awb))
-        {
-            zipArchive.CreateEntryFromFile(awb, $"SoundData/music{music.NonDxId:000000}.awb");
-        }
+        zipArchive.CreateEntryFromFile(acb, $"SoundData/music{resolvedAudioId:000000}.acb");
+        zipArchive.CreateEntryFromFile(awb, $"SoundData/music{resolvedAudioId:000000}.awb");
 
         // copy movie data
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
@@ -223,33 +448,36 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
         if (IapManager.License != IapManager.LicenseStatus.Active) return;
         var music = settings.GetMusic(id, assetDir);
         if (music is null) return;
+        var musicDir = Path.GetDirectoryName(music.FilePath);
+        if (string.IsNullOrWhiteSpace(musicDir) || !Directory.Exists(musicDir))
+        {
+            var message = $"Invalid source directory for music {music.Id}: {music.FilePath}";
+            logger.LogError("{message}", message);
+            throw new DirectoryNotFoundException(message);
+        }
         var newNonDxId = newId % 10000;
 
         var abJacketTarget = Path.Combine(StaticSettings.StreamingAssets, assetDir, "AssetBundleImages", "jacket", $"ui_jacket_{newNonDxId:000000}.ab");
         var acbawbTarget = Path.Combine(StaticSettings.StreamingAssets, assetDir, "SoundData", $"music{newNonDxId:000000}");
         var movieTarget = Path.Combine(StaticSettings.StreamingAssets, assetDir, "MovieData", $"{newNonDxId:000000}");
-        var newMusicDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{newNonDxId:000000}");
+        var newMusicDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{newId:000000}");
         DeleteIfExists(abJacketTarget, abJacketTarget + ".manifest", acbawbTarget + ".acb", acbawbTarget + ".awb", movieTarget + ".dat", movieTarget + ".mp4", newMusicDir);
-        var abiDir = Path.Combine(StaticSettings.GamePath, "StreamingAssets", assetDir, @"AssetBundleImages\jacket");
+        var abiDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, @"AssetBundleImages\jacket");
         Directory.CreateDirectory(abiDir);
 
         // jacket
-        if (music.JacketPath is not null)
+        var jacketSourcePath = music.JacketPath is not null ? music.JacketPath : music.PseudoAssetBundleJacket;
+        if (jacketSourcePath is not null)
         {
-            var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}{Path.GetExtension(music.JacketPath)}");
+            // 如果music.JacketPath或music.PseudoAssetBundleJacket不为空，则直接执行移动逻辑即可
+            var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}{Path.GetExtension(jacketSourcePath)}");
             DeleteIfExists(localJacketTarget);
-            logger.LogInformation("Move jacket: {music.JacketPath} -> {localJacketTarget}", music.JacketPath, localJacketTarget);
-            FileSystem.MoveFile(music.JacketPath, localJacketTarget, UIOption.OnlyErrorDialogs);
-        }
-        else if (music.PseudoAssetBundleJacket is not null)
-        {
-            var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}{Path.GetExtension(music.PseudoAssetBundleJacket)}");
-            DeleteIfExists(localJacketTarget);
-            logger.LogInformation("Move jacket: {music.PseudoAssetBundleJacket} -> {localJacketTarget}", music.PseudoAssetBundleJacket, localJacketTarget);
-            FileSystem.MoveFile(music.PseudoAssetBundleJacket, localJacketTarget, UIOption.OnlyErrorDialogs);
+            logger.LogInformation("Move jacket: {jacketSourcePng} -> {localJacketTarget}", jacketSourcePath, localJacketTarget);
+            FileSystem.MoveFile(jacketSourcePath, localJacketTarget, UIOption.OnlyErrorDialogs);
         }
         else if (music.AssetBundleJacket is not null)
         {
+            // 否则需要执行转换逻辑
             var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}.png");
             logger.LogInformation("Convert jacket: {music.AssetBundleJacket} -> {abJacketTarget}", music.AssetBundleJacket, abJacketTarget);
             System.IO.File.WriteAllBytes(localJacketTarget, music.GetMusicJacketPngData()!);
@@ -310,6 +538,13 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
     {
         var music = settings.GetMusic(id, assetDir);
         if (music is null) return;
+        var musicDir = Path.GetDirectoryName(music.FilePath);
+        if (string.IsNullOrWhiteSpace(musicDir) || !Directory.Exists(musicDir))
+        {
+            var message = $"Invalid source directory for music {music.Id}: {music.FilePath}";
+            logger.LogError("{message}", message);
+            throw new DirectoryNotFoundException(message);
+        }
 
         await using var zipStream = HttpContext.Response.BodyWriter.AsStream();
         using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
@@ -334,14 +569,20 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
         simaiFile.AppendLine("&ChartConvertTool=MaiChartManager");
         simaiFile.AppendLine($"&ChartConvertToolVersion={Application.ProductVersion}");
 
-        for (var i = 0; i < 5; i++)
+        for (var i = 0; i < music.Charts.Length; i++)
         {
             var chart = music.Charts[i];
-            if (chart is null) continue;
+            if (chart is null || !chart.Enable || string.IsNullOrWhiteSpace(chart.Path)) continue;
 
-            var path = Path.Combine(Path.GetDirectoryName(music.FilePath)!, chart.Path);
-            if (!System.IO.File.Exists(path)) continue;
-            var ma2Content = await System.IO.File.ReadAllLinesAsync(path);
+            var chartPath = Path.Combine(musicDir, chart.Path);
+            if (!System.IO.File.Exists(chartPath))
+            {
+                var fallbackPath = Path.Combine(musicDir, chart.Path.Replace(".ma2", "_L.ma2", StringComparison.OrdinalIgnoreCase));
+                if (!System.IO.File.Exists(fallbackPath)) continue;
+                chartPath = fallbackPath;
+            }
+
+            var ma2Content = await System.IO.File.ReadAllLinesAsync(chartPath);
             var ma2 = parser.ChartOfToken(ma2Content);
             var simai = ma2.Compose(ChartEnum.ChartVersion.SimaiFes);
             simaiFile.AppendLine($"&lv_{i + 2}={chart.Level}.{chart.LevelDecimal}");
@@ -377,29 +618,61 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
             Comment = version?.GenreName,
             AlbumArt = img,
         };
-        AudioConvert.ConvertWavPathToMp3Stream(await AudioConvert.GetCachedWavPath(id), soundStream, tag);
+        var wavPath = await AudioConvert.GetCachedWavPath(GetAudioCandidateIds(music));
+        if (wavPath is null)
+        {
+            var message = BuildAudioResolveErrorMessage(music);
+            logger.LogError("{message}", message);
+            throw new FileNotFoundException(message);
+        }
+
+        AudioConvert.ConvertWavPathToMp3Stream(wavPath, soundStream, tag);
         soundStream.Close();
 
         if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
         {
-            string? pvMp4Path = null;
-            var ext = Path.GetExtension(movieUsmPath).ToLowerInvariant();
-
-            if (ext == ".dat" || ext == ".usm")
+            DirectoryInfo? tmpDir = null;
+            try
             {
-                var tmpDir = Directory.CreateTempSubdirectory();
-                logger.LogInformation("Temp dir: {tmpDir}", tmpDir.FullName);
-                pvMp4Path = Path.Combine(tmpDir.FullName, "pv.mp4");
+                string? pvMp4Path = null;
+                var ext = Path.GetExtension(movieUsmPath).ToLowerInvariant();
 
-                await VideoConvert.ConvertUsmToMp4(movieUsmPath, pvMp4Path);
+                if (ext == ".dat" || ext == ".usm")
+                {
+                    tmpDir = Directory.CreateTempSubdirectory();
+                    logger.LogInformation("Temp dir: {tmpDir}", tmpDir.FullName);
+                    pvMp4Path = Path.Combine(tmpDir.FullName, "pv.mp4");
+
+                    await VideoConvert.ConvertUsmToMp4(movieUsmPath, pvMp4Path);
+                }
+                else if (ext == ".mp4")
+                {
+                    pvMp4Path = movieUsmPath;
+                }
+
+                if (pvMp4Path is not null && System.IO.File.Exists(pvMp4Path))
+                {
+                    zipArchive.CreateEntryFromFile(pvMp4Path, "pv.mp4");
+                }
             }
-            else if (ext == ".mp4")
+            catch (Exception ex)
             {
-                pvMp4Path = movieUsmPath;
+                logger.LogWarning(ex, "Failed to export pv.mp4 for music {musicId} ({name}), skipping video.", music.Id, music.Name);
             }
-
-            if (pvMp4Path is not null)
-                zipArchive.CreateEntryFromFile(pvMp4Path, "pv.mp4");
+            finally
+            {
+                if (tmpDir is not null)
+                {
+                    try
+                    {
+                        tmpDir.Delete(true);
+                    }
+                    catch
+                    {
+                        // ignore cleanup errors
+                    }
+                }
+            }
         }
     }
 }

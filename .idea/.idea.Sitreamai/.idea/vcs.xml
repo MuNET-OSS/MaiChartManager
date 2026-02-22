@@ -3,6 +3,7 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/AquaMai" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/MaiLib" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/SimaiSharp" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/SonicAudioTools" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/XV2-Tools" vcs="Git" />

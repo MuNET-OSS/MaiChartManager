@@ -84,6 +84,8 @@ music:
     addVersion: Add Version
     utageType: Utage Type
     utageComment: Utage Comment
+    sortName: In-game SortName
+    sortNameTips: May only contain digits, uppercase letters, and katakana; invalid characters will be automatically replaced
     jacket: Jacket
     audioPreview: Preview
     editPreview: Edit Preview

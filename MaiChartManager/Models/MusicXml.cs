@@ -240,6 +240,16 @@ public partial class MusicXml
             RootNode.SelectSingleNode("name/str").InnerText = value;
             RootNode.SelectSingleNode("movieName/str").InnerText = value;
             RootNode.SelectSingleNode("cueName/str").InnerText = value;
+            SortName = value;
+        }
+    }
+
+    public string SortName
+    {
+        get => RootNode.SelectSingleNode("sortName")?.InnerText ?? "";
+        set
+        {
+            Modified = true;
             RootNode.SelectSingleNode("sortName").InnerText = ConvertSortName(value);
         }
     }

@@ -211,9 +211,13 @@ export default defineComponent({
           }
         })
         errors.value.push({ level: MessageLevel.Fatal, message: e.error?.message || e.error?.detail || e.message || e.toString(), name: music.name });
-        try {
-          await api.DeleteMusic(music.id, selectedADir.value);
-        } catch {
+        if (music.importStep !== IMPORT_STEP.create) {
+          // 如果是在创建乐曲这步就挂了，说明乐曲XML没有创建成功，则不需要删除乐曲。
+          // 否则，在ID冲突的情况下，会把原本的乐曲给删除掉，见 https://github.com/MuNET-OSS/MaiChartManager/issues/34
+          try {
+            await api.DeleteMusic(music.id, selectedADir.value);
+          } catch {
+          }
         }
       }
     }

@@ -2,7 +2,7 @@ import { computed, defineComponent, ref } from "vue";
 import api, { getUrl } from "@/client/api";
 import { globalCapture, selectedADir, selectedMusic, selectMusicId, showNeedPurchaseDialog, updateMusicList, version } from "@/store/refs";
 import { NButton, NButtonGroup, NDropdown, useDialog, useMessage } from "naive-ui";
-import { ZipReader } from "@zip.js/zip.js";
+import { BlobWriter, ZipReader } from "@zip.js/zip.js";
 import ChangeIdDialog from "./ChangeIdDialog";
 import getSubDirFile from "@/utils/getSubDirFile";
 import { useI18n } from 'vue-i18n';
@@ -106,17 +106,29 @@ export default defineComponent({
           }
           const zip = await fetch(url)
           const zipReader = new ZipReader(zip.body!);
-          const entries = zipReader.getEntriesGenerator();
-          for await (const entry of entries) {
-            console.log(entry.filename);
-            if (entry.filename.endsWith('/')) {
-              continue;
+          try {
+            const entries = zipReader.getEntriesGenerator();
+            for await (const entry of entries) {
+              console.log(entry.filename);
+              if (entry.filename.endsWith('/')) {
+                continue;
+              }
+              if (!entry.getData) {
+                continue;
+              }
+              const fileHandle = await getSubDirFile(folderHandle, entry.filename);
+              const writable = await fileHandle.createWritable();
+              try {
+                const blob = await entry.getData(new BlobWriter());
+                await writable.write(blob);
+              } finally {
+                await writable.close();
+              }
             }
-            const fileHandle = await getSubDirFile(folderHandle, entry.filename);
-            const writable = await fileHandle.createWritable();
-            await entry.getData!(writable);
+            message.success(t('message.exportSuccess'));
+          } finally {
+            await zipReader.close();
           }
-          message.success(t('message.exportSuccess'));
         } catch (e) {
           globalCapture(e, t('copy.exportError'))
         } finally {
