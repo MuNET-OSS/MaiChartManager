@@ -369,7 +369,7 @@ public partial class MaidataImportService
 
             if (!targetLevelMap.TryGetValue(level, out var targetLevel)) continue; // 字典里没查到、说明这个难度是“被忽略的难度”
             if (isUtage) targetLevel = 0;
-            bool touchSizeBig = !isUtage && level is 2 or 3; // 对绿谱和黄谱，设置为大的batchsize
+            bool touchSizeBig = !isUtage && level is 2 or 3; // 对绿谱和黄谱，设置为大的 touchSize
 
             var targetChart = music.Charts[targetLevel];
             targetChart.Path = $"{id:000000}_0{targetLevel}.ma2";
