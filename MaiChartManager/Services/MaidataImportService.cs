@@ -83,6 +83,9 @@ public partial class MaidataImportService
 
     [GeneratedRegex(@"(\d)qx(\d)")]
     private static partial Regex SimaiError5();
+    
+    [GeneratedRegex(@"(\[[\d\.#:]+\])([bxfh]+)")]
+    private static partial Regex SimaiError6(); // 类似1h[2:1]bx这种写法是不标准的，需要改为1hbx[2:1]
 
     private static string FixChartSimaiSharp(string chart)
     {
@@ -92,6 +95,8 @@ public partial class MaidataImportService
         chart = SimaiError2().Replace(chart, "[$1:$2]");
         chart = SimaiError4().Replace(chart, ",,");
         chart = SimaiError5().Replace(chart, "$1xq$2");
+        chart = SimaiError6().Replace(chart, "$2$1");
+        chart = chart.Replace("-?", "?-"); // 不飞的星星
         return chart;
     }
 
@@ -159,18 +164,8 @@ public partial class MaidataImportService
 
         try
         {
-            var normalizedText = FixChartSimaiSharp(chartText)
-                // 不飞的星星
-                .Replace("-?", "?-");
+            var normalizedText = FixChartSimaiSharp(chartText);
             var tokens = new SimaiTokenizer().TokensFromText(normalizedText);
-            for (var i = 0; i < tokens.Length; i++)
-            {
-                if (tokens[i].Contains("]b"))
-                {
-                    tokens[i] = tokens[i].Replace("]b", "]").Replace("[", "b[");
-                }
-            }
-
             var maiLibChart = new SimaiParser().ChartOfToken(tokens);
             errors.Add(new ImportChartMessage(string.Format(Locale.ChartFixedMinorErrors, level), MessageLevel.Info));
             return maiLibChart;
@@ -331,17 +326,13 @@ public partial class MaidataImportService
         }
 
         var allCharts = new Dictionary<int, AllChartsEntry>();
-        for (var i = 2; i < 9; i++)
+        for (var i = 0; i < 9; i++)
         {
+            if (i == 1) continue;
             if (!string.IsNullOrWhiteSpace(maiData.GetValueOrDefault($"inote_{i}")))
             {
                 allCharts.Add(i, new AllChartsEntry(maiData[$"inote_{i}"], TryParseChartSimaiSharp(maiData[$"inote_{i}"], i, errors)));
             }
-        }
-
-        if (!string.IsNullOrWhiteSpace(maiData.GetValueOrDefault("inote_0")))
-        {
-            allCharts.Add(0, new AllChartsEntry(maiData["inote_0"], TryParseChartSimaiSharp(maiData["inote_0"], 0, errors)));
         }
 
         float.TryParse(maiData.GetValueOrDefault("first"), out var first);
