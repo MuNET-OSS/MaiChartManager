@@ -369,6 +369,7 @@ public partial class MaidataImportService
 
             if (!targetLevelMap.TryGetValue(level, out var targetLevel)) continue; // 字典里没查到、说明这个难度是“被忽略的难度”
             if (isUtage) targetLevel = 0;
+            bool touchSizeBig = !isUtage && level is 2 or 3; // 对绿谱和黄谱，设置为大的batchsize
 
             var targetChart = music.Charts[targetLevel];
             targetChart.Path = $"{id:000000}_0{targetLevel}.ma2";
@@ -397,6 +398,14 @@ public partial class MaidataImportService
             if (maiLibChart is null)
             {
                 return new ImportChartResult(errors, true);
+            }
+
+            if (touchSizeBig)
+            {
+                foreach (var note in maiLibChart.Notes)
+                {
+                    if (note.NoteType is NoteEnum.NoteType.TTP or NoteEnum.NoteType.THO) note.TouchSize = "L1";
+                }
             }
 
             var originalConverted = maiLibChart.Compose(ChartEnum.ChartVersion.Ma2_104);
