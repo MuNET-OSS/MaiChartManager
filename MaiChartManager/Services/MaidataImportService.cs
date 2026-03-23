@@ -147,9 +147,10 @@ public partial class MaidataImportService
 
         try
         {
-            var normalizedText = SimaiCommentRegex().Replace(chartText, "");
-            normalizedText = SimaiCommentRegex2().Replace(normalizedText, "");
-            return new SimaiParser().ChartOfToken(new SimaiTokenizer().TokensFromText(normalizedText));
+            // 移除注释
+            chartText = SimaiCommentRegex().Replace(chartText, "");
+            chartText = SimaiCommentRegex2().Replace(chartText, "");
+            return new SimaiParser().ChartOfToken(new SimaiTokenizer().TokensFromText(chartText));
         }
         catch (Exception)
         {
@@ -161,9 +162,6 @@ public partial class MaidataImportService
             var normalizedText = FixChartSimaiSharp(chartText)
                 // 不飞的星星
                 .Replace("-?", "?-");
-            // 移除注释
-            normalizedText = SimaiCommentRegex().Replace(normalizedText, "");
-            normalizedText = SimaiCommentRegex2().Replace(normalizedText, "");
             var tokens = new SimaiTokenizer().TokensFromText(normalizedText);
             for (var i = 0; i < tokens.Length; i++)
             {
