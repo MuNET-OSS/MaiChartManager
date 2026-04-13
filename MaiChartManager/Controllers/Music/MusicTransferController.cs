@@ -666,6 +666,7 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
 
         AudioConvert.ConvertWavPathToMp3Stream(wavPath, soundStream, tag);
         soundStream.Close();
+        System.IO.File.Delete(wavPath);
 
         if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
         {
