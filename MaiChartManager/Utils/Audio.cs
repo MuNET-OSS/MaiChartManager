@@ -11,7 +11,11 @@ public static class Audio
 {
     public static void ConvertToMai(string srcPath, string savePath, float padding = 0, Stream? src = null, string? previewFilename = null, Stream? preview = null, bool forceUseNAudio = false)
     {
-        var wrapper = new ACB_Wrapper(ACB_File.Load(File.ReadAllBytes(Path.Combine(StaticSettings.exeDir, previewFilename is null ? "nopreview.acb" : "template.acb")), null));
+        ACB_File acbTemplate;
+        lock (_acbFileLoadLock) {
+            acbTemplate = ACB_File.Load(File.ReadAllBytes(Path.Combine(StaticSettings.exeDir, previewFilename is null ? "nopreview.acb" : "template.acb")), null);
+        }
+        var wrapper = new ACB_Wrapper(acbTemplate);
         var trackBytes = LoadAndConvertFile(srcPath, FileType.Hca, false, 9170825592834449000, padding, src, forceUseNAudio);
 
         wrapper.Cues[0].AddTrackToCue(trackBytes, true, false, EncodeType.HCA);
@@ -173,12 +177,12 @@ public static class Audio
         }
     }
     
-    private static readonly object _acbToWavLock = new object();
+    private static readonly object _acbFileLoadLock = new();
 
     public static byte[] AcbToWav(string acbPath)
     {
         ACB_File acb;
-        lock (_acbToWavLock) {
+        lock (_acbFileLoadLock) {
             acb = ACB_File.Load(acbPath);
         }
         var wave = acb.GetWaveformsFromCue(acb.Cues[0])[0];
