@@ -172,10 +172,15 @@ public static class Audio
                 return FileType.NotSet;
         }
     }
+    
+    private static readonly object _acbToWavLock = new object();
 
     public static byte[] AcbToWav(string acbPath)
     {
-        var acb = ACB_File.Load(acbPath);
+        ACB_File acb;
+        lock (_acbToWavLock) {
+            acb = ACB_File.Load(acbPath);
+        }
         var wave = acb.GetWaveformsFromCue(acb.Cues[0])[0];
         var entry = acb.GetAfs2Entry(wave.AwbId);
         using MemoryStream stream = new MemoryStream(entry.bytes);
