@@ -73,23 +73,26 @@ public static class AudioConvert
         return cachePath;
     }
 
-    public static void ConvertWavPathToMp3Stream(string wavPath, Stream mp3Stream, ID3TagData? tagData = null)
+    public static void ConvertWavToMp3Stream(byte[] wav, Stream mp3Stream, ID3TagData? tagData = null)
     {
-        var outputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToMp3_{Guid.NewGuid():N}.mp3");
+        var tempFileGuid = Guid.NewGuid();
+        var inputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToMp3_{tempFileGuid:N}.wav");
+        var outputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToMp3_{tempFileGuid:N}.mp3");
         string? albumArtPath = null;
         try
         {
             Directory.CreateDirectory(StaticSettings.tempPath);
+            File.WriteAllBytes(inputPath, wav);
 
             var conversion = FFmpeg.Conversions.New()
-                .AddParameter($"-i " + FFmpegHelper.Escape(wavPath));
+                .AddParameter($"-i " + FFmpegHelper.Escape(inputPath));
 
             if (tagData != null)
             {
                 if (tagData.AlbumArt != null && tagData.AlbumArt.Length > 0)
                 {
                     // 把专辑封面写到临时文件，然后让ffmpeg把它嵌入mp3
-                    albumArtPath = Path.Combine(StaticSettings.tempPath, $"ConvertToMp3_{Guid.NewGuid():N}.png");
+                    albumArtPath = Path.Combine(StaticSettings.tempPath, $"ConvertToMp3_{tempFileGuid:N}.png");
                     File.WriteAllBytes(albumArtPath, tagData.AlbumArt);
                     conversion.AddParameter($"-i {FFmpegHelper.Escape(albumArtPath)}");
                 } // 顺序不能换！这个必须在第一个，因为-i必须在任何其他参数之前。
@@ -122,6 +125,7 @@ public static class AudioConvert
         }
         finally
         {
+            File.Delete(inputPath);
             File.Delete(outputPath);
             if (albumArtPath != null) File.Delete(albumArtPath);
         }

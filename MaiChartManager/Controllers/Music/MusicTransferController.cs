@@ -656,17 +656,16 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
             Comment = version?.GenreName,
             AlbumArt = img,
         };
-        var wavPath = await AudioConvert.GetCachedWavPath(GetAudioCandidateIds(music));
-        if (wavPath is null)
+        
+        if (!AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out _, out var acbPath, out var awbPath) || acbPath is null || awbPath is null)
         {
             var message = BuildAudioResolveErrorMessage(music);
             logger.LogError("{message}", message);
             throw new FileNotFoundException(message);
         }
-
-        AudioConvert.ConvertWavPathToMp3Stream(wavPath, soundStream, tag);
+        var wav = Audio.AcbToWav(acbPath);
+        AudioConvert.ConvertWavToMp3Stream(wav, soundStream, tag);
         soundStream.Close();
-        System.IO.File.Delete(wavPath);
 
         if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
         {
