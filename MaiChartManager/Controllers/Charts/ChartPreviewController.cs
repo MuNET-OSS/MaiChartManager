@@ -1,12 +1,12 @@
-﻿using MaiChartManager.Attributes;
-using MaiLib;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
+using MuConvert.generator;
+using MuConvert.parser;
 
 namespace MaiChartManager.Controllers.Charts;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[controller]Api/{assetDir}/{id:int}/{level:int}")]
-public class ChartPreviewController(StaticSettings settings, ILogger<StaticSettings> logger) : ControllerBase
+public class ChartPreviewController(StaticSettings settings) : ControllerBase
 {
     [HttpGet]
     public string Maidata(int id, int level, string assetDir)
@@ -24,12 +24,21 @@ public class ChartPreviewController(StaticSettings settings, ILogger<StaticSetti
             return "No chart found";
         }
 
-        var ma2Content = System.IO.File.ReadAllLines(path);
-        Ma2Parser parser = new();
-        var ma2 = parser.ChartOfToken(ma2Content);
-        var simai = ma2.Compose(ChartEnum.ChartVersion.SimaiFes);
-
-
+        string simai;
+        if (StaticSettings.Config.UseLegacyMaiLib)
+        {
+            var ma2Content = System.IO.File.ReadAllLines(path);
+            MaiLib.Ma2Parser parser = new();
+            var ma2 = parser.ChartOfToken(ma2Content);
+            simai = ma2.Compose(MaiLib.ChartEnum.ChartVersion.SimaiFes);
+        }
+        else
+        {
+            var ma2Content = System.IO.File.ReadAllText(path);
+            var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
+            (simai, _) = new SimaiGenerator().Generate(cvtChart);
+        }
+        
         return $"""
                 &first=0
                 &lv_1=1

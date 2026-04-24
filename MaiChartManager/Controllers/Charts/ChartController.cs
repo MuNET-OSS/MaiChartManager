@@ -1,5 +1,4 @@
-﻿using MaiChartManager.Services;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 
 namespace MaiChartManager.Controllers.Charts;
 

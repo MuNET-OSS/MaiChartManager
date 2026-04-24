@@ -2,11 +2,14 @@ using System.IO.Compression;
 using System.Collections.Concurrent;
 using System.Text;
 using System.Security.Cryptography;
+using System.Text.RegularExpressions;
 using MaiChartManager.Models;
 using MaiChartManager.Utils;
-using MaiLib;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualBasic.FileIO;
+using MuConvert.generator;
+using MuConvert.maidata;
+using MuConvert.parser;
 using NAudio.Lame;
 using Vanara.Windows.Forms;
 using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
@@ -15,7 +18,7 @@ namespace MaiChartManager.Controllers.Music;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api/{assetDir}/{id:int}")]
-public class MusicTransferController(StaticSettings settings, ILogger<MusicTransferController> logger) : ControllerBase
+public partial class MusicTransferController(StaticSettings settings, ILogger<MusicTransferController> logger) : ControllerBase
 {
     public record RequestCopyToRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool removeEvents, bool legacyFormat);
 
@@ -184,27 +187,35 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
 
         if (legacyFormat)
         {
-            var parser = new Ma2Parser();
-            foreach (var file in Directory.EnumerateFiles(musicDestDir, "*.ma2", new EnumerationOptions()
-            {
-                MatchCasing = MatchCasing.CaseInsensitive
-            }))
+            foreach (var file in Directory.EnumerateFiles(musicDestDir, "*.ma2", new EnumerationOptions { MatchCasing = MatchCasing.CaseInsensitive }))
             {
                 var originalContent = System.IO.File.ReadAllText(file);
-                var ma2Lines = new List<string>();
-                using (var reader = new StringReader(originalContent))
+                int.TryParse(MA2VersionRegex().Match(originalContent).Groups[1].Value, out var ma2Version);
+                if (ma2Version == 3) continue; // 已经是103，不需要再转换
+                if (!StaticSettings.Config.UseLegacyMaiLib)
                 {
-                    string? line;
-                    while ((line = reader.ReadLine()) is not null)
-                    {
-                        ma2Lines.Add(line);
-                    }
-                }
-
-                var ma2_103 = parser.ChartOfToken(ma2Lines.ToArray()).Compose(ChartEnum.ChartVersion.Ma2_103);
-                if (!string.Equals(originalContent, ma2_103, StringComparison.Ordinal))
-                {
+                    var (chart, _) = new MA2Parser().Parse(originalContent);
+                    var (ma2_103, _) = new MA2_103Generator().Generate(chart);
                     System.IO.File.WriteAllText(file, ma2_103);
+                }
+                else
+                {
+                    var parser = new MaiLib.Ma2Parser();
+                    var ma2Lines = new List<string>();
+                    using (var reader = new StringReader(originalContent))
+                    {
+                        string? line;
+                        while ((line = reader.ReadLine()) is not null)
+                        {
+                            ma2Lines.Add(line);
+                        }
+                    }
+
+                    var ma2_103 = parser.ChartOfToken(ma2Lines.ToArray()).Compose(MaiLib.ChartEnum.ChartVersion.Ma2_103);
+                    if (!string.Equals(originalContent, ma2_103, StringComparison.Ordinal))
+                    {
+                        System.IO.File.WriteAllText(file, ma2_103);
+                    }
                 }
             }
         }
@@ -405,12 +416,26 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
 
             if (legacyFormat && Path.GetExtension(file).Equals(".ma2", StringComparison.InvariantCultureIgnoreCase))
             {
-                var ma2 = System.IO.File.ReadAllLines(file);
-                var ma2_103 = new Ma2Parser().ChartOfToken(ma2).Compose(ChartEnum.ChartVersion.Ma2_103);
+                var ma2 = System.IO.File.ReadAllText(file);
+                int.TryParse(MA2VersionRegex().Match(ma2).Groups[1].Value, out var ma2Version);
+                if (ma2Version != 3)
+                { // 不是103才进行转换，如果已经是103的话，不需要再转换
+                    if (!StaticSettings.Config.UseLegacyMaiLib)
+                    {
+                        var (chart, _) = new MA2Parser().Parse(ma2);
+                        (ma2, _) = new MA2_103Generator().Generate(chart);
+                    }
+                    else
+                    {
+                        var ma2Lines = System.IO.File.ReadAllLines(file);
+                        ma2 = new MaiLib.Ma2Parser().ChartOfToken(ma2Lines)
+                            .Compose(MaiLib.ChartEnum.ChartVersion.Ma2_103);
+                    }
+                }
                 var entry = zipArchive.CreateEntry($"music/music{music.Id:000000}/{Path.GetFileName(file)}");
                 using var stream = entry.Open();
                 using var writer = new StreamWriter(stream);
-                writer.Write(ma2_103);
+                writer.Write(ma2);
                 writer.Close();
             }
             else
@@ -603,22 +628,18 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
         await using var zipStream = HttpContext.Response.BodyWriter.AsStream();
         using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
 
-        Ma2Parser parser = new();
-        var simaiFile = new StringBuilder();
-
-        simaiFile.AppendLine($"&title={music.Name}");
-        simaiFile.AppendLine($"&artist={music.Artist}");
-        simaiFile.AppendLine($"&wholebpm={music.Bpm}");
-        simaiFile.AppendLine("&first=0");
-        simaiFile.AppendLine($"&shortid={music.Id}");
-        simaiFile.AppendLine($"&genreid={music.GenreId}");
+        var simaiFile = new Maidata();
+        simaiFile.Title = music.Name;
+        simaiFile.Artist = music.Artist;
+        simaiFile.WholeBpm = music.Bpm;
+        simaiFile.First = 0;
+        simaiFile["shortid"] = music.Id.ToString();
+        simaiFile["genreid"] = music.GenreId.ToString();
         var genre = StaticSettings.GenreList.FirstOrDefault(it => it.Id == music.GenreId);
-        if (genre is not null)
-            simaiFile.AppendLine($"&genre={genre.GenreName}");
-        simaiFile.AppendLine($"&versionid={music.AddVersionId}");
+        if (genre is not null) simaiFile["genre"] = genre.GenreName;
+        simaiFile["versionid"] = music.AddVersionId.ToString();
         var version = StaticSettings.VersionList.FirstOrDefault(it => it.Id == music.AddVersionId);
-        if (version is not null)
-            simaiFile.AppendLine($"&version={version.GenreName}");
+        if (version is not null) simaiFile["version"] = version.GenreName;
 
         // demo_seek
         try
@@ -628,22 +649,14 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
                 var previewTime = CriUtils.GetAudioPreviewTime(previewAcb);
                 if (previewTime.StartTime >= 0 && previewTime.EndTime > previewTime.StartTime)
                 {
-                    simaiFile.AppendLine($"&demo_seek={previewTime.StartTime}");
-                    simaiFile.AppendLine($"&demo_len={previewTime.EndTime - previewTime.StartTime}");
+                    simaiFile.Demo = ((float)previewTime.StartTime, (float)(previewTime.EndTime - previewTime.StartTime));
                 }
             }
         }
-        catch
-        {
-            // ignore preview time errors
-        }
-
-        var ma2Contents = new List<(int, string[])>();
-
-        // 关于clock_count功能，我决定不走MaiLib了，而是我们自己解析。因为ma2.Compose返回的是裸谱面inote中的内容，没有办法合理的把clock信息插进去。因此，我们自己解析吧。
-        // 选用最难的一张有效谱面的MET值作为全曲的&clock_count
-        int clockCount = 0;
-
+        catch {} // ignore preview time errors
+        
+        simaiFile["chartconverter"] = $"MaiChartManager v{Application.ProductVersion}";
+        
         for (var i = 0; i < music.Charts.Length; i++)
         {
             var chart = music.Charts[i];
@@ -657,30 +670,28 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
                 chartPath = fallbackPath;
             }
 
-            var ma2Content = await System.IO.File.ReadAllLinesAsync(chartPath);
-            ma2Contents.Add((i, ma2Content));
-
-            // 从谱面内容中寻找MET行
-            var metLine = ma2Content.FirstOrDefault(it => it.StartsWith("MET\t"));
-            if (metLine is not null && int.TryParse(metLine.Split('\t')[4], out var v)) clockCount = v;
-        }
-
-        if (clockCount > 0) simaiFile.AppendLine($"&clock_count={clockCount}");
-
-        simaiFile.AppendLine($"&chartconverter=MaiChartManager v{Application.ProductVersion}");
-        simaiFile.AppendLine("&ChartConvertTool=MaiChartManager");
-        simaiFile.AppendLine($"&ChartConvertToolVersion={Application.ProductVersion}");
-
-        // 根据前面读取的结果，向simaiFile中最终写入谱面信息相关字段
-        foreach (var (i, ma2Content) in ma2Contents)
-        {
-            var chart = music.Charts[i];
-            var ma2 = parser.ChartOfToken(ma2Content);
-            var simai = ma2.Compose(ChartEnum.ChartVersion.SimaiFes);
-            simaiFile.AppendLine(""); // 为了格式美观，在每个难度之前添加一个空行
-            simaiFile.AppendLine($"&lv_{i + 2}={chart.Level}.{chart.LevelDecimal}");
-            simaiFile.AppendLine($"&des_{i + 2}={chart.Designer}");
-            simaiFile.AppendLine($"&inote_{i + 2}={simai}");
+            if (StaticSettings.Config.UseLegacyMaiLib)
+            {
+                simaiFile["ChartConvertTool"] = $"MaiLib";
+                var parser = new MaiLib.Ma2Parser();
+                var ma2Content = await System.IO.File.ReadAllLinesAsync(chartPath);
+                var ma2 = parser.ChartOfToken(ma2Content);
+                var simai = ma2.Compose(MaiLib.ChartEnum.ChartVersion.SimaiFes);
+                
+                var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
+                simaiFile.AddLevel(i + 2, new MaidataChart(simai, lvStr, chart.Designer), false);
+            }
+            else
+            {
+                var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
+                var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
+                var (simai, _) = new SimaiGenerator().Generate(cvtChart);
+    
+                var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
+                simaiFile.AddLevel(i + 2, new MaidataChart(simai, lvStr, chart.Designer));
+    
+                if (i == music.Charts.Length - 1) simaiFile.ClockCount = cvtChart.ClockCount; // 取最后一个难度的clockCount，作为写入maidata中的
+            }
         }
 
         var maidataEntry = zipArchive.CreateEntry("maidata.txt");
@@ -769,4 +780,7 @@ public class MusicTransferController(StaticSettings settings, ILogger<MusicTrans
             }
         }
     }
+
+    [GeneratedRegex(@"VERSION\t0.00.00\t1.(\d\d).00")]
+    private static partial Regex MA2VersionRegex();
 }
