@@ -142,7 +142,7 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
                 chartPaddingsSec = chartPaddings.ToDictionary(x => x.Key, x => (float)x.Value.sec);
             }
 
-            if (StaticSettings.Config.UseLegacyMaiLib)
+            if (StaticSettings.Config.UseLegacyMaiLib && !fatal && legacyCharts.Count > 0)
             {
                 chartPaddingsSec = LegacyMaidataImportService.CalcChartPadding(legacyCharts, out _);
             }

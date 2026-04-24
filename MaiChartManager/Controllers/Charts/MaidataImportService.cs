@@ -160,6 +160,11 @@ public class MaidataImportService
         var maiDataText = new StreamReader(stream).ReadToEnd();
         var maiData = new Maidata(maiDataText);
         var targetLevelMap = MapMaidataLevelToGame(maiData);
+        if (targetLevelMap.Count == 0) // 没有能够被映射的谱面
+        {
+            errors.Add(new ImportChartMessage(Locale.MusicNoCharts, MessageLevel.Fatal));
+            return new ImportChartResult(errors, true);
+        }
         
         // 先执行第一步：Parser，因为可能涉及对Chart做出调整
         List<(int lv, int targetLevel, MaidataChart data, Chart chart, List<Alert> alerts)> parserOutput = [];
@@ -189,6 +194,7 @@ public class MaidataImportService
 
         foreach (var c in music.Charts) { c.Enable = false; } // 先把所有难度标记为关闭（马上后面"第二步"的逻辑，会对存在的难度打开）
         
+        float lastChartBpm = 0; // 最后一个谱面的bpm，当没有指定wholebpm时用作fallback
         // 再执行第二步
         foreach (var (lv, targetLevel, data, chart, alerts) in parserOutput)
         {
@@ -220,6 +226,7 @@ public class MaidataImportService
             string resultMA2;
             try
             {
+                lastChartBpm = (float)chart.StartBpm;
                 if (chartPadding.bar != 0)
                 {
                     chart.Shift(chartPadding.bar, chartPadding.bpm);
@@ -248,7 +255,7 @@ public class MaidataImportService
             music.Name = maiData.Title;
             music.Artist = maiData.Artist;
             music.ShiftMethod = shift.ToString();
-            music.Bpm = maiData.WholeBpm ?? (float)chartPadding.bpm; // 优先使用&wholebpm，但如果不存在，则使用谱面开头声明的bpm
+            music.Bpm = maiData.WholeBpm ?? lastChartBpm; // 优先使用&wholebpm，但如果不存在，则使用谱面开头声明的bpm
         }
 
         MergeAlertsIntoImportChartMessages();

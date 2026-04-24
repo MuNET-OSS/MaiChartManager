@@ -10,9 +10,9 @@ namespace MaiChartManager.Controllers.Charts;
 
 public partial class LegacyMaidataImportService
 {
-    private readonly ILogger<MaidataImportService> logger;
+    private readonly ILogger<LegacyMaidataImportService> logger;
 
-    public LegacyMaidataImportService(ILogger<MaidataImportService> logger)
+    public LegacyMaidataImportService(ILogger<LegacyMaidataImportService> logger)
     {
         this.logger = logger;
     }

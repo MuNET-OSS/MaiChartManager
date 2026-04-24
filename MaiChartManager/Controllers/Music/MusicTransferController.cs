@@ -650,7 +650,10 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
                 }
             }
         }
-        catch {} // ignore preview time errors
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "ExportAsMaidata: Failed to get audio preview time, ignoring.");
+        }
         
         simaiFile["chartconverter"] = $"MaiChartManager v{Application.ProductVersion}";
         
@@ -688,8 +691,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
 
                     var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
                     simaiFile.AddLevel(i + 2, new MaidataChart(simai, lvStr, chart.Designer));
-
-                    if (i == music.Charts.Length - 1) simaiFile.ClockCount = cvtChart.ClockCount; // 取最后一个难度的clockCount，作为写入maidata中的
+                    simaiFile.ClockCount = cvtChart.ClockCount; // 通过多次写入，自然实现取最后一个有效难度的clockCount，作为写入maidata中的
                 }
             }
             catch (Exception e)
