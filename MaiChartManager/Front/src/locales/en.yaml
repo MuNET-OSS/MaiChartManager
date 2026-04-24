@@ -617,6 +617,7 @@ settings:
   movieCodec: PV Codec
   yuv420p: Use YUV420P color space when converting USM
   noScale: Don't scale video to 1080 width
+  useLegacyMaiLib: Use legacy chart converter for import/export (compatibility mode)
   updateChannel: Update Channel
   updateChannelSlow: Stable
   updateChannelCi: Fast

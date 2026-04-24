@@ -157,10 +157,13 @@
     <data name="ChartFixedMinorErrors" xml:space="preserve">
     <value>嘗試修正了一些譜面難度 {0} 中的小錯誤</value>
   </data>
-    <data name="ChartMaiLibParseError" xml:space="preserve">
-    <value>MaiLib 解析譜面難度 {0} 時報錯：
+  <data name="ChartMaiLibParseError" xml:space="preserve">
+    <value>解析譜面難度 {0} 時發生錯誤：
 {1}
 這往往是譜面中的語句不夠規範導致的，您可嘗試根據報錯對譜面進行修復。</value>
+  </data>
+  <data name="ChartPrefix" xml:space="preserve">
+    <value>在譜面難度 {0} 中：</value>
   </data>
     <data name="ChartSimaiSharpFallback" xml:space="preserve">
     <value>就算修正了一些已知錯誤，MaiLib 還是無法解析譜面難度 {0}，我們嘗試通過 AstroDX 的 SimaiSharp 解析。

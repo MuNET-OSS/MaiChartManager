@@ -204,7 +204,7 @@ namespace MaiChartManager {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to MaiLib error parsing chart difficulty {0}:
+        ///   Looks up a localized string similar to Error parsing chart difficulty {0}:
         ///{1}
         ///This is usually caused by non-standard syntax in the chart. You can try to fix the chart based on this error message..
         /// </summary>
@@ -247,6 +247,15 @@ namespace MaiChartManager {
         internal static string ChartParseGenericError {
             get {
                 return ResourceManager.GetString("ChartParseGenericError", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to In chart difficulty {0}:.
+        /// </summary>
+        internal static string ChartPrefix {
+            get {
+                return ResourceManager.GetString("ChartPrefix", resourceCulture);
             }
         }
         
@@ -658,6 +667,15 @@ namespace MaiChartManager {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to No valid images found (expected: numeric filename or ui_jacket_* pattern, PNG/JPG format).
+        /// </summary>
+        internal static string NoValidImagesFound {
+            get {
+                return ResourceManager.GetString("NoValidImagesFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Please enter activation code.
         /// </summary>
         internal static string OfflineActivationPrompt {
@@ -730,6 +748,15 @@ namespace MaiChartManager {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Please select folder containing jacket images.
+        /// </summary>
+        internal static string SelectImageFolder {
+            get {
+                return ResourceManager.GetString("SelectImageFolder", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Please select target location.
         /// </summary>
         internal static string SelectTargetLocation {
@@ -744,24 +771,6 @@ namespace MaiChartManager {
         internal static string SelectVideoToConvert {
             get {
                 return ResourceManager.GetString("SelectVideoToConvert", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Please select folder containing jacket images.
-        /// </summary>
-        internal static string SelectImageFolder {
-            get {
-                return ResourceManager.GetString("SelectImageFolder", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to No valid images found.
-        /// </summary>
-        internal static string NoValidImagesFound {
-            get {
-                return ResourceManager.GetString("NoValidImagesFound", resourceCulture);
             }
         }
         

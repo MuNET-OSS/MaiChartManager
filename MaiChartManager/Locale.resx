@@ -165,11 +165,14 @@ Would you like to install WebView2?</value>
     <data name="ChartFixedMinorErrors" xml:space="preserve">
     <value>Fixed some minor errors in chart difficulty {0}</value>
   </data>
-    <data name="ChartMaiLibParseError" xml:space="preserve">
-    <value>MaiLib error parsing chart difficulty {0}:
+  <data name="ChartMaiLibParseError" xml:space="preserve">
+    <value>Error parsing chart difficulty {0}:
 {1}
 This is usually caused by non-standard syntax in the chart. You can try to fix the chart based on this error message.</value>
   </data>
+  <data name="ChartPrefix" xml:space="preserve">
+    <value>In chart difficulty {0}:</value>
+  </data>  
     <data name="ChartSimaiSharpFallback" xml:space="preserve">
     <value>Even after fixing known errors, MaiLib still cannot parse chart difficulty {0}. Falling back to AstroDX's SimaiSharp parser.
 If you notice any issues with the conversion result, you can try testing it in AstroDX and let us know (though this is optional)</value>
