@@ -18,8 +18,10 @@ public enum MessageLevel
 
 public record ImportChartMessage(string Message, MessageLevel Level)
 {
-    public static ImportChartMessage? FromAlert(Alert alert, int lv)
+    public static ImportChartMessage? FromAlert(Alert alert, int lv, Dictionary<int, int>? lineNoDict)
     {
+        if (alert.Line != null && lineNoDict?.TryGetValue(lv, out var lineNo) == true)
+            alert.Line += lineNo - 1; // 重写行号，以确保反映真实maidata中的行号
         switch (alert.Level)
         {
             case Alert.LEVEL.Error:
@@ -144,6 +146,30 @@ public class MaidataImportService
     
     public static Dictionary<int, int> MapMaidataLevelToGame(Maidata maidata) => MapMaidataLevelToGame(maidata.Levels.Select(x => x.Key).ToList());
     
+    // 获取一个maidata文件中，每个 &inote_ 开头所对应的行号。
+    public static Dictionary<int, int> GetLevelLineNo(string maidataText)
+    {
+        Dictionary<int, int> result = new();
+        int lineNo = 0;
+        int cur = -1; // 当前正在处理哪一个等级
+        foreach (var line_ in maidataText.EnumerateLines())
+        {
+            var line = line_.ToString();
+            lineNo++;
+            if (line.StartsWith("&inote_") && line.IndexOf('=') is var p and >= 8 && int.TryParse(line[7..p], out var lv))
+            {
+                cur = lv; // 标记当前等级为pending状态
+                line = line[(p+1)..];
+            }
+            if (cur != -1 && !string.IsNullOrWhiteSpace(line))
+            { // 找到了当前等级的首个非空白行
+                result[cur] = lineNo;
+                cur = -1;
+            }
+        }
+        return result;
+    }
+    
     public ImportChartResult ImportMaidata(
         MusicXml music,
         IFormFile file,
@@ -159,6 +185,8 @@ public class MaidataImportService
         using var stream = file.OpenReadStream();
         var maiDataText = new StreamReader(stream).ReadToEnd();
         var maiData = new Maidata(maiDataText);
+        var lineNoDict = GetLevelLineNo(maiDataText);
+        
         var targetLevelMap = MapMaidataLevelToGame(maiData);
         if (targetLevelMap.Count == 0) // 没有能够被映射的谱面
         {
@@ -267,7 +295,7 @@ public class MaidataImportService
             {
                 foreach (var alert in one.alerts)
                 {
-                    var m = ImportChartMessage.FromAlert(alert, one.lv);
+                    var m = ImportChartMessage.FromAlert(alert, one.lv, lineNoDict);
                     if (m != null) errors.Add(m);
                 }
             }

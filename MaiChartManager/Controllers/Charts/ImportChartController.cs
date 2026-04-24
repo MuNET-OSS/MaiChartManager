@@ -33,6 +33,7 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
             using var stream = file.OpenReadStream();
             var maiDataText = new StreamReader(stream).ReadToEnd();
             var maiData = new Maidata(maiDataText);
+            var lineNoDict = MaidataImportService.GetLevelLineNo(maiDataText);
 
             var title = maiData.Title;
             if (string.IsNullOrWhiteSpace(title))
@@ -130,7 +131,7 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
                 }
                 foreach (var alert in alerts)
                 {
-                    var m = ImportChartMessage.FromAlert(alert, lv);
+                    var m = ImportChartMessage.FromAlert(alert, lv, lineNoDict);
                     if (m != null) errors.Add(m);
                 }
             }
