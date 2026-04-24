@@ -26,7 +26,6 @@ public class Config
     public bool NoScale { get; set; } = false;
     public bool IgnoreLevel { get; set; } = false;
     public bool DisableBga { get; set; } = false;
-    public bool UseLegacyMaiLib { get; set; } = false;
     public int UiZoom { get; set; } = 0;
 
     public void Save()

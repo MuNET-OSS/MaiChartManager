@@ -24,20 +24,9 @@ public class ChartPreviewController(StaticSettings settings) : ControllerBase
             return "No chart found";
         }
 
-        string simai;
-        if (StaticSettings.Config.UseLegacyMaiLib)
-        {
-            var ma2Content = System.IO.File.ReadAllLines(path);
-            MaiLib.Ma2Parser parser = new();
-            var ma2 = parser.ChartOfToken(ma2Content);
-            simai = ma2.Compose(MaiLib.ChartEnum.ChartVersion.SimaiFes);
-        }
-        else
-        {
-            var ma2Content = System.IO.File.ReadAllText(path);
-            var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
-            (simai, _) = new SimaiGenerator().Generate(cvtChart);
-        }
+        var ma2Content = System.IO.File.ReadAllText(path);
+        var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
+        var (simai, _) = new SimaiGenerator().Generate(cvtChart);
         
         return $"""
                 &first=0

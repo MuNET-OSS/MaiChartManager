@@ -13,12 +13,6 @@
   <Project Path="AquaMai/AquaMai.Config.HeadlessLoader/AquaMai.Config.HeadlessLoader.csproj">
     <BuildType Solution="Crack|*" Project="Release" />
   </Project>
-  <Project Path="MaiLib/MaiLib.csproj">
-    <BuildType Solution="Crack|*" Project="Release" />
-  </Project>
-  <Project Path="SimaiSharp/SimaiSharp/SimaiSharp.csproj">
-    <BuildType Solution="Crack|*" Project="Release" />
-  </Project>
   <Project Path="MuConvert/MuConvert.csproj">
     <BuildType Solution="Crack|*" Project="Release" />
   </Project>

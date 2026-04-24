@@ -12,7 +12,7 @@ namespace MaiChartManager.Controllers.Charts;
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api")]
 public class ImportChartController(StaticSettings settings, ILogger<StaticSettings> logger, 
-    MaidataImportService importService, LegacyMaidataImportService legacyMaidataImportService) : ControllerBase
+    MaidataImportService importService) : ControllerBase
 {
     public record ImportChartCheckResult(bool Accept, IEnumerable<ImportChartMessage> Errors, Dictionary<ShiftMethod, float> chartPaddings, bool IsDx, string? Title, float first, CueConvertController.SetAudioPreviewRequest? previewTime);
 
@@ -89,31 +89,9 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
             var first = maiData.First;
             var isDx = false;
             List<Chart> resultCharts = [];
-            List<SimaiSharp.Structures.MaiChart> legacyCharts = [];
             foreach (var (lv, data) in maiData.Levels)
             {
                 if (!targetLevelMap.ContainsKey(lv)) continue;
-
-                if (StaticSettings.Config.UseLegacyMaiLib)
-                {
-                    try
-                    {
-                        var chart = legacyMaidataImportService.TryParseChartSimaiSharp(data.Inote, lv, errors);
-                        legacyCharts.Add(chart);
-
-                        var candidate = legacyMaidataImportService.TryParseChart(data.Inote, chart, lv, errors);
-                        if (candidate is null) throw new Exception(Locale.ChartParseGenericError);
-                        isDx = isDx || candidate.IsDxChart;
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogError(e, "解析谱面失败");
-                        errors.Add(new ImportChartMessage(string.Format(Locale.ChartDifficultyParseFailed, lv), MessageLevel.Fatal));
-                        fatal = true;
-                    }
-                    continue;
-                }
-                // else
                 
                 // 转谱，并记录期间的警告等返回信息
                 List<Alert> alerts = [];
@@ -144,11 +122,6 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
             { // 如果解析失败了、导致没有产生resultCharts，那么就不要执行CalcChartPadding，不然会抛异常
                 var chartPaddings = MaidataImportService.CalcChartPadding(resultCharts);
                 chartPaddingsSec = chartPaddings.ToDictionary(x => x.Key, x => (float)x.Value.sec);
-            }
-
-            if (StaticSettings.Config.UseLegacyMaiLib && !fatal && legacyCharts.Count > 0)
-            {
-                chartPaddingsSec = LegacyMaidataImportService.CalcChartPadding(legacyCharts, out _);
             }
 
             CueConvertController.SetAudioPreviewRequest? previewTime = null;
@@ -185,8 +158,7 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
         [FromForm] bool debug = false)
     {
         var music = settings.GetMusic(id, assetDir);
-        IMaidataImportService service = StaticSettings.Config.UseLegacyMaiLib ? legacyMaidataImportService : importService;
-        var importMaidataResult = service.ImportMaidata(music!, file, shift, ignoreLevelNum, debug);
+        var importMaidataResult = importService.ImportMaidata(music!, file, shift, ignoreLevelNum, debug);
         if (!importMaidataResult.Fatal)
         {
             music!.AddVersionId = addVersionId;

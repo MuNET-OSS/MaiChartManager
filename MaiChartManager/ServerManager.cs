@@ -116,7 +116,6 @@ public static class ServerManager
         builder.Services
             .AddHttpClient()
             .AddSingleton<StaticSettings>()
-            .AddSingleton<LegacyMaidataImportService>()
             .AddSingleton<MaidataImportService>()
             .AddSingleton<MuModService>()
             .AddSingleton<ModConfigService>()
