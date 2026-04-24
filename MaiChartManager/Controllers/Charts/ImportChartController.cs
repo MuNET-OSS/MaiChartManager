@@ -1,16 +1,17 @@
-﻿using System.Text.RegularExpressions;
-using MaiChartManager.Controllers.Music;
-using MaiChartManager.Services;
+﻿using MaiChartManager.Controllers.Music;
 using Microsoft.AspNetCore.Mvc;
-using SimaiSharp;
-using SimaiSharp.Structures;
+using MuConvert.chart;
+using MuConvert.generator;
+using MuConvert.maidata;
+using MuConvert.parser;
+using MuConvert.utils;
 
 namespace MaiChartManager.Controllers.Charts;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api")]
 public class ImportChartController(StaticSettings settings, ILogger<StaticSettings> logger, 
-    MaidataImportService importService) : ControllerBase
+    MaidataImportService importService, LegacyMaidataImportService legacyMaidataImportService) : ControllerBase
 {
     public record ImportChartCheckResult(bool Accept, IEnumerable<ImportChartMessage> Errors, Dictionary<ShiftMethod, float> chartPaddings, bool IsDx, string? Title, float first, CueConvertController.SetAudioPreviewRequest? previewTime);
 
@@ -29,38 +30,26 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
 
         try
         {
-            var kvps = new SimaiFile(file.OpenReadStream()).ToKeyValuePairs();
-            var maiData = new Dictionary<string, string>();
-            foreach (var (key, value) in kvps)
-            {
-                maiData[key] = value;
-            }
+            using var stream = file.OpenReadStream();
+            var maiDataText = new StreamReader(stream).ReadToEnd();
+            var maiData = new Maidata(maiDataText);
 
-            var title = maiData.GetValueOrDefault("title");
-            if (string.IsNullOrWhiteSpace(maiData.GetValueOrDefault("title")))
+            var title = maiData.Title;
+            if (string.IsNullOrWhiteSpace(title))
             {
                 errors.Add(new ImportChartMessage(Locale.MusicNoTitle, MessageLevel.Fatal));
                 fatal = true;
             }
 
-            var allChartText = new Dictionary<int, string>();
-            for (var i = 0; i < 9; i++)
-            {
-                if (i == 1) continue; // maidata 中 inote_1 无对应游戏难度，与 ImportMaidata 保持一致
-                if (!string.IsNullOrWhiteSpace(maiData.GetValueOrDefault($"inote_{i}")))
-                {
-                    allChartText.Add(i, maiData.GetValueOrDefault($"inote_{i}"));
-                }
-            }
-            var targetLevelMap = MaidataImportService.MapMaidataLevelToGame(allChartText.Keys.ToList());
+            var targetLevelMap = MaidataImportService.MapMaidataLevelToGame(maiData);
 
             # region 向前端返回，关于导入谱面的inote_映射到游戏中的难度的提示信息
             string[] levelNames = [Locale.DifficultyBasic, Locale.DifficultyAdvanced, Locale.DifficultyExpert, Locale.DifficultyMaster, Locale.DifficultyReMaster];
-            string[] importAsMessages = [Locale.DifficultyImportedAsBasic, null, null, Locale.DifficultyImportedAsMaster, Locale.DifficultyImportedAsReMaster];
+            string[] importAsMessages = [Locale.DifficultyImportedAsBasic, null!, null!, Locale.DifficultyImportedAsMaster, Locale.DifficultyImportedAsReMaster];
             
             string generalImportMessage = ""; // “将导入以下难度：” 的默认信息
             var extraImportMessages = new List<string>(); // “有一个难度为 {0} 的谱面，将导入为XX谱 ” 的信息
-            foreach (var (lv, _) in allChartText)
+            foreach (var (lv, _) in maiData.Levels)
             {
                 if (!targetLevelMap.TryGetValue(lv, out var targetLevel))
                 { // 根据targetLevelMap返回的结果，该谱面应被忽略
@@ -95,55 +84,78 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
                 return new ImportChartCheckResult(!fatal, errors, new Dictionary<ShiftMethod, float>(), false, title, 0, null);
             }
 
-            float.TryParse(maiData.GetValueOrDefault("first"), out var first);
+            var first = maiData.First;
             var isDx = false;
-            var maiCharts = new List<MaiChart>();
-
-            foreach (var kvp in allChartText)
+            List<Chart> resultCharts = [];
+            List<SimaiSharp.Structures.MaiChart> legacyCharts = [];
+            foreach (var (lv, data) in maiData.Levels)
             {
-                var chartText = kvp.Value;
-                var measures = MaidataImportService.MeasureTagRegex().Matches(chartText);
-                foreach (Match measure in measures)
-                {
-                    if (!float.TryParse(measure.Groups[1].Value, out var measureValue)) continue;
-                    if (measureValue > 384)
-                    {
-                        errors.Add(new ImportChartMessage(string.Format(Locale.ChartInvalidMeasure, kvp.Key, measureValue), MessageLevel.Fatal));
-                        fatal = true;
-                        goto foreachAllChartTextContinue;
-                    }
-                }
+                if (!targetLevelMap.ContainsKey(lv)) continue;
 
+                if (StaticSettings.Config.UseLegacyMaiLib)
+                {
+                    try
+                    {
+                        var chart = legacyMaidataImportService.TryParseChartSimaiSharp(data.Inote, lv, errors);
+                        legacyCharts.Add(chart);
+
+                        var candidate = legacyMaidataImportService.TryParseChart(data.Inote, chart, lv, errors);
+                        if (candidate is null) throw new Exception(Locale.ChartParseGenericError);
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogError(e, "解析谱面失败");
+                        errors.Add(new ImportChartMessage(string.Format(Locale.ChartDifficultyParseFailed, lv), MessageLevel.Fatal));
+                        fatal = true;
+                    }
+                    continue;
+                }
+                
+                // 转谱，并记录期间的警告等返回信息
+                List<Alert> alerts = [];
                 try
                 {
-                    var chart = importService.TryParseChartSimaiSharp(chartText, kvp.Key, errors);
-                    maiCharts.Add(chart);
-
-                    var candidate = importService.TryParseChart(chartText, chart, kvp.Key, errors);
-                    if (candidate is null) throw new Exception(Locale.ChartParseGenericError);
-                    isDx = isDx || candidate.IsDxChart;
+                    var (chart, alerts1) = new SimaiParser().Parse(data.Inote);
+                    resultCharts.Add(chart);
+                    alerts.AddRange(alerts1);
+                    var (_, alerts2) = new MA2Generator().Generate(chart);
+                    alerts.AddRange(alerts2);
+                    isDx = isDx || chart.IsDxChart;
                 }
-                catch (Exception e)
+                catch (ConversionException e)
                 {
-                    logger.LogError(e, "解析谱面失败");
-                    errors.Add(new ImportChartMessage(string.Format(Locale.ChartDifficultyParseFailed, kvp.Key), MessageLevel.Fatal));
                     fatal = true;
+                    alerts.AddRange(e.Alerts);
                 }
-
-            foreachAllChartTextContinue: ;
+                foreach (var alert in alerts)
+                {
+                    var m = ImportChartMessage.FromAlert(alert, lv);
+                    if (m != null) errors.Add(m);
+                }
             }
 
-            var chartPaddings = MaidataImportService.CalcChartPadding(maiCharts, out _);
+            Dictionary<ShiftMethod, float> chartPaddingsSec = new();
+            if (!fatal && resultCharts.Count > 0)
+            { // 如果解析失败了、导致没有产生resultCharts，那么就不要执行CalcChartPadding，不然会抛异常
+                var chartPaddings = MaidataImportService.CalcChartPadding(resultCharts);
+                chartPaddingsSec = chartPaddings.ToDictionary(x => x.Key, x => (float)x.Value.sec);
+            }
+
+            if (StaticSettings.Config.UseLegacyMaiLib)
+            {
+                chartPaddingsSec = LegacyMaidataImportService.CalcChartPadding(legacyCharts, out _);
+            }
 
             CueConvertController.SetAudioPreviewRequest? previewTime = null;
-            if (float.TryParse(maiData.GetValueOrDefault("demo_seek"), out var demo_seek))
+            var maidataDemo = maiData.Demo;
+            if (maidataDemo != null)
             {
+                var (start, len) = maidataDemo.Value;
                 // 当只有demo_seek没有demo_len时，则把demo_len设为一个很大的数，表示preview直到音频结尾；SetAudioPreviewApi中会自动把实际的loopEnd限制到音频长度以内。
-                if (!float.TryParse(maiData.GetValueOrDefault("demo_len"), out var demo_len)) demo_len = 10000f;
-                previewTime = new CueConvertController.SetAudioPreviewRequest(demo_seek, demo_seek + demo_len);
+                previewTime = new CueConvertController.SetAudioPreviewRequest(start, start + (len??10000f));
             }
             
-            return new ImportChartCheckResult(!fatal, errors, chartPaddings, isDx, title, first, previewTime);
+            return new ImportChartCheckResult(!fatal, errors, chartPaddingsSec, isDx, title, first, previewTime);
         }
         catch (Exception e)
         {
@@ -168,10 +180,14 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
         [FromForm] bool debug = false)
     {
         var music = settings.GetMusic(id, assetDir);
-        var importMaidataResult = importService.ImportMaidata(music, file, shift, ignoreLevelNum, debug);
+        ImportChartResult importMaidataResult;
+        if (StaticSettings.Config.UseLegacyMaiLib)
+            importMaidataResult = legacyMaidataImportService.ImportMaidata(music!, file, shift, ignoreLevelNum, debug);
+        else 
+            importMaidataResult = importService.ImportMaidata(music!, file, shift, ignoreLevelNum, debug);
         if (!importMaidataResult.Fatal)
         {
-            music.AddVersionId = addVersionId;
+            music!.AddVersionId = addVersionId;
             music.GenreId = genreId;
             music.Version = version;
             music.Save();

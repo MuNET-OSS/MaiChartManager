@@ -6,8 +6,8 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json.Serialization;
 using System.Windows.Forms;
 using idunno.Authentication.Basic;
+using MaiChartManager.Controllers.Charts;
 using MaiChartManager.Controllers.Mod;
-using MaiChartManager.Services;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http.Features;
@@ -116,6 +116,7 @@ public static class ServerManager
         builder.Services
             .AddHttpClient()
             .AddSingleton<StaticSettings>()
+            .AddSingleton<LegacyMaidataImportService>()
             .AddSingleton<MaidataImportService>()
             .AddSingleton<MuModService>()
             .AddSingleton<ModConfigService>()

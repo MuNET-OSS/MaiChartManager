@@ -6,43 +6,13 @@ using MaiLib;
 using SimaiSharp;
 using SimaiSharp.Structures;
 
-namespace MaiChartManager.Services;
+namespace MaiChartManager.Controllers.Charts;
 
-public enum MessageLevel
-{
-    Info,
-    Warning,
-    Fatal
-}
-
-public record ImportChartMessage(string Message, MessageLevel Level);
-
-public record ImportChartResult(IEnumerable<ImportChartMessage> Errors, bool Fatal);
-
-// v1.1.2 新增
-public enum ShiftMethod
-{
-    // 之前的办法，把第一押准确的对在第二小节的开头
-    // noShiftChart = false, padding = MusicPadding
-    Legacy,
-
-    // 简单粗暴的办法，不需要让库来平移谱面，解决各种平移不兼容问题
-    // 之前修库都白修了其实
-    // bar - 休止符的长度 如果是正数，那就直接在前面加一个小节的空白
-    // 判断一下 > 0.1 好了，因为 < 0.1 秒可以忽略不计
-    // noShiftChart = true, padding = (bar - 休止符的长度 > 0.1 ? bar - first : 0)
-    // bar - 休止符的长度 = MusicPadding + first
-    Bar,
-
-    // 把音频裁掉 &first 秒，完全不用动谱面
-    // noShiftChart = true, padding = -first
-    NoShift
-}
-public partial class MaidataImportService
+public partial class LegacyMaidataImportService
 {
     private readonly ILogger<MaidataImportService> logger;
 
-    public MaidataImportService(ILogger<MaidataImportService> logger)
+    public LegacyMaidataImportService(ILogger<MaidataImportService> logger)
     {
         this.logger = logger;
     }
