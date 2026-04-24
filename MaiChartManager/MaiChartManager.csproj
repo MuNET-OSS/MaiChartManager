@@ -48,6 +48,7 @@
     <ProjectReference Include="..\AquaMai\AquaMai.Config.HeadlessLoader\AquaMai.Config.HeadlessLoader.csproj" />
     <ProjectReference Include="..\MaiLib\MaiLib.csproj" />
     <ProjectReference Include="..\SimaiSharp\SimaiSharp\SimaiSharp.csproj" />
+    <ProjectReference Include="..\MuConvert\MuConvert.csproj" />
     <ProjectReference Include="..\SonicAudioTools\Source\SonicAudioLib\SonicAudioLib.csproj" />
     <ProjectReference Include="..\XV2-Tools\LB_Common\LB_Common.csproj" />
     <ProjectReference Include="..\XV2-Tools\Xv2CoreLib\Xv2CoreLib.csproj" />

@@ -16,3 +16,6 @@
 [submodule "MuNet-UI"]
 	path = MuNET-UI
 	url = git@github.com:MuNET-OSS/MuNET-UI.git
+[submodule "MuConvert"]
+	path = MuConvert
+	url = https://github.com/MuNET-OSS/MuConvert.git
