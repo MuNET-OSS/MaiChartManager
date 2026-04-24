@@ -101,6 +101,7 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
 
                         var candidate = legacyMaidataImportService.TryParseChart(data.Inote, chart, lv, errors);
                         if (candidate is null) throw new Exception(Locale.ChartParseGenericError);
+                        isDx = isDx || candidate.IsDxChart;
                     }
                     catch (Exception e)
                     {

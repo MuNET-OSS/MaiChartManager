@@ -625,9 +625,6 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             throw new DirectoryNotFoundException(message);
         }
 
-        await using var zipStream = HttpContext.Response.BodyWriter.AsStream();
-        using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
-
         var simaiFile = new Maidata();
         simaiFile.Title = music.Name;
         simaiFile.Artist = music.Artist;
@@ -670,30 +667,41 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
                 chartPath = fallbackPath;
             }
 
-            if (StaticSettings.Config.UseLegacyMaiLib)
+            try
             {
-                simaiFile["ChartConvertTool"] = $"MaiLib";
-                var parser = new MaiLib.Ma2Parser();
-                var ma2Content = await System.IO.File.ReadAllLinesAsync(chartPath);
-                var ma2 = parser.ChartOfToken(ma2Content);
-                var simai = ma2.Compose(MaiLib.ChartEnum.ChartVersion.SimaiFes);
-                
-                var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
-                simaiFile.AddLevel(i + 2, new MaidataChart(simai, lvStr, chart.Designer), false);
+                if (StaticSettings.Config.UseLegacyMaiLib)
+                {
+                    simaiFile["ChartConvertTool"] = $"MaiLib";
+                    var parser = new MaiLib.Ma2Parser();
+                    var ma2Content = await System.IO.File.ReadAllLinesAsync(chartPath);
+                    var ma2 = parser.ChartOfToken(ma2Content);
+                    var simai = ma2.Compose(MaiLib.ChartEnum.ChartVersion.SimaiFes);
+
+                    var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
+                    simaiFile.AddLevel(i + 2, new MaidataChart(simai, lvStr, chart.Designer), false);
+                }
+                else
+                {
+                    var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
+                    var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
+                    var (simai, _) = new SimaiGenerator().Generate(cvtChart);
+
+                    var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
+                    simaiFile.AddLevel(i + 2, new MaidataChart(simai, lvStr, chart.Designer));
+
+                    if (i == music.Charts.Length - 1) simaiFile.ClockCount = cvtChart.ClockCount; // 取最后一个难度的clockCount，作为写入maidata中的
+                }
             }
-            else
+            catch (Exception e)
             {
-                var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
-                var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
-                var (simai, _) = new SimaiGenerator().Generate(cvtChart);
-    
-                var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
-                simaiFile.AddLevel(i + 2, new MaidataChart(simai, lvStr, chart.Designer));
-    
-                if (i == music.Charts.Length - 1) simaiFile.ClockCount = cvtChart.ClockCount; // 取最后一个难度的clockCount，作为写入maidata中的
+                logger.LogError("ExportAsMaidata FAILED! {title}, {filename}: {e}", music.Name, chartPath, e);
+                throw;
             }
         }
 
+        await using var zipStream = HttpContext.Response.BodyWriter.AsStream();
+        using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
+        
         var maidataEntry = zipArchive.CreateEntry("maidata.txt");
         await using var maidataStream = maidataEntry.Open();
         await maidataStream.WriteAsync(Encoding.UTF8.GetBytes(simaiFile.ToString()));
