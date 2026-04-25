@@ -655,8 +655,6 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             logger.LogWarning(e, "ExportAsMaidata: Failed to get audio preview time, ignoring.");
         }
         
-        simaiFile["chartconverter"] = $"MaiChartManager v{Application.ProductVersion}";
-        
         for (var i = 0; i < music.Charts.Length; i++)
         {
             var chart = music.Charts[i];
@@ -700,6 +698,8 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
                 throw;
             }
         }
+        
+        simaiFile["chartconverter"] = $"MaiChartManager v{Application.ProductVersion}";
 
         await using var zipStream = HttpContext.Response.BodyWriter.AsStream();
         using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
