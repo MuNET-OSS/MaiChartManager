@@ -6,7 +6,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json.Serialization;
 using System.Windows.Forms;
 using idunno.Authentication.Basic;
-using MaiChartManager.Controllers.Charts;
+using MaiChartManager.Controllers.Charts.Services;
 using MaiChartManager.Controllers.Mod;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;

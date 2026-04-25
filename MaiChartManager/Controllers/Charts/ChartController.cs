@@ -1,10 +1,11 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using MaiChartManager.Controllers.Charts.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace MaiChartManager.Controllers.Charts;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api/{assetDir}/{id:int}/{level:int}")]
-public class ChartController(StaticSettings settings, ILogger<StaticSettings> logger, MaidataImportService importService) : ControllerBase
+public class ChartController(StaticSettings settings, ILogger<StaticSettings> logger, MaidataImportService importService, LegacyMaidataImportService legacyMaidataImportService) : ControllerBase
 {
     [HttpPost]
     public void EditChartLevel(int id, int level, [FromBody] int value, string assetDir)
@@ -136,7 +137,8 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
             {
                 if (music.Id < 100000 && chart.Enable && chart.Level > 0) ignoreLevelNum = false;
             }
-            var importResult = importService.ImportMaidata(music, file, shift, ignoreLevelNum, false, true);
+            IMaidataImportService service = StaticSettings.Config.UseLegacyMaiLib ? legacyMaidataImportService : importService;
+            var importResult = service.ImportMaidata(music, file, shift, ignoreLevelNum, false, true);
             if (!importResult.Fatal)
             {
                 music.Save();

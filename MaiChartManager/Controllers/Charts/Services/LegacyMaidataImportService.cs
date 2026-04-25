@@ -6,9 +6,9 @@ using MaiLib;
 using SimaiSharp;
 using SimaiSharp.Structures;
 
-namespace MaiChartManager.Controllers.Charts;
+namespace MaiChartManager.Controllers.Charts.Services;
 
-public partial class LegacyMaidataImportService
+public partial class LegacyMaidataImportService : IMaidataImportService
 {
     private readonly ILogger<LegacyMaidataImportService> logger;
 

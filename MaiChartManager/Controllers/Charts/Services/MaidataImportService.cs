@@ -7,7 +7,7 @@ using MuConvert.parser;
 using MuConvert.utils;
 using Rationals;
 
-namespace MaiChartManager.Controllers.Charts;
+namespace MaiChartManager.Controllers.Charts.Services;
 
 public enum MessageLevel
 {
@@ -56,7 +56,7 @@ public enum ShiftMethod
     // noShiftChart = true, padding = -first
     NoShift
 }
-public class MaidataImportService
+public class MaidataImportService : IMaidataImportService
 {
     private readonly ILogger<MaidataImportService> logger;
 
