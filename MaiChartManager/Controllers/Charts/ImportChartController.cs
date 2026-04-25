@@ -183,11 +183,8 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
         [FromForm] bool debug = false)
     {
         var music = settings.GetMusic(id, assetDir);
-        ImportChartResult importMaidataResult;
-        if (StaticSettings.Config.UseLegacyMaiLib)
-            importMaidataResult = legacyMaidataImportService.ImportMaidata(music!, file, shift, ignoreLevelNum, debug);
-        else 
-            importMaidataResult = importService.ImportMaidata(music!, file, shift, ignoreLevelNum, debug);
+        IMaidataImportService service = StaticSettings.Config.UseLegacyMaiLib ? legacyMaidataImportService : importService;
+        var importMaidataResult = service.ImportMaidata(music!, file, shift, ignoreLevelNum, debug);
         if (!importMaidataResult.Fatal)
         {
             music!.AddVersionId = addVersionId;
