@@ -113,12 +113,14 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
                     }
                     continue;
                 }
+                // else
                 
                 // 转谱，并记录期间的警告等返回信息
                 List<Alert> alerts = [];
                 try
                 {
-                    var (chart, alerts1) = new SimaiParser().Parse(data.Inote);
+                    //                                                 ↓ 此处的参数应该不会影响 check 的结果
+                    var (chart, alerts1) = new SimaiParser(false, maiData.ClockCount).Parse(data.Inote);
                     resultCharts.Add(chart);
                     alerts.AddRange(alerts1);
                     var (_, alerts2) = new MA2Generator().Generate(chart);

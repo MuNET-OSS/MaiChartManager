@@ -174,7 +174,6 @@ export interface GameModInfo {
   melonLoaderInstalled?: boolean;
   aquaMaiInstalled?: boolean;
   aquaMaiVersion?: string | null;
-  bundledAquaMaiVersion?: string | null;
   isJudgeDisplay4BInstalled?: boolean;
   isHidConflictExist?: boolean;
   signature?: VerifyResult;
@@ -340,6 +339,7 @@ export interface MusicXmlWithABJacket {
   pseudoAssetBundleJacket?: string | null;
   assetDir?: string | null;
   hasJacket?: boolean;
+  realJacketPath?: string | null;
   isAcbAwbExist?: boolean;
   /** @format int32 */
   cueId?: number;
@@ -402,6 +402,7 @@ export interface SettingsDto {
   noScale?: boolean;
   ignoreLevel?: boolean;
   disableBga?: boolean;
+  useLegacyMaiLib?: boolean;
   /** @format int32 */
   uiZoom?: number;
   /** @format double */
@@ -691,7 +692,7 @@ export class HttpClient<SecurityDataType = unknown> {
 }
 
 /**
- * @title MaiChartManager.GenClient
+ * @title MaiChartManager
  * @version 1.0
  */
 export class Api<
@@ -1429,6 +1430,20 @@ export class Api<
     /**
      * No description
      *
+     * @tags ImageToAbTool
+     * @name ImageToAbTool
+     * @request POST:/MaiChartManagerServlet/ImageToAbToolApi
+     */
+    ImageToAbTool: (params: RequestParams = {}) =>
+      this.request<void, any>({
+        path: `/MaiChartManagerServlet/ImageToAbToolApi`,
+        method: "POST",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags ImportChart
      * @name ImportChartCheck
      * @request POST:/MaiChartManagerServlet/ImportChartCheckApi
@@ -1586,20 +1601,6 @@ export class Api<
     InstallMelonLoader: (params: RequestParams = {}) =>
       this.request<void, any>({
         path: `/MaiChartManagerServlet/InstallMelonLoaderApi`,
-        method: "POST",
-        ...params,
-      }),
-
-    /**
-     * No description
-     *
-     * @tags Installation
-     * @name InstallAquaMai
-     * @request POST:/MaiChartManagerServlet/InstallAquaMaiApi
-     */
-    InstallAquaMai: (params: RequestParams = {}) =>
-      this.request<void, any>({
-        path: `/MaiChartManagerServlet/InstallAquaMaiApi`,
         method: "POST",
         ...params,
       }),
