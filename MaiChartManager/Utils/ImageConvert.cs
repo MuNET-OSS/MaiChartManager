@@ -1,4 +1,4 @@
-﻿using AssetStudio;
+using AssetStudio;
 using MaiChartManager.Models;
 
 namespace MaiChartManager.Utils;
@@ -23,9 +23,13 @@ public static class ImageConvert
         }
 
         if (music.AssetBundleJacket is null) return null;
+        return GetTextureAsPngData(music.AssetBundleJacket);
+    }
 
+    public static byte[]? GetTextureAsPngData(string inputAbPath)
+    {
         var manager = new AssetsManager();
-        manager.LoadFiles(music.AssetBundleJacket);
+        manager.LoadFiles(inputAbPath);
         var asset = manager.assetsFileList[0].Objects.Find(it => it.type == ClassIDType.Texture2D);
         if (asset is null) return null;
 
