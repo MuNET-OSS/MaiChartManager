@@ -158,23 +158,36 @@ public partial class Launcher : Form
             return;
         }
 
-        string mlDllPath = Path.Combine(StaticSettings.GamePath, "..", "MelonLoader", "MelonLoader.dll");
-        if (File.Exists(mlDllPath))
+        try
         {
-            var versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(mlDllPath);
-            string? version = versionInfo.ProductVersion;
-
-            if (version == null || !version.StartsWith("0.6.4"))
+            string mlDllPath = Path.Combine(StaticSettings.GamePath, "MelonLoader", "MelonLoader.dll");
+            if (!File.Exists(mlDllPath))
             {
-                var dialougResult = MessageBox.Show(
-                    // Add i8n pls :)
-                    $"Detected MelonLoader version {version}, but 0.6.4 is recommended for stability. Continue anyway?",
-                    "MelonLoader Version Warning",
-                    MessageBoxButtons.YesNo,
-                    MessageBoxIcon.Warning);
-
-                if (dialougResult == DialogResult.No) return;
+                mlDllPath = Path.Combine(StaticSettings.GamePath, "..", "MelonLoader", "MelonLoader.dll");
             }
+
+            if (File.Exists(mlDllPath))
+            {
+                var versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(mlDllPath);
+                string version = versionInfo.ProductVersion ?? "unknown";
+
+                if (!version.StartsWith("0.6.4"))
+                {
+                    // i8n pls
+                    var dialogResult = MessageBox.Show(
+                        $"Detected MelonLoader version {version}, but 0.6.4 is recommended for stability. Continue anyway?",
+                        "MelonLoader Version Warning",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+
+                    if (dialogResult == DialogResult.No) return;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+             // add i8n, pleeeeease
+            Console.WriteLine($"Failed to check MelonLoader version: {ex.Message}");
         }
 
         if (ContainsSpecialCharacters(StaticSettings.GamePath))
