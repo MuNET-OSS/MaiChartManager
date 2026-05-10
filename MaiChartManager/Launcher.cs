@@ -186,8 +186,12 @@ public partial class Launcher : Form
         }
         catch (Exception ex)
         {
-             // add i8n, pleeeeease
-            Console.WriteLine($"Failed to check MelonLoader version: {ex.Message}");
+            // add i8n, pleeeeease
+            MessageBox.Show(
+                            $"Failed to check MelonLoader version: {ex.Message}. Please ensure MelonLoader 0.6.4 is installed.",
+                            "MelonLoader Check Error",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
         }
 
         if (ContainsSpecialCharacters(StaticSettings.GamePath))
@@ -208,7 +212,7 @@ public partial class Launcher : Form
         StaticSettings.Config.AuthUsername = textBoxLanAuthUser.Text;
         StaticSettings.Config.AuthPassword = textBoxLanAuthPass.Text;
         StaticSettings.Config.Save();
-# endif
+#endif
 
         textBox1.Enabled = false;
         button1.Enabled = false;
