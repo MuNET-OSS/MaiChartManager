@@ -1,9 +1,6 @@
 ﻿using MaiChartManager.Models;
 using MaiChartManager.Utils;
-using MuConvert.chart;
-using MuConvert.generator;
-using MuConvert.maidata;
-using MuConvert.parser;
+using MuConvert.mai;
 using MuConvert.utils;
 using Rationals;
 
@@ -65,7 +62,7 @@ public class MaidataImportService : IMaidataImportService
         this.logger = logger;
     }
 
-    public static Dictionary<ShiftMethod, (double sec, decimal bpm, Rational bar)> CalcChartPadding(List<Chart> charts)
+    public static Dictionary<ShiftMethod, (double sec, decimal bpm, Rational bar)> CalcChartPadding(List<MaiChart> charts)
     {
         // 谱面导入时，会有两个地方涉及到时间的调整：
         // 1. 对谱面的调整。在下方的ImportMaidata函数中应用，对谱面进行相应的调整（chart.Shift）。
@@ -85,7 +82,7 @@ public class MaidataImportService : IMaidataImportService
         var notePaddingOfEachChart = charts.Select(chart =>
         {
             var bpm = chart.StartBpm;
-            var notePadding = (1 - chart.FirstNoteTime.InvariantBar).CanonicalForm;
+            var notePadding = (1 - chart.StartTime.InvariantBar).CanonicalForm;
             var sec = (double)(notePadding * (240 / (Rational)bpm));
             return (sec, bpm, notePadding);
         }).ToList();
@@ -195,7 +192,7 @@ public class MaidataImportService : IMaidataImportService
         }
         
         // 先执行第一步：Parser，因为可能涉及对Chart做出调整
-        List<(int lv, int targetLevel, MaidataChart data, Chart chart, List<Alert> alerts)> parserOutput = [];
+        List<(int lv, int targetLevel, MaidataLevel data, MaiChart chart, List<Alert> alerts)> parserOutput = [];
         foreach (var (lv, data) in maiData.Levels)
         {
             if (!targetLevelMap.ContainsKey(lv)) continue;

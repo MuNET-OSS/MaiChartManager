@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using MuConvert.generator;
-using MuConvert.parser;
+using MuConvert.mai;
 
 namespace MaiChartManager.Controllers.Charts;
 

@@ -7,9 +7,7 @@ using MaiChartManager.Models;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualBasic.FileIO;
-using MuConvert.generator;
-using MuConvert.maidata;
-using MuConvert.parser;
+using MuConvert.mai;
 using NAudio.Lame;
 using Vanara.Windows.Forms;
 using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
@@ -679,7 +677,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
                     var simai = ma2.Compose(MaiLib.ChartEnum.ChartVersion.SimaiFes);
 
                     var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
-                    simaiFile.AddLevel(i + 2, new MaidataChart(simai, lvStr, chart.Designer), false);
+                    simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer), false);
                 }
                 else
                 {
@@ -688,7 +686,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
                     var (simai, _) = new SimaiGenerator().Generate(cvtChart);
 
                     var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
-                    simaiFile.AddLevel(i + 2, new MaidataChart(simai, lvStr, chart.Designer));
+                    simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer));
                     simaiFile.ClockCount = cvtChart.ClockCount; // 通过多次写入，自然实现取最后一个有效难度的clockCount，作为写入maidata中的
                 }
             }

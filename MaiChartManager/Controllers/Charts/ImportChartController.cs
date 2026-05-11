@@ -1,10 +1,7 @@
 ﻿using MaiChartManager.Controllers.Charts.Services;
 using MaiChartManager.Controllers.Music;
 using Microsoft.AspNetCore.Mvc;
-using MuConvert.chart;
-using MuConvert.generator;
-using MuConvert.maidata;
-using MuConvert.parser;
+using MuConvert.mai;
 using MuConvert.utils;
 
 namespace MaiChartManager.Controllers.Charts;
@@ -88,7 +85,7 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
 
             var first = maiData.First;
             var isDx = false;
-            List<Chart> resultCharts = [];
+            List<MaiChart> resultCharts = [];
             List<SimaiSharp.Structures.MaiChart> legacyCharts = [];
             foreach (var (lv, data) in maiData.Levels)
             {
