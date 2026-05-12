@@ -403,6 +403,7 @@ export interface SettingsDto {
   ignoreLevel?: boolean;
   disableBga?: boolean;
   useLegacyMaiLib?: boolean;
+  convertJacketToAssetBundle?: boolean;
   /** @format int32 */
   uiZoom?: number;
   /** @format double */

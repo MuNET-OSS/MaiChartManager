@@ -579,6 +579,7 @@ settings:
   yuv420p: 轉換 USM 時使用 YUV420P 顏色空間
   noScale: 不要縮放影片到 1080 寬度
   useLegacyMaiLib: 匯入/匯出時，使用舊版轉譜器進行轉譜（相容模式）
+  convertJacketToAssetBundle: 歌曲封面圖使用原生AssetBundle格式
   updateChannel: 更新通道
   updateChannelSlow: 穩定
   updateChannelCi: 快速
