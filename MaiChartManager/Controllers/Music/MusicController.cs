@@ -183,7 +183,7 @@ public class MusicController(StaticSettings settings, ILogger<MusicController> l
         }
         else
         {
-            var path = Path.Combine(abiDir, "jacket", $"ui_jacket_{music.NonDxId:000000}{ext}");
+            var path = Path.Combine(abiDir, $"ui_jacket_{music.NonDxId:000000}{ext}");
             using var write = System.IO.File.Open(path, FileMode.Create);
             file.CopyTo(write);
             write.Close();

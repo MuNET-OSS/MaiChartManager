@@ -539,7 +539,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         var newMusicDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{newId:000000}");
         DeleteIfExists(abJacketTarget, abJacketTarget + ".manifest", abJacketSTarget, abJacketSTarget + ".manifest", acbawbTarget + ".acb", acbawbTarget + ".awb", movieTarget + ".dat", movieTarget + ".mp4", newMusicDir);
 
-        # region 移动或重打包封面图
+        #region 移动或重打包封面图
         var jacketSourcePath = music.JacketPath is not null ? music.JacketPath : music.PseudoAssetBundleJacket;
         if (jacketSourcePath is not null)
         {
@@ -551,7 +551,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         }
         else if (music.AssetBundleJacket is not null)
         {
-            var oldAb = music.AssetBundleJacket;
+            var oldAb = music.AssetBundleJacket!;
             var oldSmallAb = GetAssetBundleJacketSmallPath(oldAb);
             var idPad = $"{newNonDxId:000000}";
             logger.LogInformation("Repack jacket AB: {oldMainAb} -> {abJacketTarget}", oldAb, abJacketTarget);
@@ -588,7 +588,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             }
             
             DeleteAb(oldAb);
-            DeleteAb(oldSmallAb!);
+            if (oldSmallAb is not null) DeleteAb(oldSmallAb);
         }
         #endregion
 

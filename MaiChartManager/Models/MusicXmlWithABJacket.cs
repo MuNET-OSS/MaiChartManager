@@ -123,33 +123,35 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
 
     internal bool DeleteJacket()
     {
-        bool sholdDelete = HasJacket && RealJacketPath?.Contains(@"\A000\", StringComparison.InvariantCultureIgnoreCase) == false;
-        if (!sholdDelete) return false;
+        bool shouldDelete = HasJacket && RealJacketPath?.Contains(@"\A000\", StringComparison.InvariantCultureIgnoreCase) == false;
+        if (!shouldDelete) return false;
+        var assetBundleJacket = this.AssetBundleJacket;
         
         Console.WriteLine("删除 jacket: " + RealJacketPath);
         try
         { 
             FileSystem.DeleteFile(RealJacketPath);
-            if (RealJacketPath.EndsWith(".ab")) // .ab的情况，要额外把manifest也干掉
+            if (RealJacketPath.EndsWith(".ab") && File.Exists(RealJacketPath + ".manifest")) // .ab的情况，要额外把manifest也干掉
                 FileSystem.DeleteFile(RealJacketPath + ".manifest");
         }
         catch
         {
             Console.WriteLine($"删除 jacket 失败: {RealJacketPath}");
+            return false;
         }
         JacketPath = null!;
         StaticSettings.AssetBundleJacketMap.Remove(NonDxId);
         StaticSettings.PseudoAssetBundleJacketMap.Remove(NonDxId);
 
         // Issue #42: AB jackets come with a companion jacket_s/ui_jacket_xxx_s.ab, delete it too to avoid orphan
-        if (AssetBundleJacket is not null)
+        if (assetBundleJacket is not null)
         {
-            var abDir = Path.GetDirectoryName(AssetBundleJacket);
+            var abDir = Path.GetDirectoryName(assetBundleJacket);
             var parentDir = string.IsNullOrWhiteSpace(abDir) ? null : Path.GetDirectoryName(abDir);
             if (!string.IsNullOrWhiteSpace(parentDir))
             {
                 var jacketSPath = Path.Combine(parentDir, "jacket_s",
-                    Path.GetFileNameWithoutExtension(AssetBundleJacket) + "_s" + Path.GetExtension(AssetBundleJacket));
+                    Path.GetFileNameWithoutExtension(assetBundleJacket) + "_s" + Path.GetExtension(assetBundleJacket));
                 if (File.Exists(jacketSPath) && !jacketSPath.Contains(@"\A000\", StringComparison.InvariantCultureIgnoreCase))
                 {
                     Console.WriteLine("删除 jacket_s: " + jacketSPath);
