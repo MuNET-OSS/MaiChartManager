@@ -11,7 +11,7 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
 
     // 在 mod 里文件的 jacket 是优先的
     public new bool HasJacket => JacketPath is not null || AssetBundleJacket is not null || PseudoAssetBundleJacket is not null;
-    public string RealJacketPath => JacketPath ?? PseudoAssetBundleJacket ?? AssetBundleJacket;
+    public string? RealJacketPath => JacketPath ?? PseudoAssetBundleJacket ?? AssetBundleJacket;
 
     public new static MusicXmlWithABJacket CreateNew(int id, string gamePath, string assetDir)
     {
@@ -139,7 +139,7 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
             Console.WriteLine($"删除 jacket 失败: {RealJacketPath}");
             return false;
         }
-        JacketPath = null!;
+        JacketPath = null;
         StaticSettings.AssetBundleJacketMap.Remove(NonDxId);
         StaticSettings.PseudoAssetBundleJacketMap.Remove(NonDxId);
 
