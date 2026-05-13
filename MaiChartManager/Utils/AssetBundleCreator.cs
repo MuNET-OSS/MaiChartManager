@@ -163,7 +163,7 @@ public static class AssetBundleCreator
         Directory.CreateDirectory(abiDir);
         Directory.CreateDirectory(abiSDir);
         
-        string key = $"ui_jacket_{musicId:000000}";
+        string key = $"UI_Jacket_{musicId:000000}";
         
         CreateTextureAssetBundle(
             pngImageData,

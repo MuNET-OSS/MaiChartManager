@@ -34,6 +34,7 @@ public static class ImageConvert
         if (asset is null) return null;
 
         var texture = asset as Texture2D;
-        return texture.ConvertToStream(ImageFormat.Png, true).GetBuffer();
+        using var stream = texture.ConvertToStream(ImageFormat.Png, true);
+        return stream.ToArray();
     }
 }

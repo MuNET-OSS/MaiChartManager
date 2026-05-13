@@ -589,6 +589,9 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             
             DeleteAb(oldAb);
             if (oldSmallAb is not null) DeleteAb(oldSmallAb);
+
+            StaticSettings.AssetBundleJacketMap.Remove(music.NonDxId);
+            StaticSettings.AssetBundleJacketMap[newNonDxId] = abJacketTarget;
         }
         #endregion
 
