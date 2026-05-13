@@ -73,7 +73,7 @@ public partial class ImageToAbToolController(StaticSettings settings, ILogger<Im
                 var uiJacketMatch = UiJacketFileRegex().Match(x.Name);
                 if (uiJacketMatch.Success)
                 {
-                    return new ImageTaskItem(x.Path, int.Parse(uiJacketMatch.Groups["id"].Value).ToString("000000"));
+                    return new ImageTaskItem(x.Path, uiJacketMatch.Groups["id"].Value.PadLeft(6, '0'));
                 }
 
                 return null;
