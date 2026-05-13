@@ -1,4 +1,4 @@
-﻿<root>
+<root>
     <resheader name="resmimetype">
         <value>text/microsoft-resx</value>
     </resheader>
@@ -278,6 +278,12 @@
   </data>
     <data name="NoValidImagesFound" xml:space="preserve">
     <value>未找到有效的圖片檔案（需要：純數字檔名或 ui_jacket_* 格式，PNG/JPG 格式）</value>
+  </data>
+  <data name="ImageToAbDeleteOriginalPngQuestion" xml:space="preserve">
+    <value>是否需要刪除原有的 PNG/JPG 圖片？（由於直讀優先級高於 AB，若不刪除的話，則遊戲執行時還是會優先進行圖片直讀。）</value>
+  </data>
+  <data name="ImageToAb" xml:space="preserve">
+    <value>圖片轉 AssetBundle</value>
   </data>
 
     <!-- ModController -->

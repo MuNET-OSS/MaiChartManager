@@ -279,6 +279,12 @@
     <data name="NoValidImagesFound" xml:space="preserve">
     <value>未找到有效的图片文件（需要：纯数字文件名或 ui_jacket_* 格式，PNG/JPG 格式）</value>
   </data>
+  <data name="ImageToAbDeleteOriginalPngQuestion" xml:space="preserve">
+    <value>是否需要删除原有的PNG/JPG图片？（由于直读优先级高于AB，如果不删除的话，则游戏运行时还是会优先进行图片直读。）</value>
+  </data>
+  <data name="ImageToAb" xml:space="preserve">
+    <value>图片转 AssetBundle</value>
+  </data>
 
     <!-- ModController -->
     <data name="UnsupportedConfigVersion" xml:space="preserve">

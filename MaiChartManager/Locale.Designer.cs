@@ -496,6 +496,24 @@ namespace MaiChartManager {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Image to AssetBundle.
+        /// </summary>
+        internal static string ImageToAb {
+            get {
+                return ResourceManager.GetString("ImageToAb", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Delete the original PNG/JPG images? (Direct image loading takes priority over the AB; if you do not delete them, the game will still load these images directly instead of the ABs at runtime.).
+        /// </summary>
+        internal static string ImageToAbDeleteOriginalPngQuestion {
+            get {
+                return ResourceManager.GetString("ImageToAbDeleteOriginalPngQuestion", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Will import the following difficulties: .
         /// </summary>
         internal static string ImportingDifficulties {

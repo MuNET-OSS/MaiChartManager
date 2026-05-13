@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 
 <root>
     <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
@@ -286,6 +286,12 @@ If you notice any issues with the conversion result, you can try testing it in A
   </data>
     <data name="NoValidImagesFound" xml:space="preserve">
     <value>No valid images found (expected: numeric filename or ui_jacket_* pattern, PNG/JPG format)</value>
+  </data>
+  <data name="ImageToAbDeleteOriginalPngQuestion" xml:space="preserve">
+    <value>Delete the original PNG/JPG images? (Direct image loading takes priority over the AB; if you do not delete them, the game will still load these images directly instead of the ABs at runtime.)</value>
+  </data>
+  <data name="ImageToAb" xml:space="preserve">
+    <value>Image to AssetBundle</value>
   </data>
 
     <!-- ModController -->
