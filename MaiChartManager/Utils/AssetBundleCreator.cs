@@ -167,17 +167,17 @@ public static class AssetBundleCreator
         
         CreateTextureAssetBundle(
             pngImageData,
-            Path.Combine(abiDir, $"{key}.ab"),
+            Path.Combine(abiDir, $"{key.ToLowerInvariant()}.ab"),
             key,
-            $"assets/assetbundle/jacket/{key}.png",
-            $"jacket/{key}.ab");
+            $"assets/assetbundle/jacket/{key.ToLowerInvariant()}.png",
+            $"jacket/{key.ToLowerInvariant()}.ab");
 
         CreateTextureAssetBundle(
             pngImageData,
-            Path.Combine(abiSDir, $"{key}_s.ab"),
+            Path.Combine(abiSDir, $"{key.ToLowerInvariant()}_s.ab"),
             $"{key}_s",
-            $"assets/assetbundle/jacket_s/{key}_s.png",
-            $"jacket_s/{key}_s.ab",
+            $"assets/assetbundle/jacket_s/{key.ToLowerInvariant()}_s.png",
+            $"jacket_s/{key.ToLowerInvariant()}_s.ab",
             resizeWidth: 200,
             resizeHeight: 200);
 
