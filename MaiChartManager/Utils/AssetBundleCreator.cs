@@ -156,6 +156,34 @@ public static class AssetBundleCreator
         newBundle.Pack(new AssetsFileWriter(outStream), AssetBundleCompressionType.LZ4, false, null);
     }
     
+    public static string CreateMusicJacketAssetBundles(ReadOnlySpan<byte> pngImageData, string AssetBundleImagesDir, int musicId)
+    {
+        var abiDir = Path.Combine(AssetBundleImagesDir, "jacket");
+        var abiSDir = Path.Combine(AssetBundleImagesDir, "jacket_s");
+        Directory.CreateDirectory(abiDir);
+        Directory.CreateDirectory(abiSDir);
+        
+        string key = $"ui_jacket_{musicId:000000}";
+        
+        CreateTextureAssetBundle(
+            pngImageData,
+            Path.Combine(abiDir, $"{key}.ab"),
+            key,
+            $"assets/assetbundle/jacket/{key}.png",
+            $"jacket/{key}.ab");
+
+        CreateTextureAssetBundle(
+            pngImageData,
+            Path.Combine(abiSDir, $"{key}_s.ab"),
+            $"{key}_s",
+            $"assets/assetbundle/jacket_s/{key}_s.png",
+            $"jacket_s/{key}_s.ab",
+            resizeWidth: 200,
+            resizeHeight: 200);
+
+        return Path.Combine(abiDir, $"{key}.ab");
+    }
+    
     // 读取输入的ab包当中的图片，然后用指定的assetName等参数重新打包。
     // 适用于歌曲改ID等的场景。
     public static void RepackTextureAssetBundle(
