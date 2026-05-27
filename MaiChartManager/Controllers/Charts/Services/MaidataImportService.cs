@@ -1,4 +1,4 @@
-﻿using MaiChartManager.Models;
+using MaiChartManager.Models;
 using MaiChartManager.Utils;
 using MuConvert.mai;
 using MuConvert.utils;
@@ -233,18 +233,8 @@ public class MaidataImportService : IMaidataImportService
             targetChart.Path = $"{id:000000}_0{targetLevel}.ma2";
             
             #region 计算等级（定数）相关
-            var levelNumStr = data.Level;
-            if (!string.IsNullOrWhiteSpace(levelNumStr))
-            {
-                if (isUtage && !char.IsDigit(levelNumStr[0]))
-                {
-                    music.UtageKanji = levelNumStr.Substring(0, 1);
-                    levelNumStr = levelNumStr.Substring(1).Replace("?", ""); // 为了处理类似“奏13+?”这种情况，留下13+给后面的逻辑处理
-                }
-                levelNumStr = levelNumStr.Replace("+", ".7");
-            }
-
-            float.TryParse(levelNumStr, out var levelNum);
+            MaiUtils.ParseLevelStr(data.Level, out var levelNum, out var utageKanji);
+            if (isUtage) music.UtageKanji = utageKanji;
             targetChart.LevelId = MaiUtils.GetLevelId((int)(levelNum * 10));
             // 忽略定数
             if (!ignoreLevelNum)
