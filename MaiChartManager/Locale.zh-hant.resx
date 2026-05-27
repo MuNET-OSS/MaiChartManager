@@ -199,6 +199,9 @@
     <data name="ChartDifficultyParseFailed" xml:space="preserve">
     <value>譜面難度 {0} 解析失敗</value>
   </data>
+  <data name="ChartNoNotes" xml:space="preserve">
+    <value>譜面難度 {0} 中沒有音符。將不會匯入此難度。</value>
+  </data>
     <data name="ChartParseFailedGlobal" xml:space="preserve">
     <value>譜面解析失敗（大）</value>
   </data>

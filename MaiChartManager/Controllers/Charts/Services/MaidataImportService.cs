@@ -192,7 +192,7 @@ public class MaidataImportService : IMaidataImportService
         }
         
         // 先执行第一步：Parser，因为可能涉及对Chart做出调整
-        List<(int lv, int targetLevel, MaidataLevel data, MaiChart chart, List<Alert> alerts)> parserOutput = [];
+        List<(int lv, int targetLevel, MaidataLevel data, MaiChart? chart, List<Alert> alerts)> parserOutput = [];
         foreach (var (lv, data) in maiData.Levels)
         {
             if (!targetLevelMap.ContainsKey(lv)) continue;
@@ -204,17 +204,22 @@ public class MaidataImportService : IMaidataImportService
             {
                 var parser = new SimaiParser(!isUtage && lv is 2 or 3, maiData.ClockCount);
                 var (chart, alerts) = parser.Parse(data.Inote);
+                if (chart.TotalNotes == 0)
+                {
+                    errors.Add(new ImportChartMessage(string.Format(Locale.ChartNoNotes, lv), MessageLevel.Warning));
+                    chart = null;
+                }
                 parserOutput.Add((lv, targetLevel, data, chart, alerts));
             }
             catch (ConversionException e)
             {
-                parserOutput.Add((lv, targetLevel, data, null!, e.Alerts));
+                parserOutput.Add((lv, targetLevel, data, null, e.Alerts));
                 MergeAlertsIntoImportChartMessages();
                 return new ImportChartResult(errors, true);
             }
         }
         
-        var chartPaddingDict = CalcChartPadding(parserOutput.Select(x=>x.chart).ToList());
+        var chartPaddingDict = CalcChartPadding(parserOutput.Where(x=>x.chart != null).Select(x=>x.chart!).ToList());
         var chartPadding = chartPaddingDict[shift]; // 当前所选择的模式所具体对应的chartPadding
 
         foreach (var c in music.Charts) { c.Enable = false; } // 先把所有难度标记为关闭（马上后面"第二步"的逻辑，会对存在的难度打开）
@@ -223,6 +228,7 @@ public class MaidataImportService : IMaidataImportService
         // 再执行第二步
         foreach (var (lv, targetLevel, data, chart, alerts) in parserOutput)
         {
+            if (chart == null) continue;
             var targetChart = music.Charts[targetLevel];
             targetChart.Path = $"{id:000000}_0{targetLevel}.ma2";
             

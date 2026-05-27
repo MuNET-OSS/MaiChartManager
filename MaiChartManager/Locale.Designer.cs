@@ -215,6 +215,15 @@ namespace MaiChartManager {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Chart difficulty {0} has no notes. This difficulty will not be imported..
+        /// </summary>
+        internal static string ChartNoNotes {
+            get {
+                return ResourceManager.GetString("ChartNoNotes", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to It looks like some notes were lost! This is likely a bug. We&apos;d really appreciate it if you could provide the chart file!.
         /// </summary>
         internal static string ChartNotesMissing {
