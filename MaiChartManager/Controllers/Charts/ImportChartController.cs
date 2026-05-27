@@ -134,7 +134,7 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
                 }
             }
             
-            if (resultCharts.Count == 0) // 没有解析成功的谱面
+            if ((StaticSettings.Config.UseLegacyMaiLib ? legacyCharts.Count : resultCharts.Count) == 0) // 没有解析成功的谱面
             {
                 errors.Add(new ImportChartMessage(Locale.MusicNoCharts, MessageLevel.Fatal));
                 fatal = true;

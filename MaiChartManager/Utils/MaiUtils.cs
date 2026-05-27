@@ -12,7 +12,8 @@ public static partial class MaiUtils
     {
         utageKanji = "";
         value = 0;
-        if (string.IsNullOrEmpty(input)) return false;
+        input = input?.Trim();
+        if (string.IsNullOrWhiteSpace(input)) return false;
         
         if (!char.IsDigit(input[0]))
         { // 如果不以数字开头，说明是utageKanji的情况

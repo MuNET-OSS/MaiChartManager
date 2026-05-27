@@ -185,11 +185,6 @@ public class MaidataImportService : IMaidataImportService
         var lineNoDict = GetLevelLineNo(maiDataText);
         
         var targetLevelMap = MapMaidataLevelToGame(maiData);
-        if (targetLevelMap.Count == 0) // 没有能够被映射的谱面
-        {
-            errors.Add(new ImportChartMessage(Locale.MusicNoCharts, MessageLevel.Fatal));
-            return new ImportChartResult(errors, true);
-        }
         
         // 先执行第一步：Parser，因为可能涉及对Chart做出调整
         List<(int lv, int targetLevel, MaidataLevel data, MaiChart? chart, List<Alert> alerts)> parserOutput = [];
@@ -219,7 +214,13 @@ public class MaidataImportService : IMaidataImportService
             }
         }
         
-        var chartPaddingDict = CalcChartPadding(parserOutput.Where(x=>x.chart != null).Select(x=>x.chart!).ToList());
+        var validCharts = parserOutput.Where(x=> x.chart != null).Select(x => x.chart!).ToList();
+        if (validCharts.Count == 0)
+        {
+            errors.Add(new ImportChartMessage(Locale.MusicNoCharts, MessageLevel.Fatal));
+            return new ImportChartResult(errors, true);
+        }
+        var chartPaddingDict = CalcChartPadding(validCharts);
         var chartPadding = chartPaddingDict[shift]; // 当前所选择的模式所具体对应的chartPadding
 
         foreach (var c in music.Charts) { c.Enable = false; } // 先把所有难度标记为关闭（马上后面"第二步"的逻辑，会对存在的难度打开）
