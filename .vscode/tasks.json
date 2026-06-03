@@ -22,8 +22,7 @@
         {
             "label": "Dev Server",
             "type": "shell",
-            "command": "pnpm dev",
-            "options": { "cwd": "${workspaceFolder}/MaiChartManager/Front" },
+            "command": "pnpm --filter mcm-frontend run dev",
             "isBackground": true,
             "problemMatcher": [],
             "presentation": { "reveal": "always", "panel": "dedicated" },
@@ -32,8 +31,7 @@
         {
             "label": "Gen Client",
             "type": "shell",
-            "command": "pnpm genClient",
-            "options": { "cwd": "${workspaceFolder}/MaiChartManager/Front" },
+            "command": "pnpm --filter mcm-frontend run genClient",
             "problemMatcher": [],
             "presentation": { "reveal": "always", "panel": "shared" },
             "icon": { "id": "refresh" }

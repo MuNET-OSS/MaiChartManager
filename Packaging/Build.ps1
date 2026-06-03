@@ -154,10 +154,13 @@ if ($Mode -eq "Canary") {
             $app.VisualElements.DisplayName = $app.VisualElements.DisplayName + " (Canary)"
         }
         
-        # 修改 CLI Alias: mcm.exe -> mcmc.exe
-        $aliasNode = $app.SelectSingleNode(".//desktop:ExecutionAlias", $ns)
-        if ($aliasNode) {
+        if ($app.Id -eq "CliTool") {
+            $aliasNode = $app.SelectSingleNode(".//desktop:ExecutionAlias", $ns)
             $aliasNode.Alias = "mcmc.exe"
+        }
+        if ($app.Id -eq "MuConvert") {
+            $aliasNode = $app.SelectSingleNode(".//desktop:ExecutionAlias", $ns)
+            $aliasNode.Alias = "MuConvertCanary.exe"
         }
     }
 

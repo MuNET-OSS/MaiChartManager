@@ -69,6 +69,27 @@
       </Extensions>
     </Application>
 
+    <Application Id="MuConvert"
+      Executable="MuConvert.exe"
+      EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        AppListEntry="none"
+        DisplayName="MuConvert"
+        Description="MuConvert Command line tool"
+        BackgroundColor="transparent"
+        Square150x150Logo="CLI_Square150x150Logo.png"
+        Square44x44Logo="CLI_Square44x44Logo.png">
+      </uap:VisualElements>
+
+      <Extensions>
+        <uap3:Extension Category="windows.appExecutionAlias">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="MuConvert.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
+      </Extensions>
+    </Application>
+
 
 
   </Applications>

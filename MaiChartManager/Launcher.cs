@@ -33,10 +33,9 @@ public partial class Launcher : Form
 # if DEBUG
         checkBox1.Checked = true;
         StaticSettings.Config.Export = true;
-        textBox1.Text = @"D:\Arcade\Maimai\SDEZ160 Debug";
+        textBox1.Text = @"Z:\mnt\Arcade\SDEZ165";
         StartClicked(null, null);
-        notifyIcon1.Visible = true;
-        WindowState = FormWindowState.Minimized;
+        Visible = false;
 # endif
         comboBox1.SelectedIndex = StaticSettings.CurrentLocale switch
         {
@@ -47,7 +46,9 @@ public partial class Launcher : Form
         };
         if (!AppMain.IsFromStartup)
         {
+# if !DEBUG
             Visible = true;
+# endif
             IapManager.BindToForm(this);
             return;
         }

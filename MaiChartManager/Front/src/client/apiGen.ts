@@ -60,6 +60,11 @@ export enum HardwareAccelerationStatus {
   Disabled = "Disabled",
 }
 
+export enum BatchConvertPvDirection {
+  UsmToMp4 = "UsmToMp4",
+  Mp4ToUsm = "Mp4ToUsm",
+}
+
 export enum AssetType {
   Music = "Music",
   Movie = "Movie",
@@ -403,6 +408,7 @@ export interface SettingsDto {
   ignoreLevel?: boolean;
   disableBga?: boolean;
   useLegacyMaiLib?: boolean;
+  convertJacketToAssetBundle?: boolean;
   /** @format int32 */
   uiZoom?: number;
   /** @format double */
@@ -2607,6 +2613,27 @@ export class Api<
       this.request<void, any>({
         path: `/MaiChartManagerServlet/VideoConvertToolApi`,
         method: "POST",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags VideoConvertTool
+     * @name BatchConvertPvTool
+     * @request POST:/MaiChartManagerServlet/BatchConvertPvToolApi
+     */
+    BatchConvertPvTool: (
+      query?: {
+        folderPath?: string;
+        direction?: BatchConvertPvDirection;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<void, any>({
+        path: `/MaiChartManagerServlet/BatchConvertPvToolApi`,
+        method: "POST",
+        query: query,
         ...params,
       }),
 

@@ -8,7 +8,7 @@ import { useI18n } from 'vue-i18n';
 export default defineComponent({
   setup(props) {
     const { t } = useI18n();
-    
+
     return () => <Modal
       width="min(50vw,60em)"
       title={t('purchase.title')}
@@ -32,23 +32,12 @@ export default defineComponent({
         <div class="flex gap-2 items-center">
           {t('purchase.supportDev')}
           <StorePurchaseButton/>
-          <Button variant="secondary" onClick={() => window.open("https://afdian.com/item/90b4d1fe70e211efab3052540025c377")}>
-              <span class="text-lg c-#946ce6 mr-2 translate-y-.25">
-                <AfdianIcon/>
-              </span>
-            {t('purchase.afdian')}
+          <Button variant="secondary" onClick={() => window.open("https://pay.ldxp.cn/item/lymueu")}>
+            {t('purchase.ldxp')}
           </Button>
-          <Popover trigger="click">
-            {{
-              trigger: () => <Button variant="secondary">
-              <span class="text-lg i-ri-qq-fill c-gray-6 mr-1 translate-y-.12">
-                <AfdianIcon/>
-              </span>
-                {t('purchase.qqGroup')}
-              </Button>,
-              default: () => <div><Qrcode value="https://qm.qq.com/q/U3gT7CDuy6"/></div>
-            }}
-          </Popover>
+          <Button variant="secondary" onClick={() => window.open("https://qm.qq.com/q/U3gT7CDuy6")}>
+            {t('purchase.qqGroup')}
+          </Button>
         </div>
       </div>
     </Modal>;

@@ -89,7 +89,9 @@ music:
     utageType: Utage Type
     utageComment: Utage Comment
     sortName: In-game SortName
-    sortNameTips: May only contain digits, uppercase letters, and katakana; invalid characters will be automatically replaced
+    sortNameTips: >-
+      May only contain digits, uppercase letters, and katakana; invalid
+      characters will be automatically replaced
     jacket: Jacket
     audioPreview: Preview
     editPreview: Edit Preview
@@ -142,7 +144,9 @@ music:
     replaceChartFailed: Failed to replace chart
     replaceChartSuccess: Chart replaced successfully
     notValidChartFile: Chart file must be .ma2 or maidata.txt.
-    replaceChartShiftModeHint: Make sure the delay adjustment mode selected here matches the one used when importing the chart, otherwise notes may be positioned incorrectly!
+    replaceChartShiftModeHint: >-
+      Make sure the delay adjustment mode selected here matches the one used
+      when importing the chart, otherwise notes may be positioned incorrectly!
   batch:
     title: Batch Actions
     batchAndSearch: Batch Actions & Search
@@ -232,7 +236,9 @@ chart:
     option:
       advancedOptions: Advanced Options
       shiftMode: Delay Adjustment Mode
-      shiftModeLocked: The Delay Adjustment Mode is locked to the mode used when the chart was originally imported and cannot be changed.
+      shiftModeLocked: >-
+        The Delay Adjustment Mode is locked to the mode used when the chart was
+        originally imported and cannot be changed.
       shiftByBar: By Bar
       shiftByBarDesc: >-
         If the rest at the beginning of the chart is less than one bar, add one
@@ -257,7 +263,10 @@ chart:
 
         May cause first note to appear at odd timing, e.g. immediately at start
       ignoreGapless: MP3 compatibility mode (ignore Gapless)
-      ignoreGaplessTip: If the chart was made with some specific chart editors, such as certain versions of Visual Maimai, and the imported chart has timing issues, you can try enabling this option.
+      ignoreGaplessTip: >-
+        If the chart was made with some specific chart editors, such as certain
+        versions of Visual Maimai, and the imported chart has timing issues, you
+        can try enabling this option.
       codecForceH264: H264
       codecForceVP9: VP9 USM
     assignId: Assign ID for new imported songs
@@ -271,7 +280,9 @@ chart:
     trimPadding: Will trim {padding} seconds of audio to ensure first note is in second bar
     addFirst: Will add {padding} seconds of silence to match &first value
     trimFirst: Will trim {padding} seconds of audio to match &first value
-    addBar: Will add 1 bar of silence at the beginning of the chart to ensure the first note is after the second bar
+    addBar: >-
+      Will add 1 bar of silence at the beginning of the chart to ensure the
+      first note is after the second bar
     error:
       noMaidata: maidata.txt not found
       noAudio: Audio file not found
@@ -298,6 +309,9 @@ mod:
   update: Update
   search: Search
   searchPlaceholder: Search config...
+  favorite: Favorites
+  addFavorite: Add to favorites
+  removeFavorite: Remove from favorites
   other: Other
   needEnableOption: Need to enable this option
   unsupportedType: 'Unsupported type: {type}'
@@ -366,7 +380,9 @@ mod:
     select1P: 1P Select
     select2P: 2P Select
     disableIO4: Disable IO4 Input
-    disableIO4Tip: Toggle on to disable corresponding input. After disabling IO4 input, your compatible IO4 board or segatools IO4 simulation will be ignored.
+    disableIO4Tip: >-
+      Toggle on to disable corresponding input. After disabling IO4 input, your
+      compatible IO4 board or segatools IO4 simulation will be ignored.
     disableIO4System: System Buttons (Test, Service)
     disable1P: Disable 1P
     enable1P: Enable 1P
@@ -400,7 +416,8 @@ mod:
       After enabling this, the settings in Test menu will no longer work, but
       you can still test (testing requires disabling 1P mode)
 
-      If your controller has corresponding host software, it's recommended to disable this option and use the host software for adjustments
+      If your controller has corresponding host software, it's recommended to
+      disable this option and use the host software for adjustments
   configCorrupted: AquaMai config file corrupted
   configCorruptedMessage: Please manually check AquaMai.toml and try to fix possible issues
   resetToDefault: Reset to default settings
@@ -453,42 +470,46 @@ mod:
     Led: LEDs
     P1: Enable 1P
     P2: Enable 2P
-    tip: If mixing Maimoller with other protocols, disable this for the non-Maimoller side
-  on: 'On'
-  off: 'Off'
+    tip: >-
+      If mixing Maimoller with other protocols, disable this for the
+      non-Maimoller side
+  'on': 'On'
+  'off': 'Off'
   enable: Enable
   disable: Disable
-  stableChannel: "Stable Channel"
-  fastChannel: "Fast Channel"
-  mumod: "MuMod"
-  mumodDesc: "Auto-update Loader"
-  mumodInstalled: "Installed"
-  mumodChannel: "Update Channel"
-  mumodChannelSlow: "Stable"
-  mumodChannelFast: "Fast"
-  cacheUpdating: "Updating cache..."
-  cacheFailed: "Cache update failed"
+  stableChannel: Stable Channel
+  fastChannel: Fast Channel
+  mumod: MuMod
+  mumodDesc: Auto-update Loader
+  mumodInstalled: Installed
+  mumodChannel: Update Channel
+  mumodChannelSlow: Stable
+  mumodChannelFast: Fast
+  cacheUpdating: Updating cache...
+  cacheFailed: Cache update failed
   conflict:
-    title: "Conflict Detected"
-    message: "Both AquaMai and MuMod are present, please choose which to keep"
-    deleteAquaMai: "Delete AquaMai"
-    deleteMuMod: "Delete MuMod"
+    title: Conflict Detected
+    message: Both AquaMai and MuMod are present, please choose which to keep
+    deleteAquaMai: Delete AquaMai
+    deleteMuMod: Delete MuMod
   pdx:
-    noDevice: "No PDX device detected"
-    deviceCount: "{count} PDX device(s) detected"
-    driverWinusb: "Current driver: Exclusive mode"
-    driverDefault: "Current driver: Windows Touch mode"
-    switchToExclusive: "Switch to Exclusive mode"
-    switchToWintouch: "Switch to Windows Touch mode"
-    switchSuccess: "Driver switched successfully"
-    switchFailed: "Driver switch failed"
-    switchCancelled: "Permission request cancelled"
-    refresh: "Refresh device status"
-    unavailable: "PDX driver tool unavailable"
-    selectDevice: "Select device"
-    path1P: "1P Device Path"
-    path2P: "2P Device Path"
-    pathDesc: "USB port path, e.g. 2.2. Use the path shown in the configuration tool. Leave empty to use the first detected device as 1P"
+    noDevice: No PDX device detected
+    deviceCount: '{count} PDX device(s) detected'
+    driverWinusb: 'Current driver: Exclusive mode'
+    driverDefault: 'Current driver: Windows Touch mode'
+    switchToExclusive: Switch to Exclusive mode
+    switchToWintouch: Switch to Windows Touch mode
+    switchSuccess: Driver switched successfully
+    switchFailed: Driver switch failed
+    switchCancelled: Permission request cancelled
+    refresh: Refresh device status
+    unavailable: PDX driver tool unavailable
+    selectDevice: Select device
+    path1P: 1P Device Path
+    path2P: 2P Device Path
+    pathDesc: >-
+      USB port path, e.g. 2.2. Use the path shown in the configuration tool.
+      Leave empty to use the first detected device as 1P
 tools:
   title: Tools
   audioConvert: Audio Convert (ACB + AWB)
@@ -499,8 +520,40 @@ tools:
   videoConvertError: Video conversion error
   imageToAb: Image to AssetBundle
   imageToAbError: Image to AB conversion error
+  pvConvert:
+    label: Convert PV
+    single: Single convert
+    singleHint: Pick one PV file. DAT/USM to MP4, or another video format to DAT
+    batch: Batch convert
+    batchHint: Pick a folder for batch conversion, with DAT/USM and MP4 direction options
   videoOptions:
     processing: Still processing, please wait...
+  batchPv:
+    label: Batch Convert PVs
+    title: Batch Convert PVs
+    selectFolder: Pick folder
+    changeFolder: Change folder
+    selectedFolder: Selected folder
+    folderNotFound: Selected folder does not exist
+    direction: Conversion direction
+    directionUsmToMp4: USM / DAT → MP4
+    directionMp4ToUsm: MP4 → USM / DAT
+    directionUsmToMp4Hint: Writes a sibling .mp4 next to each DAT/USM in the chosen folder; originals are kept
+    directionMp4ToUsmHint: Writes a sibling .dat next to each MP4 in the chosen folder; source .mp4 files are kept
+    start: Start
+    cancel: Cancel
+    cancelling: Cancelling...
+    cancelHint: Cancel takes effect after the current file finishes
+    close: Close
+    overall: Overall
+    currentFile: Current file
+    currentFileProgress: Current file progress
+    completedSummary: 'Completed: {success} / {total} succeeded ({failed} failed)'
+    cancelledSummary: 'Cancelled: {completed} / {total} done'
+    noFiles: No PV files in that folder match the selected direction
+    needLicense: This feature requires sponsor activation
+    error: Batch PV conversion error
+    fileErrors: 'File errors encountered:'
 error:
   title: Error
   unknown: Unknown error occurred
@@ -515,7 +568,7 @@ error:
     confirm: Got it
   file:
     notSelected: No file selected
-  unsupportedFileType: 'Unsupported file type'
+  unsupportedFileType: Unsupported file type
 message:
   notice: Notice
   saveSuccess: Saved successfully
@@ -563,6 +616,7 @@ purchase:
     changeId: Change music ID
     batchExport: Batch export music as new Opt
     batchMaidata: Batch convert music to Maidata
+  ldxp: LDXP
 startup:
   error: Error occurred during startup
   errorList: Error List
@@ -585,7 +639,7 @@ about:
   enterActivationCode: Please enter activation code
   activationCodeInvalid: Invalid activation code
   activationSuccess: Premium features activated, thank you!
-  updateAvailable: 'New version available ({version})'
+  updateAvailable: New version available ({version})
   viewChangelog: View Changelog
   changelogTitle: Changelog
   updateHint: Update from Microsoft Store
@@ -617,10 +671,13 @@ settings:
   movieCodec: PV Codec
   yuv420p: Use YUV420P color space when converting USM
   noScale: Don't scale video to 1080 width
+  convertJacketToAssetBundle: Use native AssetBundle format for music jackets
   updateChannel: Update Channel
   updateChannelSlow: Stable
   updateChannelCi: Fast
-  updateChannelDesc: Stable channel delays updates by a few days, suitable for users who prefer stability
+  updateChannelDesc: >-
+    Stable channel delays updates by a few days, suitable for users who prefer
+    stability
   gameDirectory: Game Directory
   currentPath: Current Path
   changeDirectory: Change Directory

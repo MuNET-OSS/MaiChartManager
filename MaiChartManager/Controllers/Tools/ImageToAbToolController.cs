@@ -6,7 +6,7 @@ namespace MaiChartManager.Controllers.Tools;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api")]
-public partial class ImageToAbToolController(ILogger<ImageToAbToolController> logger) : ControllerBase
+public partial class ImageToAbToolController(StaticSettings settings, ILogger<ImageToAbToolController> logger) : ControllerBase
 {
     [GeneratedRegex(@"^(?<id>\d+)\.(png|jpg|jpeg)$", RegexOptions.IgnoreCase)]
     private static partial Regex NumericFileRegex();
@@ -44,6 +44,17 @@ public partial class ImageToAbToolController(ILogger<ImageToAbToolController> lo
             await WriteEvent(ImageToAbEventType.Error, Locale.FileNotSelected);
             return;
         }
+        
+        // 所选择的路径是否是正规的OPT内jacket路径。方法是判断路径结尾是否是AssetBundleImages\jacket
+        var isIngameJacketPath = selectedPath.TrimEnd('\\').EndsWith(@"AssetBundleImages\jacket", StringComparison.OrdinalIgnoreCase);
+
+        var deleteOriginalPngAfterSuccess = false;
+        if (isIngameJacketPath)
+        {
+            deleteOriginalPngAfterSuccess = MessageBox.Show(
+                Locale.ImageToAbDeleteOriginalPngQuestion, Locale.ImageToAb, MessageBoxButtons.YesNo, 
+                MessageBoxIcon.Question) == DialogResult.Yes;
+        }
 
         var candidates = Directory.EnumerateFiles(selectedPath)
             .Select(path => new
@@ -56,13 +67,13 @@ public partial class ImageToAbToolController(ILogger<ImageToAbToolController> lo
                 var numericMatch = NumericFileRegex().Match(x.Name);
                 if (numericMatch.Success)
                 {
-                    return new ImageTaskItem(x.Path, numericMatch.Groups["id"].Value);
+                    return new ImageTaskItem(x.Path, numericMatch.Groups["id"].Value.PadLeft(6, '0'));
                 }
 
                 var uiJacketMatch = UiJacketFileRegex().Match(x.Name);
                 if (uiJacketMatch.Success)
                 {
-                    return new ImageTaskItem(x.Path, uiJacketMatch.Groups["id"].Value);
+                    return new ImageTaskItem(x.Path, uiJacketMatch.Groups["id"].Value.PadLeft(6, '0'));
                 }
 
                 return null;
@@ -79,8 +90,9 @@ public partial class ImageToAbToolController(ILogger<ImageToAbToolController> lo
             return;
         }
 
-        var jacketDir = Path.Combine(selectedPath, "jacket");
-        var jacketSmallDir = Path.Combine(selectedPath, "jacket_s");
+        var outputRootDir = isIngameJacketPath ? Path.GetDirectoryName(selectedPath)! : selectedPath;
+        var jacketDir = Path.Combine(outputRootDir, "jacket");
+        var jacketSmallDir = Path.Combine(outputRootDir, "jacket_s");
         Directory.CreateDirectory(jacketDir);
         Directory.CreateDirectory(jacketSmallDir);
 
@@ -119,8 +131,22 @@ public partial class ImageToAbToolController(ILogger<ImageToAbToolController> lo
             {
                 logger.LogError(ex, "Failed to create AB for image {ImagePath}", item.FilePath);
                 failures.Add($"{Path.GetFileName(item.FilePath)}: {ex.Message}");
+                continue;
+            }
+            if (deleteOriginalPngAfterSuccess)
+            {
+                try
+                { // 删除原始文件。如果删除失败，也不要抛异常，只是打个警告
+                    System.IO.File.Delete(item.FilePath);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to delete source PNG after ImageToAb: {Path}", item.FilePath);
+                }
             }
         }
+        
+        await settings.RescanAll(); // rescan all
 
         if (failures.Count > 0)
         {

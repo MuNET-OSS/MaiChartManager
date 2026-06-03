@@ -85,7 +85,7 @@ jobs:
         .\Packaging\Build.ps1 -Mode Canary
 
     - name: Upload to Alist
-      shell: powershell
+      shell: pwsh
       env:
         ALIST_TOKEN: ${{ secrets.ALIST_TOKEN }}
       run: |

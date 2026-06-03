@@ -1,7 +1,7 @@
-﻿    // Auto-generated file. Do not modify manually.
+    // Auto-generated file. Do not modify manually.
     namespace MaiChartManager;
 
     public partial class AppMain
     {
-        public const string Version = "26.1";
+        public const string Version = "26.2";
     }

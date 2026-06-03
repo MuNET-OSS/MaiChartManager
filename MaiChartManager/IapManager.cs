@@ -6,7 +6,9 @@ public static class IapManager
 {
     private const string storeId = "9NPJ5N4MMBR5";
 
+# if !CRACK
     private static StoreContext StoreContext { get; } = StoreContext.GetDefault();
+# endif
 
     private static Form _form;
 
@@ -24,7 +26,7 @@ public static class IapManager
 # if CRACK
         License = LicenseStatus.Active;
         return;
-# endif
+# else
         if (!string.IsNullOrWhiteSpace(StaticSettings.Config.OfflineKey) && (await OfflineReg.VerifyAsync(StaticSettings.Config.OfflineKey)).IsValid)
         {
             License = LicenseStatus.Active;
@@ -53,12 +55,15 @@ public static class IapManager
         {
             License = LicenseStatus.Inactive;
         }
+# endif
     }
 
     public static void BindToForm(Form form)
     {
         _form = form;
+# if !CRACK
         WinRT.Interop.InitializeWithWindow.Initialize(StoreContext, form.Handle);
+# endif
     }
 
     public static void SetOfflineLicenseActive()
@@ -75,12 +80,15 @@ public static class IapManager
 
         _form.Show();
         _form.Activate();
+# if CRACK
+        return null!;
+# else
         var res = await StoreContext.RequestPurchaseAsync(storeId);
         if (res.Status == StorePurchaseStatus.Succeeded)
         {
             License = LicenseStatus.Active;
         }
-
         return res;
+# endif
     }
 }

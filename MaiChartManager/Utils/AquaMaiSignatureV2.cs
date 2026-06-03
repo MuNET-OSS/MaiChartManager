@@ -81,26 +81,38 @@ public static class AquaMaiSignatureV2
 
     public static VerifyResult VerifySignature(byte[] data)
     {
-        var block = parseFromBytes(data);
-        if (block == null)
+#if DEBUG // (wine) 0314:fixme:ncrypt:NCryptImportKey Parameter information not implemented
+        try
         {
-            var sha256 = SHA256.HashData(data);
-            var hashString = Convert.ToHexString(sha256).ToLowerInvariant();
-            var oldValid = oldHashes.Contains(hashString);
-            return new VerifyResult(oldValid ? VerifyStatus.Valid : VerifyStatus.NotFound, PubKeyId.None);
-        }
+#endif
+            var block = parseFromBytes(data);
+            if (block == null)
+            {
+                var sha256 = SHA256.HashData(data);
+                var hashString = Convert.ToHexString(sha256).ToLowerInvariant();
+                var oldValid = oldHashes.Contains(hashString);
+                return new VerifyResult(oldValid ? VerifyStatus.Valid : VerifyStatus.NotFound, PubKeyId.None);
+            }
 
-        if (!pubKeys.TryGetValue(block.Value.KeyId, out var pubKey))
+            if (!pubKeys.TryGetValue(block.Value.KeyId, out var pubKey))
+            {
+                return new VerifyResult(VerifyStatus.InvalidKeyId, block.Value.KeyId);
+            }
+
+            using var ecdsa = ECDsa.Create();
+            ecdsa.ImportSubjectPublicKeyInfo(pubKey, out _);
+
+            var size = Marshal.SizeOf<AquaMaiSignatureBlock>();
+            var dataToVerify = data.AsSpan(0, data.Length - size);
+            var isValid = ecdsa.VerifyData(dataToVerify, block.Value.Signature, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
+            return new VerifyResult(isValid ? VerifyStatus.Valid : VerifyStatus.InvalidSignature, block.Value.KeyId);
+#if DEBUG
+        }
+        catch (Exception ex)
         {
-            return new VerifyResult(VerifyStatus.InvalidKeyId, block.Value.KeyId);
+            Console.WriteLine(ex);
+            return new VerifyResult(VerifyStatus.Valid, PubKeyId.Local);
         }
-
-        using var ecdsa = ECDsa.Create();
-        ecdsa.ImportSubjectPublicKeyInfo(pubKey, out _);
-
-        var size = Marshal.SizeOf<AquaMaiSignatureBlock>();
-        var dataToVerify = data.AsSpan(0, data.Length - size);
-        var isValid = ecdsa.VerifyData(dataToVerify, block.Value.Signature, HashAlgorithmName.SHA256, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);
-        return new VerifyResult(isValid ? VerifyStatus.Valid : VerifyStatus.InvalidSignature, block.Value.KeyId);
+#endif
     }
 }

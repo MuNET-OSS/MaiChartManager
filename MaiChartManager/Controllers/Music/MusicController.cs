@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using AssetStudio;
 using MaiChartManager.Models;
 using MaiChartManager.Utils;
@@ -157,7 +157,6 @@ public class MusicController(StaticSettings settings, ILogger<MusicController> l
     [HttpPut]
     public string SetMusicJacket(int id, IFormFile file, string assetDir)
     {
-        var nonDxId = id % 10000;
         var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
         if (!MusicXml.jacketExtensions.Contains(ext[1..]))
         {
@@ -165,19 +164,32 @@ public class MusicController(StaticSettings settings, ILogger<MusicController> l
         }
 
         var music = settings.GetMusic(id, assetDir);
-        while (music?.JacketPath is not null && System.IO.File.Exists(music.JacketPath))
-        {
-            FileSystem.DeleteFile(music.JacketPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
-        }
+        if (music is null) return "Music not found!";
+        music.DeleteJacket(); // 删除老的jacket
 
         var abiDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, @"AssetBundleImages\jacket");
         Directory.CreateDirectory(abiDir);
-        var path = Path.Combine(abiDir, $"ui_jacket_{nonDxId:000000}{ext}");
-        using var write = System.IO.File.Open(path, FileMode.Create);
-        file.CopyTo(write);
-        write.Close();
-        if (music is not null)
+        
+        if (StaticSettings.Config.ConvertJacketToAssetBundle)
+        { // 将图片转为AssetBundle
+            using var buffer = new MemoryStream();
+            file.CopyTo(buffer);
+            var imageBytes = buffer.ToArray();
+
+            var assetBundleDir = Path.GetDirectoryName(abiDir)!;
+            var resultAbPath = AssetBundleCreator.CreateMusicJacketAssetBundles(
+                imageBytes, assetBundleDir, music.NonDxId);
+            StaticSettings.AssetBundleJacketMap[music.NonDxId] = resultAbPath;
+        }
+        else
+        {
+            var path = Path.Combine(abiDir, $"ui_jacket_{music.NonDxId:000000}{ext}");
+            using var write = System.IO.File.Open(path, FileMode.Create);
+            file.CopyTo(write);
+            write.Close();
             music.JacketPath = path;
+        }
+
         return "";
     }
 

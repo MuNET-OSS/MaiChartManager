@@ -1,12 +1,14 @@
 import { defineComponent, PropType, ref, computed, watch } from 'vue';
-import { ConfigDto } from "@/client/apiGen";
+import { ConfigDto, Section } from "@/client/apiGen";
 import { TextInput, theme, WhateverNaviBar } from '@munet/ui';
 import _ from "lodash";
 import configSortStub from './configSort.yaml'
-import { useMagicKeys, whenever } from "@vueuse/core";
+import { useMagicKeys, useStorage, whenever } from "@vueuse/core";
 import { getBigSectionName } from './utils';
 import { useI18n } from 'vue-i18n';
 import ConfigSection from './ConfigSection';
+
+const FAVORITES_TAB_KEY = '__favorites__';
 
 export default defineComponent({
   props: {
@@ -21,6 +23,14 @@ export default defineComponent({
     const configSort = computed(() => props.config?.configSort || configSortStub)
     const communityList = computed(() => configSort.value['社区功能'] || []);
     const { t } = useI18n();
+    const favoriteSectionPaths = useStorage<string[]>('aquamai-config-favorite-sections', []);
+
+    const configSections = computed(() => props.config?.sections || []);
+    const favoritePathList = computed(() => Array.isArray(favoriteSectionPaths.value) ? favoriteSectionPaths.value : []);
+    const favoritePathSet = computed(() => new Set(favoritePathList.value));
+    const sectionByPath = computed(() => new Map(configSections.value
+      .filter((section): section is Section & { path: string } => !!section.path)
+      .map(section => [section.path, section])));
 
     const { ctrl_f } = useMagicKeys({
       passive: false,
@@ -31,19 +41,40 @@ export default defineComponent({
     })
     whenever(ctrl_f, () => searchRef.value?.select());
 
+    const sectionMatchesSearch = (section: Section, keyword: string) =>
+      section.path?.toLowerCase().includes(keyword) ||
+      section.attribute?.comment?.nameZh?.toLowerCase().includes(keyword) ||
+      section.attribute?.comment?.commentZh?.toLowerCase().includes(keyword) ||
+      section.attribute?.comment?.commentEn?.toLowerCase().includes(keyword) ||
+      section.entries?.some(entry => entry.name?.toLowerCase().includes(keyword) || entry.path?.toLowerCase().includes(keyword) ||
+        entry.attribute?.comment?.commentZh?.toLowerCase().includes(keyword) || entry.attribute?.comment?.commentEn?.toLowerCase().includes(keyword) ||
+        entry.attribute?.comment?.nameZh?.toLowerCase().includes(keyword));
+
     const filteredSections = computed(() => {
-      if (!search.value) return props.config?.sections;
+      if (!search.value) return configSections.value;
       const s = search.value.toLowerCase();
-      return props.config.sections?.filter(it =>
-        it.path?.toLowerCase().includes(s) ||
-        it.attribute?.comment?.nameZh?.toLowerCase().includes(s) ||
-        it.attribute?.comment?.commentZh?.toLowerCase().includes(s) ||
-        it.attribute?.comment?.commentEn?.toLowerCase().includes(s) ||
-        it.entries?.some(entry => entry.name?.toLowerCase().includes(s) || entry.path?.toLowerCase().includes(s) ||
-          entry.attribute?.comment?.commentZh?.toLowerCase().includes(s) || entry.attribute?.comment?.commentEn?.toLowerCase().includes(s) ||
-          entry.attribute?.comment?.nameZh?.toLowerCase().includes(s))
-      );
+      return configSections.value.filter(it => sectionMatchesSearch(it, s));
     })
+
+    const favoriteSections = computed(() => {
+      const seen = new Set<string>();
+      return favoritePathList.value
+        .filter(path => {
+          if (typeof path !== 'string' || seen.has(path)) return false;
+          seen.add(path);
+          return true;
+        })
+        .map(path => sectionByPath.value.get(path))
+        .filter((section) => !!section && !section.attribute?.exampleHidden);
+    });
+
+    const toggleFavoriteSection = (path: string) => {
+      if (favoritePathSet.value.has(path)) {
+        favoriteSectionPaths.value = favoritePathList.value.filter(item => item !== path);
+        return;
+      }
+      favoriteSectionPaths.value = [...favoritePathList.value.filter(item => typeof item === 'string'), path];
+    };
 
     const bigSections = computed(() => {
       if (props.useNewSort) {
@@ -61,6 +92,9 @@ export default defineComponent({
     // 所有可选 tab，包括 "其他"
     const allTabs = computed(() => {
       const tabs = bigSections.value.map(key => ({ key: key!, label: getBigSectionName(key!) }));
+      if (favoriteSections.value.length > 0) {
+        tabs.unshift({ key: FAVORITES_TAB_KEY, label: t('mod.favorite') });
+      }
       if (otherSection.value.length > 0) {
         tabs.push({ key: '__other__', label: t('mod.other') });
       }
@@ -85,6 +119,7 @@ export default defineComponent({
         return filteredSections.value?.filter(it => !it.attribute?.exampleHidden) || [];
       }
       if (!activeTab.value) return [];
+      if (activeTab.value === FAVORITES_TAB_KEY) return favoriteSections.value;
       if (activeTab.value === '__other__') return otherSection.value;
       return filteredSections.value?.filter(it => {
         if (props.useNewSort) {
@@ -126,12 +161,20 @@ export default defineComponent({
         </div>
         <div ref={scrollContainerRef} class="of-y-auto cst flex-1 p-2 pt-0 text-14px">
           <div class="flex flex-col gap-1">
-            {currentSections.value.map((section) =>
-              <ConfigSection key={section.path!} section={section}
-                             entryStates={props.config.entryStates!}
-                             isCommunity={communityList.value.includes(section.path!)}
-                             sectionState={props.config.sectionStates![section.path!]}
-                             allSectionStates={props.config.sectionStates!}/>)}
+            {currentSections.value.map((section) => {
+              if (!section) return null;
+              const entryStates = props.config?.entryStates;
+              const sectionStates = props.config?.sectionStates;
+              const sectionState = sectionStates?.[section.path!];
+              if (!entryStates || !sectionStates || !sectionState) return null;
+              return <ConfigSection key={section.path!} section={section}
+                                    entryStates={entryStates}
+                                    isCommunity={communityList.value.includes(section.path!)}
+                                    isFavorite={favoritePathSet.value.has(section.path!)}
+                                    toggleFavorite={() => toggleFavoriteSection(section.path!)}
+                                    sectionState={sectionState}
+                                    allSectionStates={sectionStates}/>;
+            })}
           </div>
         </div>
       </div>

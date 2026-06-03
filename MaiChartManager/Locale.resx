@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 
 <root>
     <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
@@ -207,6 +207,9 @@ If you notice any issues with the conversion result, you can try testing it in A
     <data name="ChartDifficultyParseFailed" xml:space="preserve">
     <value>Failed to parse chart difficulty {0}</value>
   </data>
+  <data name="ChartNoNotes" xml:space="preserve">
+    <value>Chart difficulty {0} has no notes. This difficulty will not be imported.</value>
+  </data>
     <data name="ChartParseFailedGlobal" xml:space="preserve">
     <value>Chart parsing failed (global)</value>
   </data>
@@ -279,6 +282,15 @@ If you notice any issues with the conversion result, you can try testing it in A
     <data name="VideoFileFilter" xml:space="preserve">
     <value>Video or Image|*.mp4;*.mov;*.avi;*.mkv;*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.webp;*.svg;*.dat;*.usm</value>
   </data>
+    <data name="BatchConvertPvNeedLicense" xml:space="preserve">
+    <value>Batch PV conversion requires sponsor activation</value>
+  </data>
+    <data name="BatchConvertPvNoFiles" xml:space="preserve">
+    <value>No PV files found in the matching format</value>
+  </data>
+    <data name="BatchConvertPvFolderNotFound" xml:space="preserve">
+    <value>Selected folder does not exist</value>
+  </data>
 
     <!-- ImageToAbToolController -->
     <data name="SelectImageFolder" xml:space="preserve">
@@ -286,6 +298,12 @@ If you notice any issues with the conversion result, you can try testing it in A
   </data>
     <data name="NoValidImagesFound" xml:space="preserve">
     <value>No valid images found (expected: numeric filename or ui_jacket_* pattern, PNG/JPG format)</value>
+  </data>
+  <data name="ImageToAbDeleteOriginalPngQuestion" xml:space="preserve">
+    <value>Delete the original PNG/JPG images? (Direct image loading takes priority over the AB; if you do not delete them, the game will still load these images directly instead of the ABs at runtime.)</value>
+  </data>
+  <data name="ImageToAb" xml:space="preserve">
+    <value>Image to AssetBundle</value>
   </data>
 
     <!-- ModController -->

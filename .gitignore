@@ -10,4 +10,5 @@ riderModule.iml
 node_modules
 nul
 .sisyphus
+.omo
 *.lscache

@@ -1,4 +1,4 @@
-﻿<root>
+<root>
     <resheader name="resmimetype">
         <value>text/microsoft-resx</value>
     </resheader>
@@ -199,6 +199,9 @@
     <data name="ChartDifficultyParseFailed" xml:space="preserve">
     <value>譜面難度 {0} 解析失敗</value>
   </data>
+  <data name="ChartNoNotes" xml:space="preserve">
+    <value>譜面難度 {0} 中沒有音符。將不會匯入此難度。</value>
+  </data>
     <data name="ChartParseFailedGlobal" xml:space="preserve">
     <value>譜面解析失敗（大）</value>
   </data>
@@ -271,6 +274,15 @@
     <data name="VideoFileFilter" xml:space="preserve">
     <value>影片或者圖片|*.mp4;*.mov;*.avi;*.mkv;*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.webp;*.svg;*.dat;*.usm</value>
   </data>
+    <data name="BatchConvertPvNeedLicense" xml:space="preserve">
+    <value>批次轉換 PV 需要贊助啟用</value>
+  </data>
+    <data name="BatchConvertPvNoFiles" xml:space="preserve">
+    <value>未找到符合格式的 PV 檔案</value>
+  </data>
+    <data name="BatchConvertPvFolderNotFound" xml:space="preserve">
+    <value>選擇的資料夾不存在</value>
+  </data>
 
     <!-- ImageToAbToolController -->
     <data name="SelectImageFolder" xml:space="preserve">
@@ -278,6 +290,12 @@
   </data>
     <data name="NoValidImagesFound" xml:space="preserve">
     <value>未找到有效的圖片檔案（需要：純數字檔名或 ui_jacket_* 格式，PNG/JPG 格式）</value>
+  </data>
+  <data name="ImageToAbDeleteOriginalPngQuestion" xml:space="preserve">
+    <value>是否需要刪除原有的 PNG/JPG 圖片？（由於直讀優先級高於 AB，若不刪除的話，則遊戲執行時還是會優先進行圖片直讀。）</value>
+  </data>
+  <data name="ImageToAb" xml:space="preserve">
+    <value>圖片轉 AssetBundle</value>
   </data>
 
     <!-- ModController -->

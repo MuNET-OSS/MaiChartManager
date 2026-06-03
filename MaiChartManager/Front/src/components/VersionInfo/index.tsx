@@ -132,12 +132,9 @@ export default defineComponent({
           {version.value.license === LicenseStatus.Inactive && <div class="flex gap-2 items-center">
             {t('purchase.supportDev')}
             <StorePurchaseButton/>
-            <button onClick={() => window.open("https://afdian.com/item/90b4d1fe70e211efab3052540025c377")}>
-              <span class="text-lg c-#946ce6 mr-2 translate-y-.25">
-                <AfdianIcon/>
-              </span>
-              {t('purchase.afdian')}
-            </button>
+            <Button variant="secondary" onClick={() => window.open("https://pay.ldxp.cn/item/lymueu")}>
+              {t('purchase.ldxp')}
+            </Button>
           </div>}
           <div class="op-80 text-center translate-y-2">
             © 2024-2025 MuNET Team

@@ -129,6 +129,7 @@ public partial class AppMain : ISingleInstance
             }
             catch (WebView2RuntimeNotFoundException) { }
 
+#if !DEBUG
             if (availableVersion == null && !IsFromStartup)
             {
                 var answer = MessageBox.Show(Locale.WebView2NotInstalled, Locale.WebView2NotInstalledTitle, MessageBoxButtons.YesNo,
@@ -138,6 +139,7 @@ public partial class AppMain : ISingleInstance
                     Process.Start(new ProcessStartInfo(Path.Combine(StaticSettings.exeDir, "MicrosoftEdgeWebview2Setup.exe")) { UseShellExecute = true });
                 }
             }
+#endif
 
             IapManager.Init();
 

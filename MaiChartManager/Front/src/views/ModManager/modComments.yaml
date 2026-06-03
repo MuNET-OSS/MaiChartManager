@@ -39,4 +39,5 @@ sectionNameEn:
   选曲界面: Music Selection
   过新过热（实验性）: Too New Too Hot (Experimental)
 
-customPanelPosition: {}
+customPanelPosition:
+  GameSystem.Window: top

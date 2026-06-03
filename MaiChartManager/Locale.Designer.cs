@@ -215,6 +215,15 @@ namespace MaiChartManager {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Chart difficulty {0} has no notes. This difficulty will not be imported..
+        /// </summary>
+        internal static string ChartNoNotes {
+            get {
+                return ResourceManager.GetString("ChartNoNotes", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to It looks like some notes were lost! This is likely a bug. We&apos;d really appreciate it if you could provide the chart file!.
         /// </summary>
         internal static string ChartNotesMissing {
@@ -496,6 +505,24 @@ namespace MaiChartManager {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Image to AssetBundle.
+        /// </summary>
+        internal static string ImageToAb {
+            get {
+                return ResourceManager.GetString("ImageToAb", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Delete the original PNG/JPG images? (Direct image loading takes priority over the AB; if you do not delete them, the game will still load these images directly instead of the ABs at runtime.).
+        /// </summary>
+        internal static string ImageToAbDeleteOriginalPngQuestion {
+            get {
+                return ResourceManager.GetString("ImageToAbDeleteOriginalPngQuestion", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Will import the following difficulties: .
         /// </summary>
         internal static string ImportingDifficulties {
@@ -771,6 +798,33 @@ namespace MaiChartManager {
         internal static string SelectVideoToConvert {
             get {
                 return ResourceManager.GetString("SelectVideoToConvert", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Batch PV conversion requires sponsor activation.
+        /// </summary>
+        internal static string BatchConvertPvNeedLicense {
+            get {
+                return ResourceManager.GetString("BatchConvertPvNeedLicense", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to No PV files found in the matching format.
+        /// </summary>
+        internal static string BatchConvertPvNoFiles {
+            get {
+                return ResourceManager.GetString("BatchConvertPvNoFiles", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Selected folder does not exist.
+        /// </summary>
+        internal static string BatchConvertPvFolderNotFound {
+            get {
+                return ResourceManager.GetString("BatchConvertPvFolderNotFound", resourceCulture);
             }
         }
         

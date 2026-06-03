@@ -29,8 +29,20 @@ export default defineComponent({
 
     const PREFIX = 'GameSystem.MaimollerIO.';
     const useLegacyEntryPath = PREFIX + 'UseLegacy';
+
+    const pathsLeft = [
+      'Button1', 'Button2',
+      'P1Button1', 'P1Button2', 'P1Button3', 'P1Button4',
+    ].map(it => PREFIX + it);
+
+    const pathsRight = [
+      'Button3', 'Button4',
+      'P2Button1', 'P2Button2', 'P2Button3', 'P2Button4',
+    ].map(it => PREFIX + it);
+
     const knownPaths = [
-      ...['P1', 'Touch1p', 'Button1p', 'Led1p', 'P2', 'Touch2p', 'Button2p', 'Led2p', 'Button1', 'Button2', 'Button3', 'Button4'].map(it => PREFIX + it),
+      ...['P1', 'Touch1p', 'Button1p', 'Led1p', 'P2', 'Touch2p', 'Button2p', 'Led2p'].map(it => PREFIX + it),
+      ...pathsLeft, ...pathsRight,
     ];
 
     const isLegacyModeEnabled = computed(() => {
@@ -83,18 +95,8 @@ export default defineComponent({
               </div>
             </div>
           }
-          <div class="flex gap-2 items-start">
-            <div class={ENTRY_LABEL_CLASS}>{t('mod.mmlIo.button1')}</div>
-            <div class="flex flex-col gap-2 w-full ws-pre-line">
-              <Select v-model:value={props.entryStates[PREFIX + 'Button1'].value} options={options}/>
-            </div>
-          </div>
-          <div class="flex gap-2 items-start">
-            <div class={ENTRY_LABEL_CLASS}>{t('mod.mmlIo.button2')}</div>
-            <div class="flex flex-col gap-2 w-full ws-pre-line">
-              <Select v-model:value={props.entryStates[PREFIX + 'Button2'].value} options={options}/>
-            </div>
-          </div>
+          {props.section.entries?.filter(it => pathsLeft.includes(it.path!))
+            .map((entry) => <ConfigEntry key={entry.path!} entry={entry} entryState={props.entryStates[entry.path!]} />)}
         </div>
         <div class="flex flex-col gap-2">
           {props.section.entries?.some(it => it.path === PREFIX + 'P2') &&
@@ -115,18 +117,8 @@ export default defineComponent({
               </div>
             </div>
           }
-          <div class="flex gap-2 items-start">
-            <div class={ENTRY_LABEL_CLASS}>{t('mod.mmlIo.button3')}</div>
-            <div class="flex flex-col gap-2 w-full ws-pre-line">
-              <Select v-model:value={props.entryStates[PREFIX + 'Button3'].value} options={options}/>
-            </div>
-          </div>
-          <div class="flex gap-2 items-start">
-            <div class={ENTRY_LABEL_CLASS}>{t('mod.mmlIo.button4')}</div>
-            <div class="flex flex-col gap-2 w-full ws-pre-line">
-              <Select v-model:value={props.entryStates[PREFIX + 'Button4'].value} options={options}/>
-            </div>
-          </div>
+          {props.section.entries?.filter(it => pathsRight.includes(it.path!))
+            .map((entry) => <ConfigEntry key={entry.path!} entry={entry} entryState={props.entryStates[entry.path!]} />)}
         </div>
       </div>
       {props.section.entries?.filter(it => !knownPaths.includes(it.path!))

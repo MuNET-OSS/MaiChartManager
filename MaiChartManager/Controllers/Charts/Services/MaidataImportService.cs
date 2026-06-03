@@ -1,9 +1,6 @@
-﻿using MaiChartManager.Models;
+using MaiChartManager.Models;
 using MaiChartManager.Utils;
-using MuConvert.chart;
-using MuConvert.generator;
-using MuConvert.maidata;
-using MuConvert.parser;
+using MuConvert.mai;
 using MuConvert.utils;
 using Rationals;
 
@@ -65,7 +62,7 @@ public class MaidataImportService : IMaidataImportService
         this.logger = logger;
     }
 
-    public static Dictionary<ShiftMethod, (double sec, decimal bpm, Rational bar)> CalcChartPadding(List<Chart> charts)
+    public static Dictionary<ShiftMethod, (double sec, decimal bpm, Rational bar)> CalcChartPadding(List<MaiChart> charts)
     {
         // 谱面导入时，会有两个地方涉及到时间的调整：
         // 1. 对谱面的调整。在下方的ImportMaidata函数中应用，对谱面进行相应的调整（chart.Shift）。
@@ -85,7 +82,7 @@ public class MaidataImportService : IMaidataImportService
         var notePaddingOfEachChart = charts.Select(chart =>
         {
             var bpm = chart.StartBpm;
-            var notePadding = (1 - chart.FirstNoteTime.InvariantBar).CanonicalForm;
+            var notePadding = (1 - chart.StartTime.InvariantBar).CanonicalForm;
             var sec = (double)(notePadding * (240 / (Rational)bpm));
             return (sec, bpm, notePadding);
         }).ToList();
@@ -188,14 +185,9 @@ public class MaidataImportService : IMaidataImportService
         var lineNoDict = GetLevelLineNo(maiDataText);
         
         var targetLevelMap = MapMaidataLevelToGame(maiData);
-        if (targetLevelMap.Count == 0) // 没有能够被映射的谱面
-        {
-            errors.Add(new ImportChartMessage(Locale.MusicNoCharts, MessageLevel.Fatal));
-            return new ImportChartResult(errors, true);
-        }
         
         // 先执行第一步：Parser，因为可能涉及对Chart做出调整
-        List<(int lv, int targetLevel, MaidataChart data, Chart chart, List<Alert> alerts)> parserOutput = [];
+        List<(int lv, int targetLevel, MaidataLevel data, MaiChart? chart, List<Alert> alerts)> parserOutput = [];
         foreach (var (lv, data) in maiData.Levels)
         {
             if (!targetLevelMap.ContainsKey(lv)) continue;
@@ -207,17 +199,28 @@ public class MaidataImportService : IMaidataImportService
             {
                 var parser = new SimaiParser(!isUtage && lv is 2 or 3, maiData.ClockCount);
                 var (chart, alerts) = parser.Parse(data.Inote);
+                if (chart.TotalNotes == 0)
+                {
+                    errors.Add(new ImportChartMessage(string.Format(Locale.ChartNoNotes, lv), MessageLevel.Warning));
+                    chart = null;
+                }
                 parserOutput.Add((lv, targetLevel, data, chart, alerts));
             }
             catch (ConversionException e)
             {
-                parserOutput.Add((lv, targetLevel, data, null!, e.Alerts));
+                parserOutput.Add((lv, targetLevel, data, null, e.Alerts));
                 MergeAlertsIntoImportChartMessages();
                 return new ImportChartResult(errors, true);
             }
         }
         
-        var chartPaddingDict = CalcChartPadding(parserOutput.Select(x=>x.chart).ToList());
+        var validCharts = parserOutput.Where(x=> x.chart != null).Select(x => x.chart!).ToList();
+        if (validCharts.Count == 0)
+        {
+            errors.Add(new ImportChartMessage(Locale.MusicNoCharts, MessageLevel.Fatal));
+            return new ImportChartResult(errors, true);
+        }
+        var chartPaddingDict = CalcChartPadding(validCharts);
         var chartPadding = chartPaddingDict[shift]; // 当前所选择的模式所具体对应的chartPadding
 
         foreach (var c in music.Charts) { c.Enable = false; } // 先把所有难度标记为关闭（马上后面"第二步"的逻辑，会对存在的难度打开）
@@ -226,22 +229,13 @@ public class MaidataImportService : IMaidataImportService
         // 再执行第二步
         foreach (var (lv, targetLevel, data, chart, alerts) in parserOutput)
         {
+            if (chart == null) continue;
             var targetChart = music.Charts[targetLevel];
             targetChart.Path = $"{id:000000}_0{targetLevel}.ma2";
             
             #region 计算等级（定数）相关
-            var levelNumStr = data.Level;
-            if (!string.IsNullOrWhiteSpace(levelNumStr))
-            {
-                if (isUtage && !char.IsDigit(levelNumStr[0]))
-                {
-                    music.UtageKanji = levelNumStr.Substring(0, 1);
-                    levelNumStr = levelNumStr.Substring(1).Replace("?", ""); // 为了处理类似“奏13+?”这种情况，留下13+给后面的逻辑处理
-                }
-                levelNumStr = levelNumStr.Replace("+", ".7");
-            }
-
-            float.TryParse(levelNumStr, out var levelNum);
+            MaiUtils.ParseLevelStr(data.Level, out var levelNum, out var utageKanji);
+            if (isUtage) music.UtageKanji = utageKanji;
             targetChart.LevelId = MaiUtils.GetLevelId((int)(levelNum * 10));
             // 忽略定数
             if (!ignoreLevelNum)

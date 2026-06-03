@@ -26,30 +26,47 @@ public static class AssetBundleCreator
     {
         if (!File.Exists(imagePath))
             throw new FileNotFoundException($"Image file not found: {imagePath}", imagePath);
+        CreateTextureAssetBundle(File.ReadAllBytes(imagePath), outputAbPath, assetName, containerPath, abName, resizeWidth, resizeHeight);
+    }
 
+    public static void CreateTextureAssetBundle(
+        ReadOnlySpan<byte> pngImageData,
+        string outputAbPath,
+        string assetName,
+        string containerPath,
+        string abName,
+        int? resizeWidth = null,
+        int? resizeHeight = null)
+    {
+        using var image = SixLabors.ImageSharp.Image.Load<Rgba32>(pngImageData);
+        if (resizeWidth.HasValue && resizeHeight.HasValue)
+            image.Mutate(x => x.Resize(resizeWidth.Value, resizeHeight.Value));
+
+        image.Mutate(x => x.Flip(FlipMode.Vertical));
+
+        int width = image.Width;
+        int height = image.Height;
+        var rgbaData = new byte[width * height * 4];
+        image.CopyPixelDataTo(rgbaData);
+        
+        CreateTextureAssetBundle(rgbaData, width, height, outputAbPath, assetName, containerPath, abName);
+    }
+
+    private static void CreateTextureAssetBundle(
+        byte[] rgbaData,
+        int width,
+        int height,
+        string outputAbPath,
+        string assetName,
+        string containerPath,
+        string abName)
+    {
         if (!File.Exists(TemplateAbPath))
             throw new FileNotFoundException($"Template AB not found: {TemplateAbPath}", TemplateAbPath);
 
         var outputDir = Path.GetDirectoryName(outputAbPath);
         if (!string.IsNullOrWhiteSpace(outputDir))
             Directory.CreateDirectory(outputDir);
-
-        // 加载图片并转为 RGBA32 像素数据
-        byte[] rgbaData;
-        int width, height;
-
-        using (var image = SixLabors.ImageSharp.Image.Load<Rgba32>(imagePath))
-        {
-            if (resizeWidth.HasValue && resizeHeight.HasValue)
-                image.Mutate(x => x.Resize(resizeWidth.Value, resizeHeight.Value));
-
-            image.Mutate(x => x.Flip(FlipMode.Vertical));
-
-            width = image.Width;
-            height = image.Height;
-            rgbaData = new byte[width * height * 4];
-            image.CopyPixelDataTo(rgbaData);
-        }
 
         // 加载模板 AB 并解包
         var am = new AssetsManager();
@@ -137,6 +154,52 @@ public static class AssetBundleCreator
 
         using var outStream = File.Create(outputAbPath);
         newBundle.Pack(new AssetsFileWriter(outStream), AssetBundleCompressionType.LZ4, false, null);
+    }
+    
+    public static string CreateMusicJacketAssetBundles(ReadOnlySpan<byte> pngImageData, string AssetBundleImagesDir, int musicId)
+    {
+        var abiDir = Path.Combine(AssetBundleImagesDir, "jacket");
+        var abiSDir = Path.Combine(AssetBundleImagesDir, "jacket_s");
+        Directory.CreateDirectory(abiDir);
+        Directory.CreateDirectory(abiSDir);
+        
+        string key = $"UI_Jacket_{musicId:000000}";
+        
+        CreateTextureAssetBundle(
+            pngImageData,
+            Path.Combine(abiDir, $"{key.ToLowerInvariant()}.ab"),
+            key,
+            $"assets/assetbundle/jacket/{key.ToLowerInvariant()}.png",
+            $"jacket/{key.ToLowerInvariant()}.ab");
+
+        CreateTextureAssetBundle(
+            pngImageData,
+            Path.Combine(abiSDir, $"{key.ToLowerInvariant()}_s.ab"),
+            $"{key}_s",
+            $"assets/assetbundle/jacket_s/{key.ToLowerInvariant()}_s.png",
+            $"jacket_s/{key.ToLowerInvariant()}_s.ab",
+            resizeWidth: 200,
+            resizeHeight: 200);
+
+        return Path.Combine(abiDir, $"{key}.ab");
+    }
+    
+    // 读取输入的ab包当中的图片，然后用指定的assetName等参数重新打包。
+    // 适用于歌曲改ID等的场景。
+    public static void RepackTextureAssetBundle(
+        string inputAbPath,
+        string outputAbPath,
+        string assetName,
+        string containerPath,
+        string abName)
+    {
+        if (!File.Exists(inputAbPath))
+            throw new FileNotFoundException($"Input AB not found: {inputAbPath}", inputAbPath);
+
+        var pngBytes = ImageConvert.GetTextureAsPngData(inputAbPath);
+        if (pngBytes is null || pngBytes.Length == 0)
+            throw new InvalidOperationException($"Could not decode jacket texture to PNG from: {inputAbPath}");
+        CreateTextureAssetBundle(pngBytes, outputAbPath, assetName, containerPath, abName);
     }
 
     private static void WriteUncompressedBundle(byte[] assetsData, string cabName, Stream output)

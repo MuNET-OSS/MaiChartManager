@@ -1,10 +1,7 @@
 ﻿using MaiChartManager.Controllers.Charts.Services;
 using MaiChartManager.Controllers.Music;
 using Microsoft.AspNetCore.Mvc;
-using MuConvert.chart;
-using MuConvert.generator;
-using MuConvert.maidata;
-using MuConvert.parser;
+using MuConvert.mai;
 using MuConvert.utils;
 
 namespace MaiChartManager.Controllers.Charts;
@@ -79,16 +76,9 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
             }
             # endregion
 
-            if (targetLevelMap.Count == 0) // 没有能够被映射的谱面
-            {
-                errors.Add(new ImportChartMessage(Locale.MusicNoCharts, MessageLevel.Fatal));
-                fatal = true;
-                return new ImportChartCheckResult(!fatal, errors, new Dictionary<ShiftMethod, float>(), false, title, 0, null);
-            }
-
             var first = maiData.First;
             var isDx = false;
-            List<Chart> resultCharts = [];
+            List<MaiChart> resultCharts = [];
             foreach (var (lv, data) in maiData.Levels)
             {
                 if (!targetLevelMap.ContainsKey(lv)) continue;
@@ -99,8 +89,13 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
                 {
                     //                                                 ↓ 此处的参数应该不会影响 check 的结果
                     var (chart, alerts1) = new SimaiParser(false, maiData.ClockCount).Parse(data.Inote);
-                    resultCharts.Add(chart);
                     alerts.AddRange(alerts1);
+                    if (chart.TotalNotes == 0)
+                    {
+                        errors.Add(new ImportChartMessage(string.Format(Locale.ChartNoNotes, lv), MessageLevel.Warning));
+                        continue;
+                    }
+                    resultCharts.Add(chart);
                     var (_, alerts2) = new MA2Generator().Generate(chart);
                     alerts.AddRange(alerts2);
                     isDx = isDx || chart.IsDxChart;
@@ -115,6 +110,12 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
                     var m = ImportChartMessage.FromAlert(alert, lv, lineNoDict);
                     if (m != null) errors.Add(m);
                 }
+            }
+            
+            if (resultCharts.Count == 0) // 没有解析成功的谱面
+            {
+                errors.Add(new ImportChartMessage(Locale.MusicNoCharts, MessageLevel.Fatal));
+                fatal = true;
             }
 
             Dictionary<ShiftMethod, float> chartPaddingsSec = new();

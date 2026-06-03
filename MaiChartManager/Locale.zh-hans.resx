@@ -199,6 +199,9 @@
     <data name="ChartDifficultyParseFailed" xml:space="preserve">
     <value>谱面难度 {0} 解析失败</value>
   </data>
+  <data name="ChartNoNotes" xml:space="preserve">
+    <value>谱面难度 {0} 中没有音符。将不会导入此难度。</value>
+  </data>
     <data name="ChartParseFailedGlobal" xml:space="preserve">
     <value>谱面解析失败（大）</value>
   </data>
@@ -271,6 +274,15 @@
     <data name="VideoFileFilter" xml:space="preserve">
     <value>视频或者图片|*.mp4;*.mov;*.avi;*.mkv;*.jpg;*.jpeg;*.png;*.gif;*.bmp;*.webp;*.svg;*.dat;*.usm</value>
   </data>
+    <data name="BatchConvertPvNeedLicense" xml:space="preserve">
+    <value>批量转换 PV 需要赞助激活</value>
+  </data>
+    <data name="BatchConvertPvNoFiles" xml:space="preserve">
+    <value>没有找到匹配格式的 PV 文件</value>
+  </data>
+    <data name="BatchConvertPvFolderNotFound" xml:space="preserve">
+    <value>选择的文件夹不存在</value>
+  </data>
 
     <!-- ImageToAbToolController -->
     <data name="SelectImageFolder" xml:space="preserve">
@@ -278,6 +290,12 @@
   </data>
     <data name="NoValidImagesFound" xml:space="preserve">
     <value>未找到有效的图片文件（需要：纯数字文件名或 ui_jacket_* 格式，PNG/JPG 格式）</value>
+  </data>
+  <data name="ImageToAbDeleteOriginalPngQuestion" xml:space="preserve">
+    <value>是否需要删除原有的PNG/JPG图片？（由于直读优先级高于AB，如果不删除的话，则游戏运行时还是会优先进行图片直读。）</value>
+  </data>
+  <data name="ImageToAb" xml:space="preserve">
+    <value>图片转 AssetBundle</value>
   </data>
 
     <!-- ModController -->

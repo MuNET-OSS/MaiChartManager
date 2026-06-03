@@ -276,6 +276,9 @@ mod:
   update: 更新
   search: 搜索
   searchPlaceholder: 搜索配置…
+  favorite: 收藏
+  addFavorite: 添加到收藏
+  removeFavorite: 取消收藏
   other: 其他
   needEnableOption: 需要开启此选项
   unsupportedType: '不支持的类型: {type}'
@@ -411,41 +414,41 @@ mod:
     P1: 启用 1P
     P2: 启用 2P
     tip: 如果混用 Maimoller 与其他协议，请对不是 Maimoller 的一侧禁用
-  on: 开
-  off: 关
+  'on': 开
+  'off': 关
   enable: 启用
   disable: 禁用
-  stableChannel: "稳定通道"
-  fastChannel: "快速通道"
-  mumod: "MuMod"
-  mumodDesc: "自动更新加载器"
-  mumodInstalled: "已安装"
-  mumodChannel: "更新通道"
-  mumodChannelSlow: "稳定"
-  mumodChannelFast: "快速"
-  cacheUpdating: "正在更新缓存..."
-  cacheFailed: "缓存更新失败"
+  stableChannel: 稳定通道
+  fastChannel: 快速通道
+  mumod: MuMod
+  mumodDesc: 自动更新加载器
+  mumodInstalled: 已安装
+  mumodChannel: 更新通道
+  mumodChannelSlow: 稳定
+  mumodChannelFast: 快速
+  cacheUpdating: 正在更新缓存...
+  cacheFailed: 缓存更新失败
   conflict:
-    title: "检测到冲突"
-    message: "AquaMai 和 MuMod 同时存在，请选择保留哪一个"
-    deleteAquaMai: "删除 AquaMai"
-    deleteMuMod: "删除 MuMod"
+    title: 检测到冲突
+    message: AquaMai 和 MuMod 同时存在，请选择保留哪一个
+    deleteAquaMai: 删除 AquaMai
+    deleteMuMod: 删除 MuMod
   pdx:
-    noDevice: "未检测到 PDX 设备"
-    deviceCount: "检测到 {count} 个 PDX 设备"
-    driverWinusb: "当前驱动: 独占模式"
-    driverDefault: "当前驱动: Windows 触摸模式"
-    switchToExclusive: "切换到独占模式"
-    switchToWintouch: "切换到 Windows 触摸模式"
-    switchSuccess: "驱动切换成功"
-    switchFailed: "驱动切换失败"
-    switchCancelled: "已取消权限请求"
-    refresh: "刷新设备状态"
-    unavailable: "PDX 驱动工具不可用"
-    selectDevice: "选择设备"
-    path1P: "1P 设备路径"
-    path2P: "2P 设备路径"
-    pathDesc: "USB 端口路径，例如 2.2。请使用配置工具中显示的路径。留空则使用第一个检测到的设备作为 1P"
+    noDevice: 未检测到 PDX 设备
+    deviceCount: 检测到 {count} 个 PDX 设备
+    driverWinusb: '当前驱动: 独占模式'
+    driverDefault: '当前驱动: Windows 触摸模式'
+    switchToExclusive: 切换到独占模式
+    switchToWintouch: 切换到 Windows 触摸模式
+    switchSuccess: 驱动切换成功
+    switchFailed: 驱动切换失败
+    switchCancelled: 已取消权限请求
+    refresh: 刷新设备状态
+    unavailable: PDX 驱动工具不可用
+    selectDevice: 选择设备
+    path1P: 1P 设备路径
+    path2P: 2P 设备路径
+    pathDesc: USB 端口路径，例如 2.2。请使用配置工具中显示的路径。留空则使用第一个检测到的设备作为 1P
 tools:
   title: 工具
   audioConvert: 音频转换（ACB + AWB）
@@ -456,8 +459,40 @@ tools:
   videoConvertError: 视频转换出错
   imageToAb: 图片转 AssetBundle
   imageToAbError: 图片转 AB 出错
+  pvConvert:
+    label: 转换 PV
+    single: 单个转换
+    singleHint: 选择一个 PV 文件，DAT/USM 转 MP4，其他视频转 DAT
+    batch: 批量转换
+    batchHint: 选择文件夹批量转换，可选择 DAT/USM 与 MP4 的转换方向
   videoOptions:
     processing: 还在处理，别急…
+  batchPv:
+    label: 批量转换 PV
+    title: 批量转换 PV
+    selectFolder: 选择文件夹
+    changeFolder: 重新选择
+    selectedFolder: 已选择的文件夹
+    folderNotFound: 选择的文件夹不存在
+    direction: 转换方向
+    directionUsmToMp4: USM / DAT → MP4
+    directionMp4ToUsm: MP4 → USM / DAT
+    directionUsmToMp4Hint: 在该文件夹内为每个 DAT/USM 生成对应的 MP4，原文件保留
+    directionMp4ToUsmHint: 在该文件夹内为每个 MP4 生成对应的 DAT，原 MP4 保留
+    start: 开始转换
+    cancel: 取消
+    cancelling: 正在取消…
+    cancelHint: 取消会在当前文件转换完成后生效
+    close: 关闭
+    overall: 总进度
+    currentFile: 当前文件
+    currentFileProgress: 当前文件进度
+    completedSummary: 转换完成：成功 {success} / {total}（失败 {failed}）
+    cancelledSummary: 已取消：已完成 {completed} / {total}
+    noFiles: 该文件夹下没有找到匹配方向的 PV 文件
+    needLicense: 此功能需要赞助激活
+    error: 批量转换 PV 出错
+    fileErrors: 处理过程中的文件错误：
 error:
   title: 错误
   unknown: 发生未知错误
@@ -520,6 +555,7 @@ purchase:
     changeId: 修改歌曲 ID
     batchExport: 批量将乐曲导出成新的 Opt
     batchMaidata: 批量将乐曲转换成 Maidata
+  ldxp: 链动小铺（推荐）
 startup:
   error: 启动过程中发生错误
   errorList: 错误列表
@@ -572,6 +608,7 @@ settings:
   movieCodec: PV 编码
   yuv420p: 转换 USM 时使用 YUV420P 颜色空间
   noScale: 不要缩放视频到 1080 宽度
+  convertJacketToAssetBundle: 歌曲封面图使用原生AssetBundle格式
   updateChannel: 更新通道
   updateChannelSlow: 稳定
   updateChannelCi: 快速

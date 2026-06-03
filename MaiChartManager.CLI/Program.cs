@@ -24,14 +24,6 @@ try
     AppMain.InitConfiguration(true);
     await IapManager.Init();
 
-#if !CRACK
-    if (IapManager.License != IapManager.LicenseStatus.Active)
-    {
-        Console.WriteLine("命令行工具目前为赞助版功能，请先使用桌面版应用程序解锁");
-        return 1;
-    }
-#endif
-
     var app = new CommandApp();
 
     app.Configure(config =>

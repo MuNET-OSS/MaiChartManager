@@ -276,6 +276,9 @@ mod:
   update: 更新
   search: 搜尋
   searchPlaceholder: 搜尋設定…
+  favorite: 收藏
+  addFavorite: 新增到收藏
+  removeFavorite: 取消收藏
   other: 其他
   needEnableOption: 需要開啟此選項
   unsupportedType: '不支援的類型: {type}'
@@ -417,41 +420,41 @@ mod:
     P1: 啟用 1P
     P2: 啟用 2P
     tip: 如果混用 Maimoller 與其他協議，請對不是 Maimoller 的一侧停用
-  on: 開
-  off: 關
+  'on': 開
+  'off': 關
   enable: 啟用
   disable: 停用
-  stableChannel: "穩定通道"
-  fastChannel: "快速通道"
-  mumod: "MuMod"
-  mumodDesc: "自動更新載入器"
-  mumodInstalled: "已安裝"
-  mumodChannel: "更新通道"
-  mumodChannelSlow: "穩定"
-  mumodChannelFast: "快速"
-  cacheUpdating: "正在更新快取..."
-  cacheFailed: "快取更新失敗"
+  stableChannel: 穩定通道
+  fastChannel: 快速通道
+  mumod: MuMod
+  mumodDesc: 自動更新載入器
+  mumodInstalled: 已安裝
+  mumodChannel: 更新通道
+  mumodChannelSlow: 穩定
+  mumodChannelFast: 快速
+  cacheUpdating: 正在更新快取...
+  cacheFailed: 快取更新失敗
   conflict:
-    title: "偵測到衝突"
-    message: "AquaMai 和 MuMod 同時存在，請選擇保留哪一個"
-    deleteAquaMai: "刪除 AquaMai"
-    deleteMuMod: "刪除 MuMod"
+    title: 偵測到衝突
+    message: AquaMai 和 MuMod 同時存在，請選擇保留哪一個
+    deleteAquaMai: 刪除 AquaMai
+    deleteMuMod: 刪除 MuMod
   pdx:
-    noDevice: "未偵測到 PDX 設備"
-    deviceCount: "偵測到 {count} 個 PDX 設備"
-    driverWinusb: "目前驅動: 獨占模式"
-    driverDefault: "目前驅動: Windows 觸控模式"
-    switchToExclusive: "切換至獨占模式"
-    switchToWintouch: "切換至 Windows 觸控模式"
-    switchSuccess: "驅動切換成功"
-    switchFailed: "驅動切換失敗"
-    switchCancelled: "已取消權限請求"
-    refresh: "重新整理設備狀態"
-    unavailable: "PDX 驅動工具不可用"
-    selectDevice: "選擇設備"
-    path1P: "1P 設備路徑"
-    path2P: "2P 設備路徑"
-    pathDesc: "USB 連接埠路徑，例如 2.2。請使用設定工具中顯示的路徑。留空則使用第一個偵測到的設備作為 1P"
+    noDevice: 未偵測到 PDX 設備
+    deviceCount: 偵測到 {count} 個 PDX 設備
+    driverWinusb: '目前驅動: 獨占模式'
+    driverDefault: '目前驅動: Windows 觸控模式'
+    switchToExclusive: 切換至獨占模式
+    switchToWintouch: 切換至 Windows 觸控模式
+    switchSuccess: 驅動切換成功
+    switchFailed: 驅動切換失敗
+    switchCancelled: 已取消權限請求
+    refresh: 重新整理設備狀態
+    unavailable: PDX 驅動工具不可用
+    selectDevice: 選擇設備
+    path1P: 1P 設備路徑
+    path2P: 2P 設備路徑
+    pathDesc: USB 連接埠路徑，例如 2.2。請使用設定工具中顯示的路徑。留空則使用第一個偵測到的設備作為 1P
 tools:
   title: 工具
   audioConvert: 音訊轉換（ACB + AWB）
@@ -462,8 +465,40 @@ tools:
   videoConvertError: 影片轉換出錯
   imageToAb: 圖片轉 AssetBundle
   imageToAbError: 圖片轉 AB 出錯
+  pvConvert:
+    label: 轉換 PV
+    single: 單個轉換
+    singleHint: 選擇一個 PV 檔案，DAT/USM 轉 MP4，其他影片轉 DAT
+    batch: 批次轉換
+    batchHint: 選擇資料夾批次轉換，可選擇 DAT/USM 與 MP4 的轉換方向
   videoOptions:
     processing: 還在處理，別急…
+  batchPv:
+    label: 批次轉換 PV
+    title: 批次轉換 PV
+    selectFolder: 選擇資料夾
+    changeFolder: 重新選擇
+    selectedFolder: 已選擇的資料夾
+    folderNotFound: 選擇的資料夾不存在
+    direction: 轉換方向
+    directionUsmToMp4: USM / DAT → MP4
+    directionMp4ToUsm: MP4 → USM / DAT
+    directionUsmToMp4Hint: 在該資料夾內為每個 DAT/USM 產生對應的 MP4，原檔案保留
+    directionMp4ToUsmHint: 在該資料夾內為每個 MP4 產生對應的 DAT，原 MP4 保留
+    start: 開始轉換
+    cancel: 取消
+    cancelling: 正在取消…
+    cancelHint: 取消會在目前檔案轉換完成後生效
+    close: 關閉
+    overall: 總進度
+    currentFile: 目前檔案
+    currentFileProgress: 目前檔案進度
+    completedSummary: 轉換完成：成功 {success} / {total}（失敗 {failed}）
+    cancelledSummary: 已取消：已完成 {completed} / {total}
+    noFiles: 該資料夾下找不到符合方向的 PV 檔案
+    needLicense: 此功能需要贊助啟用
+    error: 批次轉換 PV 出錯
+    fileErrors: 處理過程中的檔案錯誤：
 error:
   title: 錯誤
   unknown: 發生未知錯誤
@@ -478,7 +513,7 @@ error:
   feedbackError: 回饋錯誤
   file:
     notSelected: 未選擇檔案
-  unsupportedFileType: '不支援的檔案類型'
+  unsupportedFileType: 不支援的檔案類型
 message:
   notice: 提示
   saveSuccess: 儲存成功
@@ -526,6 +561,7 @@ purchase:
     changeId: 修改歌曲 ID
     batchExport: 批次將樂曲匯出成新的 Opt
     batchMaidata: 批次將樂曲轉換成 Maidata
+  ldxp: 鏈動小舖（推薦）
 startup:
   error: 啟動過程中發生錯誤
   errorList: 錯誤列表
@@ -578,6 +614,7 @@ settings:
   movieCodec: PV 編碼
   yuv420p: 轉換 USM 時使用 YUV420P 顏色空間
   noScale: 不要縮放影片到 1080 寬度
+  convertJacketToAssetBundle: 歌曲封面圖使用原生AssetBundle格式
   updateChannel: 更新通道
   updateChannelSlow: 穩定
   updateChannelCi: 快速

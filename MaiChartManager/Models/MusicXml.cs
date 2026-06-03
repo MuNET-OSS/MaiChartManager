@@ -566,7 +566,7 @@ public partial class MusicXml
 
     public static readonly string[] jacketExtensions = ["jpg", "png", "jpeg"];
 
-    [JsonIgnore] public string JacketPath { get; set; }
+    [JsonIgnore] public string? JacketPath { get; set; }
 
     public bool HasJacket => JacketPath is not null;
 
