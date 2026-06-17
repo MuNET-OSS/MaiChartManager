@@ -27,8 +27,8 @@ public class CueConvertController(StaticSettings settings, ILogger<CueConvertCon
     public void SetAudio(int id, [FromForm] float padding, IFormFile file, IFormFile? awb, IFormFile? preview, string assetDir, [FromForm] bool ignoreGapless = false)
     {
         id %= 10000;
-        var targetAcbPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, $@"SoundData\music{id:000000}.acb");
-        var targetAwbPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, $@"SoundData\music{id:000000}.awb");
+        var targetAcbPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, "SoundData", $"music{id:000000}.acb");
+        var targetAwbPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, "SoundData", $"music{id:000000}.awb");
         Directory.CreateDirectory(Path.GetDirectoryName(targetAcbPath));
 
         if (Path.GetExtension(file.FileName).Equals(".acb", StringComparison.InvariantCultureIgnoreCase))

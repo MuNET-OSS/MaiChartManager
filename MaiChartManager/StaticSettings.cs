@@ -220,8 +220,8 @@ public partial class StaticSettings
         PseudoAssetBundleJacketMap.Clear();
         foreach (var a in AssetsDirs)
         {
-            if (!Directory.Exists(Path.Combine(StreamingAssets, a, @"AssetBundleImages\jacket"))) continue;
-            foreach (var jacketFile in Directory.EnumerateFiles(Path.Combine(StreamingAssets, a, @"AssetBundleImages\jacket")))
+            if (!Directory.Exists(Path.Combine(StreamingAssets, a, "AssetBundleImages", "jacket"))) continue;
+            foreach (var jacketFile in Directory.EnumerateFiles(Path.Combine(StreamingAssets, a, "AssetBundleImages", "jacket")))
             {
                 if (!Path.GetFileName(jacketFile).StartsWith("ui_jacket_", StringComparison.InvariantCultureIgnoreCase)) continue;
                 var idStr = Path.GetFileName(jacketFile).Substring("ui_jacket_".Length, 6);

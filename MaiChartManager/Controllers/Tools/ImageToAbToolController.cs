@@ -41,8 +41,9 @@ public partial class ImageToAbToolController(StaticSettings settings, ILogger<Im
             return;
         }
 
-        // 所选择的路径是否是正规的OPT内jacket路径。方法是判断路径结尾是否是AssetBundleImages\jacket
-        var isIngameJacketPath = selectedPath.TrimEnd('\\').EndsWith(@"AssetBundleImages\jacket", StringComparison.OrdinalIgnoreCase);
+        // 所选择的路径是否是正规的OPT内jacket路径。方法是判断路径结尾是否是AssetBundleImages/jacket
+        var normalizedPath = selectedPath.TrimEnd('/', '\\').Replace('\\', '/');
+        var isIngameJacketPath = normalizedPath.EndsWith("AssetBundleImages/jacket", StringComparison.OrdinalIgnoreCase);
 
         var deleteOriginalPngAfterSuccess = false;
         if (isIngameJacketPath)

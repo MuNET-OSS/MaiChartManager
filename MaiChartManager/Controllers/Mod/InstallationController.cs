@@ -100,7 +100,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
 
     #region ADX HID 冲突检测和删除
 
-    private static readonly string[] HidModPaths = [@"Mods\Mai2InputMod.dll", @"Mods\hid_input_lib.dll", "hid_input_lib.dll", "mai2io.dll"];
+    private static readonly string[] HidModPaths = [Path.Combine("Mods", "Mai2InputMod.dll"), Path.Combine("Mods", "hid_input_lib.dll"), "hid_input_lib.dll", "mai2io.dll"];
 
     [NonAction]
     private static bool GetIsHidConflictExist()
@@ -133,17 +133,17 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
     [NonAction]
     private static bool GetIsAdxHidIoModAbsent()
     {
-        return !System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Mods\ADXHIDIOMod.dll"));
+        return !System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Mods", "ADXHIDIOMod.dll"));
     }
 
     [NonAction]
     private static bool GetIsMmlLegacyLibsInstalled()
     {
-        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\hidapi.dll")))
+        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "hidapi.dll")))
         {
             return false;
         }
-        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\libadxhid.dll")))
+        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "libadxhid.dll")))
         {
             return false;
         }
@@ -165,18 +165,18 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
     public void InstallMmlLibs([FromBody] InstallMmlLibsDto req)
     {
         var isMaimollerLegacyModeEnabled = req.UseLegacy;
-        if (System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Mods\ADXHIDIOMod.dll")))
+        if (System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Mods", "ADXHIDIOMod.dll")))
         {
-            System.IO.File.Delete(Path.Combine(StaticSettings.GamePath, @"Mods\ADXHIDIOMod.dll"));
+            System.IO.File.Delete(Path.Combine(StaticSettings.GamePath, "Mods", "ADXHIDIOMod.dll"));
         }
         if (!isMaimollerLegacyModeEnabled || GetIsMmlLegacyLibsInstalled()) return;
-        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\hidapi.dll")))
+        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "hidapi.dll")))
         {
-            CopyFile(Path.Combine(StaticSettings.exeDir, @"hidapi.dll"), Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\hidapi.dll"));
+            CopyFile(Path.Combine(StaticSettings.exeDir, @"hidapi.dll"), Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "hidapi.dll"));
         }
-        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\libadxhid.dll")))
+        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "libadxhid.dll")))
         {
-            CopyFile(Path.Combine(StaticSettings.exeDir, @"libadxhid.dll"), Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\libadxhid.dll"));
+            CopyFile(Path.Combine(StaticSettings.exeDir, @"libadxhid.dll"), Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "libadxhid.dll"));
         }
     }
 
@@ -274,7 +274,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
                 continue;
             }
             // Save to Mods folder
-            var dest = Path.Combine(StaticSettings.GamePath, @"Mods\AquaMai.dll");
+            var dest = Path.Combine(StaticSettings.GamePath, "Mods", "AquaMai.dll");
             Directory.CreateDirectory(Path.GetDirectoryName(dest));
             await System.IO.File.WriteAllBytesAsync(dest, data);
             if (System.IO.File.Exists(ModPaths.MuModDllInstalledPath))

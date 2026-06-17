@@ -508,8 +508,8 @@ public partial class MusicTransferController(
         // 当新ID和旧ID的 NonDx部分相同时（例如 5003 -> 15003），封面、音频、视频文件的目标路径与源路径完全一致，因此既不需要也不应该删除/移动它们。
         if (newNonDxId == music.NonDxId) return;
         
-        var abiDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, @"AssetBundleImages\jacket");
-        var abiSDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, @"AssetBundleImages\jacket_s");
+        var abiDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "AssetBundleImages", "jacket");
+        var abiSDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "AssetBundleImages", "jacket_s");
         Directory.CreateDirectory(abiDir);
         Directory.CreateDirectory(abiSDir);
         var abJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}.ab");

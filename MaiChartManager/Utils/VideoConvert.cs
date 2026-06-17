@@ -350,7 +350,7 @@ public static class VideoConvert
 
                 // 查找解包后的 IVF 文件
                 onProgress?.Invoke(50);
-                var outputIvfFile = Directory.EnumerateFiles(Path.Combine(tmpDir.FullName, @"output\movie.usm\videos")).FirstOrDefault();
+                var outputIvfFile = Directory.EnumerateFiles(Path.Combine(tmpDir.FullName, "output", "movie.usm", "videos")).FirstOrDefault();
                 if (outputIvfFile is null)
                 {
                     throw new Exception("USM 解包失败：未找到视频文件");

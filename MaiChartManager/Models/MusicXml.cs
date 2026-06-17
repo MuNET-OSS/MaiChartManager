@@ -203,7 +203,7 @@ public partial class MusicXml
                       <priority>0</priority>
                     </MusicData>
                     """;
-        var path = Path.Combine(gamePath, @"Sinmai_Data\StreamingAssets", assetDir, $@"music\music{dxId:000000}");
+        var path = Path.Combine(gamePath, "Sinmai_Data", "StreamingAssets", assetDir, "music", $"music{dxId:000000}");
         Directory.CreateDirectory(path);
         File.WriteAllText(Path.Combine(path, "Music.xml"), data);
         return new MusicXml(Path.Combine(path, "Music.xml"), gamePath);

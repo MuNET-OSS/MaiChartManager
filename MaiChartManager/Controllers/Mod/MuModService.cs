@@ -9,7 +9,7 @@ public class MuModService(ILogger<MuModService> logger, IHttpClientFactory httpC
 {
     private const string CosVersionApiUrl = "https://munet-version-config-1251600285.cos.ap-shanghai.myqcloud.com/aquamai.json";
     private const string CfVersionApiUrl = "https://aquamai-version-config.mumur.net/api/config";
-    private const string DefaultCacheRelativePath = @"LocalAssets\MuMod.cache";
+    private const string DefaultCacheRelativePath = "LocalAssets/MuMod.cache";
 
     private enum VersionSource
     {

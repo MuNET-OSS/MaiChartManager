@@ -12,7 +12,7 @@ public class GenreXml
 
     // name.str 在游戏里不会被用到
     public int Id { get; }
-    public string FilePath => Path.Combine(GamePath, @"Sinmai_Data\StreamingAssets", AssetDir, $"musicGenre/musicgenre{Id:000000}/MusicGenre.xml");
+    public string FilePath => Path.Combine(GamePath, "Sinmai_Data", "StreamingAssets", AssetDir, $"musicGenre/musicgenre{Id:000000}/MusicGenre.xml");
 
     public GenreXml(int id, string assetDir, string gamePath)
     {
@@ -25,7 +25,7 @@ public class GenreXml
 
     public static GenreXml CreateNew(int id, string assetDir, string gamePath)
     {
-        var dir = Path.Combine(gamePath, @"Sinmai_Data\StreamingAssets", assetDir, $"musicGenre/musicgenre{id:000000}");
+        var dir = Path.Combine(gamePath, "Sinmai_Data", "StreamingAssets", assetDir, $"musicGenre/musicgenre{id:000000}");
         Directory.CreateDirectory(dir);
         var text = $"""
                     <?xml version="1.0" encoding="utf-8"?>
@@ -96,6 +96,6 @@ public class GenreXml
 
     public void Delete()
     {
-        FileSystem.DeleteDirectory(Path.Combine(GamePath, @"Sinmai_Data\StreamingAssets", AssetDir, $"musicGenre/musicgenre{Id:000000}"), UIOption.AllDialogs, RecycleOption.SendToRecycleBin);
+        FileSystem.DeleteDirectory(Path.Combine(GamePath, "Sinmai_Data", "StreamingAssets", AssetDir, $"musicGenre/musicgenre{Id:000000}"), UIOption.AllDialogs, RecycleOption.SendToRecycleBin);
     }
 }

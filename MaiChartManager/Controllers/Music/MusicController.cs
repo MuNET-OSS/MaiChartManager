@@ -166,7 +166,7 @@ public class MusicController(StaticSettings settings, ILogger<MusicController> l
         if (music is null) return "Music not found!";
         music.DeleteJacket(); // 删除老的jacket
 
-        var abiDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, @"AssetBundleImages\jacket");
+        var abiDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "AssetBundleImages", "jacket");
         Directory.CreateDirectory(abiDir);
         
         if (StaticSettings.Config.ConvertJacketToAssetBundle)
