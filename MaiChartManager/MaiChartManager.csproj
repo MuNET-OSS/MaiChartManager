@@ -119,6 +119,10 @@
     </Compile>
   </ItemGroup>
   <ItemGroup Condition="'$(IsLinuxBuild)' == 'true'">
+    <PackageReference Include="System.Resources.Extensions" Version="10.0.0" />
+    <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(IsLinuxBuild)' == 'true'">
     <Compile Remove="Program.cs" />
     <Compile Remove="AppMain.cs" />
     <Compile Remove="AppMain.g.cs" />
