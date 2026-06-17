@@ -122,6 +122,18 @@ public static class ServerManager
             .AddJsonOptions(options =>
                 options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
+#if WINDOWS
+        builder.Services.AddSingleton<MaiChartManager.Platform.IDesktopDialogService, MaiChartManager.Platform.Windows.WinFormsDialogService>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.ITaskbarProgress, MaiChartManager.Platform.Windows.WindowsTaskbarProgress>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IShellService, MaiChartManager.Platform.Windows.WindowsShellService>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IAppShell, MaiChartManager.Platform.Windows.WindowsAppShell>();
+#else
+        builder.Services.AddSingleton<MaiChartManager.Platform.IDesktopDialogService, MaiChartManager.Platform.Linux.HeadlessDialogService>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.ITaskbarProgress, MaiChartManager.Platform.Linux.NoopTaskbarProgress>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IShellService, MaiChartManager.Platform.Linux.LinuxShellService>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IAppShell, MaiChartManager.Platform.Linux.HeadlessAppShell>();
+#endif
+
         if (StaticSettings.Config.UseAuth)
         {
             builder.Services.AddAuthentication(BasicAuthenticationDefaults.AuthenticationScheme)
