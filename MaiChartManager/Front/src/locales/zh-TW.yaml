@@ -21,6 +21,7 @@ common:
   dismiss: 放棄
   longMusic: LongMusic
   error: 錯誤
+  detail: 詳情
 assetDir:
   title: Opt 管理
   create: 建立目錄

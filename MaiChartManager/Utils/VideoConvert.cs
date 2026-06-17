@@ -40,7 +40,7 @@ public static class VideoConvert
                 .Start();
             HardwareAcceleration = HardwareAccelerationStatus.Enabled;
         }
-        catch (Exception e)
+        catch
         {
             HardwareAcceleration = HardwareAccelerationStatus.Disabled;
         }
@@ -62,7 +62,7 @@ public static class VideoConvert
                 H264Encoder = encoder;
                 break;
             }
-            catch (Exception e) { }
+            catch { }
         }
 
         Console.WriteLine($"H264 encoder: {H264Encoder}");
@@ -183,6 +183,8 @@ public static class VideoConvert
         var firstStream = srcMedia.VideoStreams.First().SetCodec(codec);
         var conversion = FFmpeg.Conversions.New()
             .AddStream(firstStream);
+        var logCollector = new FfmpegLogCollector();
+        logCollector.Attach(conversion);
 
         // 处理图片输入
         if (options.ContentType?.StartsWith("image/") == true)
@@ -222,9 +224,11 @@ public static class VideoConvert
                 .AddParameter($"-i color=c=black:s={srcMedia.VideoStreams.First().Width}x{srcMedia.VideoStreams.First().Height}:r=30")
                 .UseMultiThread(true)
                 .SetOutput(blankPath);
+            logCollector.Attach(blank);
             await blank.Start();
             var blankVideoInfo = await FFmpeg.GetMediaInfo(blankPath);
             conversion = Concatenate(vf, blankVideoInfo, srcMedia);
+            logCollector.Attach(conversion);
             conversion.AddParameter($"-c:v {codec}");
         }
 
@@ -264,7 +268,17 @@ public static class VideoConvert
             };
         }
 
-        await conversion.Start();
+        try
+        {
+            await conversion.Start();
+        }
+        catch (Exception ex)
+        {
+            throw new VideoConversionException(
+                FfmpegDiagnostics.CreateSummary(ex, logCollector.GetLog()),
+                FfmpegDiagnostics.CreateDetail(ex, logCollector.GetLog()),
+                ex);
+        }
     }
 
     private static IConversion Concatenate(string vf, params IMediaInfo[] mediaInfos)
@@ -339,6 +353,8 @@ public static class VideoConvert
                     .AddParameter("-i " + FFmpegHelper.Escape(outputIvfFile))
                     .AddParameter("-c:v copy")
                     .SetOutput(outputPath);
+                var logCollector = new FfmpegLogCollector();
+                logCollector.Attach(conversion);
 
                 if (onProgress != null)
                 {
@@ -350,7 +366,17 @@ public static class VideoConvert
                     };
                 }
 
-                await conversion.Start();
+                try
+                {
+                    await conversion.Start();
+                }
+                catch (Exception ex)
+                {
+                    throw new VideoConversionException(
+                        FfmpegDiagnostics.CreateSummary(ex, logCollector.GetLog()),
+                        FfmpegDiagnostics.CreateDetail(ex, logCollector.GetLog()),
+                        ex);
+                }
 
                 if (!File.Exists(outputPath) || new FileInfo(outputPath).Length == 0)
                 {
@@ -375,4 +401,10 @@ public static class VideoConvert
             UsmToMp4Semaphore.Release();
         }
     }
+}
+
+public sealed class VideoConversionException(string message, string detail, Exception innerException)
+    : Exception(message, innerException)
+{
+    public string Detail { get; } = detail;
 }

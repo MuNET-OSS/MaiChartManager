@@ -15,20 +15,13 @@ import { handleSseOpen } from "@/utils/sseOpen";
 import { defaultSavedOptions, defaultTempOptions, dummyMeta, IMPORT_STEP, ImportChartMessageEx, ImportMeta, STEP } from "./types";
 import getNextUnusedMusicId from "@/utils/getNextUnusedMusicId";
 import { useI18n } from 'vue-i18n';
+import { createImportFatal, createVideoConvertWarning, getCaptureTarget, isAbortError } from "./importErrors";
+import tryGetFile from "@/utils/tryGetFile";
 
-const tryGetFile = async (dir: FileSystemDirectoryHandle, file: string) => {
-  try {
-    const handle = await dir.getFileHandle(file);
-    return await handle.getFile();
-  } catch (e) {
-    return;
-  }
-}
-
-export let startProcess = (dir?: FileSystemDirectoryHandle | FileSystemDirectoryHandle[]) => { }
+export let startProcess = (_dir?: FileSystemDirectoryHandle | FileSystemDirectoryHandle[]) => { }
 
 export default defineComponent({
-  setup(props) {
+  setup() {
     const savedOptions = useStorage('importMusicOptions', defaultSavedOptions, undefined, { mergeDefaults: true });
     const tempOptions = ref({ ...defaultTempOptions });
     const step = ref(STEP.none);
@@ -186,8 +179,8 @@ export default defineComponent({
           music.importStep = IMPORT_STEP.movie;
           try {
             await uploadMovie(music.id, music.movie, audioPadding);
-          } catch (e: any) {
-            errors.value.push({ level: MessageLevel.Warning, message: t('chart.import.error.videoConvertFailed') + `: ${e.error?.message || e.error?.detail || e?.message || e?.toString() || t('error.unknown')}`, name: music.name });
+          } catch (e) {
+            errors.value.push(createVideoConvertWarning(e, music.name, t('chart.import.error.videoConvertFailed'), t('error.unknown')));
           }
         }
 
@@ -195,15 +188,15 @@ export default defineComponent({
         if (music.bg) await api.SetMusicJacket(music.id, selectedADir.value, { file: music.bg });
 
         music.importStep = IMPORT_STEP.finish;
-      } catch (e: any) {
+      } catch (e) {
         console.log(music, e)
-        captureException(e.error || e, {
+        captureException(getCaptureTarget(e), {
           tags: {
             context: t('chart.import.error.importError'),
             step: music.importStep,
           }
         })
-        errors.value.push({ level: MessageLevel.Fatal, message: e.error?.message || e.error?.detail || e.message || e.toString(), name: music.name });
+        errors.value.push(createImportFatal(e, music.name));
         if (music.importStep !== IMPORT_STEP.create) {
           // 如果是在创建乐曲这步就挂了，说明乐曲XML没有创建成功，则不需要删除乐曲。
           // 否则，在ID冲突的情况下，会把原本的乐曲给删除掉，见 https://github.com/MuNET-OSS/MaiChartManager/issues/34
@@ -269,8 +262,8 @@ export default defineComponent({
         if (errors.value.length) {
           step.value = STEP.showResultError
         }
-      } catch (e: any) {
-        if (e.name === 'AbortError') return
+      } catch (e) {
+        if (isAbortError(e)) return
         console.log(e)
         globalCapture(e, t('chart.import.error.importErrorGlobal'))
       } finally {

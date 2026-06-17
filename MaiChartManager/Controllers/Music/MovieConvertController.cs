@@ -1,4 +1,5 @@
-﻿using MaiChartManager.Utils;
+﻿using System.Text.Json;
+using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MaiChartManager.Controllers.Music;
@@ -7,6 +8,13 @@ namespace MaiChartManager.Controllers.Music;
 [Route("MaiChartManagerServlet/[action]Api/{assetDir}/{id:int}")]
 public class MovieConvertController(ILogger<MovieConvertController> logger) : ControllerBase
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
+    private record SseErrorPayload(string Message, string? Detail);
+
     public enum SetMovieEventType
     {
         Progress,
@@ -73,7 +81,7 @@ public class MovieConvertController(ILogger<MovieConvertController> logger) : Co
         {
             logger.LogError(e, "Failed to convert video");
             SentrySdk.CaptureException(e);
-            await Response.WriteAsync($"event: {SetMovieEventType.Error}\ndata: 转换失败：{e.Message}\n\n");
+            await WriteError(e);
             await Response.Body.FlushAsync();
         }
         finally
@@ -88,5 +96,14 @@ public class MovieConvertController(ILogger<MovieConvertController> logger) : Co
                 // 忽略清理错误
             }
         }
+    }
+
+    private async Task WriteError(Exception exception)
+    {
+        var detail = exception is VideoConversionException videoConversionException
+            ? videoConversionException.Detail
+            : exception.ToString();
+        var payload = JsonSerializer.Serialize(new SseErrorPayload(exception.Message, detail), JsonOptions);
+        await Response.WriteAsync($"event: {SetMovieEventType.Error}\ndata: {payload}\n\n");
     }
 }
