@@ -127,11 +127,13 @@ public static class ServerManager
         builder.Services.AddSingleton<MaiChartManager.Platform.ITaskbarProgress, MaiChartManager.Platform.Windows.WindowsTaskbarProgress>();
         builder.Services.AddSingleton<MaiChartManager.Platform.IShellService, MaiChartManager.Platform.Windows.WindowsShellService>();
         builder.Services.AddSingleton<MaiChartManager.Platform.IAppShell, MaiChartManager.Platform.Windows.WindowsAppShell>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IProgressController, MaiChartManager.Platform.Windows.WindowsProgressController>();
 #else
         builder.Services.AddSingleton<MaiChartManager.Platform.IDesktopDialogService, MaiChartManager.Platform.Linux.HeadlessDialogService>();
         builder.Services.AddSingleton<MaiChartManager.Platform.ITaskbarProgress, MaiChartManager.Platform.Linux.NoopTaskbarProgress>();
         builder.Services.AddSingleton<MaiChartManager.Platform.IShellService, MaiChartManager.Platform.Linux.LinuxShellService>();
         builder.Services.AddSingleton<MaiChartManager.Platform.IAppShell, MaiChartManager.Platform.Linux.HeadlessAppShell>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IProgressController, MaiChartManager.Platform.Linux.HeadlessProgressController>();
 #endif
 
         if (StaticSettings.Config.UseAuth)

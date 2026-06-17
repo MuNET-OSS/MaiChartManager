@@ -19,7 +19,8 @@ public partial class MusicTransferController(
     StaticSettings settings,
     ILogger<MusicTransferController> logger,
     IDesktopDialogService dialogService,
-    ITaskbarProgress taskbarProgress) : ControllerBase
+    ITaskbarProgress taskbarProgress,
+    IProgressController progressController) : ControllerBase
 {
     public record RequestCopyToRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool removeEvents, bool legacyFormat);
 
@@ -288,20 +289,18 @@ public partial class MusicTransferController(
         logger.LogInformation("CopyTo: {dest}", dest);
 
         var showProgress = request.music.Length > 1;
-        if (showProgress)
-        {
-            taskbarProgress.Set(0, (ulong)request.music.Length);
-            logger.LogInformation("{message}", string.Format(Locale.ExportingMultipleMusic, request.music.Length));
-        }
+        using var progress = showProgress
+            ? progressController.Begin(Locale.Exporting, string.Format(Locale.ExportingMultipleMusic, request.music.Length), Locale.Cancelling)
+            : null;
+        progress?.Report(0, (ulong)request.music.Length);
 
         if (request.music.Length == 0)
         {
-            taskbarProgress.Clear();
             return;
         }
 
         var musicRootDir = Path.Combine(dest, "music");
-        var jacketRootDir = Path.Combine(dest, @"AssetBundleImages\jacket");
+        var jacketRootDir = Path.Combine(dest, "AssetBundleImages", "jacket");
         var soundRootDir = Path.Combine(dest, "SoundData");
         var movieRootDir = Path.Combine(dest, "MovieData");
         Directory.CreateDirectory(musicRootDir);
@@ -319,14 +318,29 @@ public partial class MusicTransferController(
         var maxConcurrency = GetBatchExportMaxConcurrency();
         var progressStep = Math.Max(1, request.music.Length / 100);
         var copiedSharedDestinations = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var cancellation = new CancellationTokenSource();
 
         try
         {
             Parallel.ForEach(request.music, new ParallelOptions
             {
                 MaxDegreeOfParallelism = maxConcurrency,
+                CancellationToken = cancellation.Token,
             }, (musicId, state) =>
             {
+                if (progress is not null)
+                {
+                    lock (progressLock)
+                    {
+                        if (progress.IsCancelled)
+                        {
+                            cancellation.Cancel();
+                            state.Stop();
+                            return;
+                        }
+                    }
+                }
+
                 string? currentMusicName = null;
                 if (!musicIndex.TryGetValue((musicId.Id, musicId.AssetDir), out var music))
                 {
@@ -339,27 +353,18 @@ public partial class MusicTransferController(
                 }
 
                 var done = Interlocked.Increment(ref completed);
-                if (showProgress && (done % progressStep == 0 || done == request.music.Length))
+                if (progress is not null && (done % progressStep == 0 || done == request.music.Length))
                 {
                     lock (progressLock)
                     {
-                        if (currentMusicName is not null)
-                        {
-                            logger.LogInformation("Exporting: {detail} ({done}/{total})", currentMusicName, done, request.music.Length);
-                        }
-
-                        taskbarProgress.Set((ulong)done, (ulong)request.music.Length);
+                        progress.Report((ulong)done, (ulong)request.music.Length, currentMusicName);
                     }
                 }
             });
         }
         catch (OperationCanceledException)
         {
-            logger.LogInformation("Batch export cancelled.");
-        }
-        finally
-        {
-            taskbarProgress.Clear();
+            logger.LogInformation("Batch export cancelled by user.");
         }
     }
 
