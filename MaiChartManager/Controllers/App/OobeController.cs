@@ -1,7 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text.Json;
-using System.Windows.Forms;
+using MaiChartManager.Platform;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MaiChartManager.Controllers.App;
@@ -10,7 +10,11 @@ public record CompleteSetupRequest(bool Export, bool UseAuth, string? AuthUserna
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api")]
-public class OobeController(StaticSettings settings, ILogger<OobeController> logger) : ControllerBase
+public class OobeController(
+    StaticSettings settings,
+    ILogger<OobeController> logger,
+    IAppShell appShell,
+    IDesktopDialogService dialogService) : ControllerBase
 {
     [HttpGet]
     public string? GetGamePath()
@@ -45,11 +49,7 @@ public class OobeController(StaticSettings settings, ILogger<OobeController> log
             StaticSettings.Config.Save();
         }
 
-        AppMain.UiContext?.Post(_ =>
-        {
-            if (AppMain.BrowserWin is { IsDisposed: false })
-                AppMain.BrowserWin.Text = $"MaiChartManager ({StaticSettings.GamePath})";
-        }, null);
+        appShell.UpdateMainWindowTitle(StaticSettings.GamePath);
 
         return Ok();
     }
@@ -77,19 +77,7 @@ public class OobeController(StaticSettings settings, ILogger<OobeController> log
     [HttpGet]
     public string? OpenFolderDialog()
     {
-        string? result = null;
-        AppMain.UiContext?.Send(_ =>
-        {
-            var dialog = new FolderBrowserDialog
-            {
-                ShowNewFolderButton = false,
-            };
-            if (dialog.ShowDialog(AppMain.ActiveForm) == DialogResult.OK)
-            {
-                result = dialog.SelectedPath;
-            }
-        }, null);
-        return result;
+        return dialogService.PickFolder();
     }
 
     [HttpGet]
@@ -113,17 +101,9 @@ public class OobeController(StaticSettings settings, ILogger<OobeController> log
 
         if (exportChanged)
         {
-            AppLifecycleManager.DisposeTrayIcon();
+            appShell.DisposeTrayIcon();
             // 管理开机启动
-            try
-            {
-                var startupTask = await Windows.ApplicationModel.StartupTask.GetAsync("MaiChartManagerStartupId");
-                if (request.Export && request.StartupEnabled)
-                    await startupTask.RequestEnableAsync();
-                else
-                    startupTask.Disable();
-            }
-            catch { }
+            await appShell.SetStartupEnabledAsync(request.Export && request.StartupEnabled);
             _ = Task.Run(async () =>
             {
                 await Task.Delay(100);
@@ -136,26 +116,18 @@ public class OobeController(StaticSettings settings, ILogger<OobeController> log
                     if (StaticSettings.Config.Export)
                     {
                         // 局域网模式：服务器重启后端口变了，需要把新 URL 注入回 OOBE 浏览器
-                        AppMain.UiContext?.Post(_ => AppMain.OobeBrowser?.InjectBackendUrl(url), null);
+                        appShell.InjectOobeBackendUrl(url);
                         return;
                     }
-                    AppLifecycleManager.ShowBrowser(url);
-                    AppMain.UiContext?.Post(_ =>
-                    {
-                        AppMain.OobeBrowser?.Dispose();
-                        AppMain.OobeBrowser = null;
-                    }, null);
+                    appShell.ShowBrowser(url);
+                    appShell.CloseOobeBrowser();
                 });
             });
         }
         else if (!request.Export)
         {
-            AppLifecycleManager.ShowBrowser(ServerManager.GetLoopbackUrl() ?? throw new InvalidOperationException("Loopback URL is null"));
-            AppMain.UiContext?.Post(_ =>
-            {
-                AppMain.OobeBrowser?.Dispose();
-                AppMain.OobeBrowser = null;
-            }, null);
+            appShell.ShowBrowser(ServerManager.GetLoopbackUrl() ?? throw new InvalidOperationException("Loopback URL is null"));
+            appShell.CloseOobeBrowser();
         }
 
         return Ok();
@@ -164,13 +136,13 @@ public class OobeController(StaticSettings settings, ILogger<OobeController> log
     [HttpPost]
     public void OpenMainUI()
     {
-        AppLifecycleManager.ShowBrowser(ServerManager.GetLoopbackUrl() ?? throw new InvalidOperationException("Loopback URL is null"));
+        appShell.ShowBrowser(ServerManager.GetLoopbackUrl() ?? throw new InvalidOperationException("Loopback URL is null"));
     }
 
     [HttpPost]
     public void SwitchToSetMode()
     {
         var url = ServerManager.GetLoopbackUrl() ?? throw new InvalidOperationException("Loopback URL is null");
-        AppLifecycleManager.GoToModeSwitch(url);
+        appShell.GoToModeSwitch(url);
     }
 }

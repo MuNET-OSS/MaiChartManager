@@ -133,11 +133,13 @@ public class VideoConvertToolController(ILogger<VideoConvertToolController> logg
         Response.Headers.Append("Content-Type", "text/event-stream");
 
         // PV 转换属于赞助功能
+#if WINDOWS
         if (IapManager.License != IapManager.LicenseStatus.Active)
         {
             await WriteBatchError(BatchConvertPvErrorCode.NeedLicense, Locale.BatchConvertPvNeedLicense);
             return;
         }
+#endif
 
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
         {

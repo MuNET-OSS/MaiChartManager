@@ -38,7 +38,9 @@ public class MovieConvertController(ILogger<MovieConvertController> logger) : Co
             return;
         }
 
+#if WINDOWS
         if (IapManager.License != IapManager.LicenseStatus.Active) return;
+#endif
         Response.Headers.Append("Content-Type", "text/event-stream");
         
         var tmpDir = Directory.CreateTempSubdirectory();

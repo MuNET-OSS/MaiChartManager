@@ -56,7 +56,11 @@ public class WindowsAppShell : IAppShell
         }
     }
 
-    public void ReloadLocale(string locale) => AppMain.SetLocale(locale);
+    public void ReloadLocale(string locale)
+    {
+        // Locale state (CurrentLocale/Config/Culture) is applied by LocaleController in a
+        // platform-independent way. Nothing extra to refresh on the WinForms shell for now.
+    }
 
     public double GetTargetDpiScale() => Browser.TargetDpiScale;
 

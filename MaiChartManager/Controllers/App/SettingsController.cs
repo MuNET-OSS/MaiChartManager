@@ -18,7 +18,7 @@ public class SettingsDto
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api")]
-public class SettingsController : ControllerBase
+public class SettingsController(MaiChartManager.Platform.IAppShell appShell) : ControllerBase
 {
     [HttpGet]
     public SettingsDto GetSettings()
@@ -33,7 +33,7 @@ public class SettingsController : ControllerBase
             UseLegacyMaiLib = StaticSettings.Config.UseLegacyMaiLib,
             ConvertJacketToAssetBundle = StaticSettings.Config.ConvertJacketToAssetBundle,
             UiZoom = StaticSettings.Config.UiZoom,
-            TargetDpiScale = Browser.TargetDpiScale,
+            TargetDpiScale = appShell.GetTargetDpiScale(),
         };
     }
 

@@ -18,7 +18,8 @@
     <PublishAot>False</PublishAot>
     <PublishReadyToRun>true</PublishReadyToRun>
     <SelfContained>true</SelfContained>
-    <StartupObject>MaiChartManager.Program</StartupObject>
+    <StartupObject Condition="'$(IsLinuxBuild)' != 'true'">MaiChartManager.Program</StartupObject>
+    <StartupObject Condition="'$(IsLinuxBuild)' == 'true'">MaiChartManager.LinuxProgram</StartupObject>
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <UseWindowsForms Condition="'$(IsLinuxBuild)' != 'true'">true</UseWindowsForms>

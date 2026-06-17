@@ -596,7 +596,9 @@ public partial class MusicTransferController(
     [HttpPost]
     public async Task ModifyId(int id, [FromBody] int newId, string assetDir)
     {
+#if WINDOWS
         if (IapManager.License != IapManager.LicenseStatus.Active) return;
+#endif
         var music = settings.GetMusic(id, assetDir);
         if (music is null) return;
         var musicDir = Path.GetDirectoryName(music.FilePath);
@@ -726,7 +728,8 @@ public partial class MusicTransferController(
             }
         }
         
-        simaiFile["chartconverter"] = $"MaiChartManager v{Application.ProductVersion}";
+        var appVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
+        simaiFile["chartconverter"] = $"MaiChartManager v{appVersion}";
 
         await using var zipStream = HttpContext.Response.BodyWriter.AsStream();
         using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
