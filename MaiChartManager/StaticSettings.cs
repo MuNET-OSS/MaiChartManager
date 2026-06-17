@@ -10,7 +10,7 @@ public partial class StaticSettings
 {
     public static readonly string tempPath = Path.Combine(Path.GetTempPath(), "MaiChartManager");
     public static readonly string appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MaiChartManager");
-    public static readonly string exeDir = Path.GetDirectoryName(Application.ExecutablePath);
+    public static readonly string exeDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
 #if DEBUG
     public static readonly string wwwroot = Path.Combine(ProjectDir, "wwwroot");
     private static string ProjectDir => Path.GetDirectoryName(GetThisFilePath())!;
@@ -47,8 +47,7 @@ public partial class StaticSettings
         {
             _logger.LogError(e, "初始化数据目录时出错");
             SentrySdk.CaptureException(e);
-            MessageBox.Show(e.Message, Locale.InitDataDirError, MessageBoxButtons.OK, MessageBoxIcon.Error);
-            Application.Exit();
+            throw new InvalidOperationException(Locale.InitDataDirError, e);
         }
     }
 
@@ -63,8 +62,7 @@ public partial class StaticSettings
         {
             _logger.LogError(e, "初始化数据目录时出错");
             SentrySdk.CaptureException(e);
-            MessageBox.Show(e.Message, Locale.InitDataDirError, MessageBoxButtons.OK, MessageBoxIcon.Error);
-            Application.Exit();
+            throw new InvalidOperationException(Locale.InitDataDirError, e);
         }
     }
 
@@ -277,14 +275,14 @@ public partial class StaticSettings
             xmlDoc.Load(Path.Combine(StreamingAssets, @"A000/DataConfig.xml"));
             if (!int.TryParse(xmlDoc.SelectSingleNode("/DataConfig/version/minor")?.InnerText, out gameVersion))
             {
-                MessageBox.Show(Locale.GameVersionNotFound, Locale.GameVersionNotFoundTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                _logger.LogWarning("{message}", Locale.GameVersionNotFound);
             }
         }
         catch (Exception e)
         {
             _logger.LogError(e, @"无法获取游戏版本号，可能是因为 A000\DataConfig.xml 找不到或者有错误");
             SentrySdk.CaptureException(e);
-            MessageBox.Show(Locale.GameVersionError, Locale.GameVersionNotFoundTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _logger.LogWarning(e, "{message}", Locale.GameVersionError);
         }
     }
 

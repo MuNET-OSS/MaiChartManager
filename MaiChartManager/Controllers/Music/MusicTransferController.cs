@@ -4,19 +4,22 @@ using System.Text;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using MaiChartManager.Models;
+using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.VisualBasic.FileIO;
 using MuConvert.mai;
 using NAudio.Lame;
-using Vanara.Windows.Forms;
-using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
 
 namespace MaiChartManager.Controllers.Music;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api/{assetDir}/{id:int}")]
-public partial class MusicTransferController(StaticSettings settings, ILogger<MusicTransferController> logger) : ControllerBase
+public partial class MusicTransferController(
+    StaticSettings settings,
+    ILogger<MusicTransferController> logger,
+    IDesktopDialogService dialogService,
+    ITaskbarProgress taskbarProgress) : ControllerBase
 {
     public record RequestCopyToRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool removeEvents, bool legacyFormat);
 
@@ -253,6 +256,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         }
 
         // copy acbawb
+#if WINDOWS
         if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out var resolvedAudioId, out var acb, out var awb)
             && acb is not null
             && awb is not null)
@@ -264,6 +268,9 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         {
             logger.LogWarning("{message}", BuildAudioResolveErrorMessage(music));
         }
+#else
+        logger.LogWarning("Audio export not supported on this platform; skipping ACB/AWB for music {Id}.", music.Id);
+#endif
 
         // copy movie data
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
@@ -276,32 +283,20 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
     [Route("/MaiChartManagerServlet/[action]Api")]
     public void RequestCopyTo(RequestCopyToRequest request)
     {
-        var dialog = new FolderBrowserDialog
-        {
-            Description = Locale.SelectTargetLocation
-        };
-        if (WinUtils.ShowDialog(dialog) != DialogResult.OK) return;
-        var dest = dialog.SelectedPath;
+        var dest = dialogService.PickFolder(Locale.SelectTargetLocation);
+        if (dest is null) return;
         logger.LogInformation("CopyTo: {dest}", dest);
 
-        ShellProgressDialog? progress = null;
-        if (request.music.Length > 1)
+        var showProgress = request.music.Length > 1;
+        if (showProgress)
         {
-            progress = new ShellProgressDialog()
-            {
-                AutoTimeEstimation = false,
-                Title = Locale.Exporting,
-                Description = string.Format(Locale.ExportingMultipleMusic, request.music.Length),
-                CancelMessage = Locale.Cancelling,
-                HideTimeRemaining = true,
-            };
-            progress.Start(AppMain.BrowserWin!);
-            progress.UpdateProgress(0, (ulong)request.music.Length);
+            taskbarProgress.Set(0, (ulong)request.music.Length);
+            logger.LogInformation("{message}", string.Format(Locale.ExportingMultipleMusic, request.music.Length));
         }
 
         if (request.music.Length == 0)
         {
-            progress?.Stop();
+            taskbarProgress.Clear();
             return;
         }
 
@@ -319,7 +314,6 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             musicIndex.TryAdd((music.Id, music.AssetDir), music);
         }
 
-        var cancellation = new CancellationTokenSource();
         var progressLock = new object();
         var completed = 0;
         var maxConcurrency = GetBatchExportMaxConcurrency();
@@ -331,22 +325,8 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             Parallel.ForEach(request.music, new ParallelOptions
             {
                 MaxDegreeOfParallelism = maxConcurrency,
-                CancellationToken = cancellation.Token
             }, (musicId, state) =>
             {
-                if (progress is not null)
-                {
-                    lock (progressLock)
-                    {
-                        if (progress.IsCancelled)
-                        {
-                            cancellation.Cancel();
-                            state.Stop();
-                            return;
-                        }
-                    }
-                }
-
                 string? currentMusicName = null;
                 if (!musicIndex.TryGetValue((musicId.Id, musicId.AssetDir), out var music))
                 {
@@ -359,27 +339,27 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
                 }
 
                 var done = Interlocked.Increment(ref completed);
-                if (progress is not null && (done % progressStep == 0 || done == request.music.Length))
+                if (showProgress && (done % progressStep == 0 || done == request.music.Length))
                 {
                     lock (progressLock)
                     {
                         if (currentMusicName is not null)
                         {
-                            progress.Detail = currentMusicName;
+                            logger.LogInformation("Exporting: {detail} ({done}/{total})", currentMusicName, done, request.music.Length);
                         }
 
-                        progress.UpdateProgress((ulong)done, (ulong)request.music.Length);
+                        taskbarProgress.Set((ulong)done, (ulong)request.music.Length);
                     }
                 }
             });
         }
         catch (OperationCanceledException)
         {
-            logger.LogInformation("Batch export cancelled by user.");
+            logger.LogInformation("Batch export cancelled.");
         }
         finally
         {
-            progress?.Stop();
+            taskbarProgress.Clear();
         }
     }
 
@@ -472,6 +452,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         }
 
         // copy acbawb
+#if WINDOWS
         if (!AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out var resolvedAudioId, out var acb, out var awb) || acb is null || awb is null)
         {
             var message = BuildAudioResolveErrorMessage(music);
@@ -480,6 +461,9 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         }
         zipArchive.CreateEntryFromFile(acb, $"SoundData/music{resolvedAudioId:000000}.acb");
         zipArchive.CreateEntryFromFile(awb, $"SoundData/music{resolvedAudioId:000000}.awb");
+#else
+        logger.LogWarning("Audio export not supported on this platform; skipping ACB/AWB for music {Id}.", music.Id);
+#endif
 
         // copy movie data
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
@@ -680,6 +664,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         if (version is not null) simaiFile["version"] = version.GenreName;
 
         // demo_seek
+#if WINDOWS
         try
         {
             if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out _, out var previewAcb, out _) && previewAcb is not null)
@@ -695,6 +680,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         {
             logger.LogWarning(e, "ExportAsMaidata: Failed to get audio preview time, ignoring.");
         }
+#endif
         
         for (var i = 0; i < music.Charts.Length; i++)
         {
@@ -763,6 +749,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         }
 
         // 导出音频
+#if WINDOWS
         var soundEntry = zipArchive.CreateEntry("track.mp3");
         await using var soundStream = soundEntry.Open();
         var tag = new ID3TagData
@@ -784,6 +771,9 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         var wav = Audio.AcbToWav(acbPath);
         AudioConvert.ConvertWavToMp3Stream(wav, soundStream, tag);
         soundStream.Close();
+#else
+        logger.LogWarning("Audio export not supported on this platform; skipping track.mp3 for music {Id}.", music.Id);
+#endif
 
         if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
         {

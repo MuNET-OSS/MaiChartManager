@@ -1,4 +1,5 @@
 ﻿using MaiChartManager.Attributes;
+using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
@@ -9,7 +10,7 @@ namespace MaiChartManager.Controllers.AssetDir;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api")]
-public class AssetDirController(StaticSettings settings, ILogger<AssetDirController> logger) : ControllerBase
+public class AssetDirController(StaticSettings settings, ILogger<AssetDirController> logger, IDesktopDialogService dialogService) : ControllerBase
 {
     [HttpPost]
     public void CreateAssetDir([FromBody] string dir)
@@ -105,15 +106,9 @@ public class AssetDirController(StaticSettings settings, ILogger<AssetDirControl
     [HttpPost]
     public async Task RequestLocalImportDir()
     {
-        var dialog = new FolderBrowserDialog
-        {
-            Description = Locale.SelectAssetDirectory,
-            ShowNewFolderButton = false,
-        };
-        if (WinUtils.ShowDialog(dialog) != DialogResult.OK) return;
-        var src = dialog.SelectedPath;
-        logger.LogInformation("LocalImportDir: {src}", src);
+        var src = dialogService.PickFolder(Locale.SelectAssetDirectory);
         if (src is null) return;
+        logger.LogInformation("LocalImportDir: {src}", src);
         var destName = Path.GetFileName(src);
         if (!StaticSettings.ADirRegex().IsMatch(destName))
         {

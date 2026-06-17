@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,7 +7,7 @@ namespace MaiChartManager.Controllers.Tools;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api")]
-public partial class ImageToAbToolController(StaticSettings settings, ILogger<ImageToAbToolController> logger) : ControllerBase
+public partial class ImageToAbToolController(StaticSettings settings, ILogger<ImageToAbToolController> logger, IDesktopDialogService dialogService) : ControllerBase
 {
     [GeneratedRegex(@"^(?<id>\d+)\.(png|jpg|jpeg)$", RegexOptions.IgnoreCase)]
     private static partial Regex NumericFileRegex();
@@ -26,34 +27,28 @@ public partial class ImageToAbToolController(StaticSettings settings, ILogger<Im
     {
         Response.Headers.Append("Content-Type", "text/event-stream");
 
-        var dialog = new FolderBrowserDialog
-        {
-            Description = Locale.SelectImageFolder,
-            ShowNewFolderButton = false,
-        };
+        var selectedPath = dialogService.PickFolder(Locale.SelectImageFolder);
 
-        if (WinUtils.ShowDialog(dialog) != DialogResult.OK)
+        if (selectedPath is null)
         {
             await WriteEvent(ImageToAbEventType.Error, Locale.FileNotSelected);
             return;
         }
 
-        var selectedPath = dialog.SelectedPath;
         if (string.IsNullOrWhiteSpace(selectedPath) || !Directory.Exists(selectedPath))
         {
             await WriteEvent(ImageToAbEventType.Error, Locale.FileNotSelected);
             return;
         }
-        
+
         // 所选择的路径是否是正规的OPT内jacket路径。方法是判断路径结尾是否是AssetBundleImages\jacket
         var isIngameJacketPath = selectedPath.TrimEnd('\\').EndsWith(@"AssetBundleImages\jacket", StringComparison.OrdinalIgnoreCase);
 
         var deleteOriginalPngAfterSuccess = false;
         if (isIngameJacketPath)
         {
-            deleteOriginalPngAfterSuccess = MessageBox.Show(
-                Locale.ImageToAbDeleteOriginalPngQuestion, Locale.ImageToAb, MessageBoxButtons.YesNo, 
-                MessageBoxIcon.Question) == DialogResult.Yes;
+            deleteOriginalPngAfterSuccess = dialogService.Confirm(
+                Locale.ImageToAbDeleteOriginalPngQuestion, Locale.ImageToAb);
         }
 
         var candidates = Directory.EnumerateFiles(selectedPath)

@@ -123,7 +123,9 @@ public static class VideoConvert
         {
             if (options.TaskbarProgress)
             {
+#if WINDOWS
                 WinUtils.SetTaskbarProgressIndeterminate();
+#endif
             }
 
             var outputDirectory = Path.GetDirectoryName(options.OutputPath);
@@ -151,7 +153,9 @@ public static class VideoConvert
             {
                 if (options.TaskbarProgress)
                 {
+#if WINDOWS
                     WinUtils.SetTaskbarProgressIndeterminate();
+#endif
                 }
 
                 WannaCRI.WannaCRI.CreateUsm(intermediateFile, options.OutputPath);
@@ -163,7 +167,9 @@ public static class VideoConvert
         }
         finally
         {
+#if WINDOWS
             WinUtils.ClearTaskbarProgress();
+#endif
             // 清理临时目录
             try
             {
@@ -264,7 +270,9 @@ public static class VideoConvert
         {
             conversion.OnProgress += (sender, args) =>
             {
+#if WINDOWS
                 WinUtils.SetTaskbarProgress((ulong)args.Percent);
+#endif
             };
         }
 

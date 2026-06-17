@@ -142,6 +142,7 @@
     <Compile Remove="Controllers/Music/CueConvertController.cs" />
     <Compile Remove="Controllers/Music/VrcProcessController.cs" />
     <Compile Remove="Controllers/Charts/ImportChartController.cs" />
+    <Compile Remove="Controllers/Tools/AudioConvertToolController.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="Front\**"/>
