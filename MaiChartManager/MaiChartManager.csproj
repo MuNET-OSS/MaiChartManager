@@ -1,15 +1,19 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
-      <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
+    <IsLinuxBuild Condition="$(Configuration.StartsWith('Linux'))">true</IsLinuxBuild>
+    <TargetFramework Condition="'$(IsLinuxBuild)' == 'true'">net10.0</TargetFramework>
+    <TargetFramework Condition="'$(IsLinuxBuild)' != 'true'">net10.0-windows10.0.17763.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <InvariantGlobalization>false</InvariantGlobalization>
     <Platforms>x64</Platforms>
     <IsTransformWebConfigDisabled>True</IsTransformWebConfigDisabled>
     <StaticWebAssetsEnabled>True</StaticWebAssetsEnabled>
-    <OutputType>WinExe</OutputType>
+    <OutputType Condition="'$(IsLinuxBuild)' == 'true'">Exe</OutputType>
+    <OutputType Condition="'$(IsLinuxBuild)' != 'true'">WinExe</OutputType>
     <ValidateExecutableReferencesMatchSelfContained>False</ValidateExecutableReferencesMatchSelfContained>
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(IsLinuxBuild)' == 'true'">linux-x64</RuntimeIdentifier>
+    <RuntimeIdentifier Condition="'$(IsLinuxBuild)' != 'true'">win-x64</RuntimeIdentifier>
     <PublishTrimmed>False</PublishTrimmed>
     <PublishAot>False</PublishAot>
     <PublishReadyToRun>true</PublishReadyToRun>
@@ -17,14 +21,17 @@
     <StartupObject>MaiChartManager.Program</StartupObject>
     <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <UseWindowsForms>true</UseWindowsForms>
+    <UseWindowsForms Condition="'$(IsLinuxBuild)' != 'true'">true</UseWindowsForms>
     <NoWarn>NU1605</NoWarn>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Configurations>Debug;Release;Crack</Configurations>
+    <Configurations>Debug;Release;Crack;LinuxDebug;LinuxRelease</Configurations>
     <PublishDir>..\Packaging\Pack</PublishDir>
     <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
     <CETCompat>false</CETCompat>
     <ApplicationIcon>icon.ico</ApplicationIcon>
+  </PropertyGroup>
+  <PropertyGroup>
+    <DefineConstants Condition="'$(IsLinuxBuild)' != 'true'">$(DefineConstants);WINDOWS</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <IsPublishable>False</IsPublishable>
@@ -41,6 +48,14 @@
     <DefineConstants>CRACK</DefineConstants>
     <Optimize>true</Optimize>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='LinuxDebug'">
+    <IsPublishable>False</IsPublishable>
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='LinuxRelease'">
+    <IsPublishable>True</IsPublishable>
+    <Optimize>true</Optimize>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(Platform)'=='x64'">
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
@@ -49,27 +64,27 @@
     <ProjectReference Include="..\MaiLib\MaiLib.csproj" />
     <ProjectReference Include="..\SimaiSharp\SimaiSharp\SimaiSharp.csproj" />
     <ProjectReference Include="..\MuConvert\MuConvert.csproj" />
-    <ProjectReference Include="..\SonicAudioTools\Source\SonicAudioLib\SonicAudioLib.csproj" />
-    <ProjectReference Include="..\XV2-Tools\LB_Common\LB_Common.csproj" />
-    <ProjectReference Include="..\XV2-Tools\Xv2CoreLib\Xv2CoreLib.csproj" />
+    <ProjectReference Include="..\SonicAudioTools\Source\SonicAudioLib\SonicAudioLib.csproj" Condition="'$(IsLinuxBuild)' != 'true'" />
+    <ProjectReference Include="..\XV2-Tools\LB_Common\LB_Common.csproj" Condition="'$(IsLinuxBuild)' != 'true'" />
+    <ProjectReference Include="..\XV2-Tools\Xv2CoreLib\Xv2CoreLib.csproj" Condition="'$(IsLinuxBuild)' != 'true'" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="DesktopBridge.Helpers" Version="1.2.2"/>
+    <PackageReference Include="DesktopBridge.Helpers" Version="1.2.2" Condition="'$(IsLinuxBuild)' != 'true'"/>
     <PackageReference Include="idunno.Authentication.Basic" Version="2.4.0"/>
       <PackageReference Include="LibNMeCab" Version="0.10.2"/>
       <PackageReference Include="LibNMeCab.IpaDicBin" Version="0.10.0"/>
       <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.0"/>
       <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.15.0"/>
-      <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3595.46"/>
+      <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3595.46" Condition="'$(IsLinuxBuild)' != 'true'"/>
       <PackageReference Include="NAudio" Version="2.2.1"/>
     <PackageReference Include="NAudio.Lame" Version="2.1.0"/>
       <PackageReference Include="NAudio.Vorbis" Version="1.5.0"/>
       <PackageReference Include="PeNet" Version="5.1.0" />
       <PackageReference Include="PeNet.Asn1" Version="2.0.2" />
-    <PackageReference Include="Pluralsight.Crypto" Version="1.1.0"/>
+    <PackageReference Include="Pluralsight.Crypto" Version="1.1.0" Condition="'$(IsLinuxBuild)' != 'true'"/>
       <PackageReference Include="Sentry" Version="5.16.2"/>
       <PackageReference Include="Sentry.AspNetCore" Version="5.16.2"/>
-    <PackageReference Include="SingleInstanceCore" Version="2.2.2"/>
+    <PackageReference Include="SingleInstanceCore" Version="2.2.2" Condition="'$(IsLinuxBuild)' != 'true'"/>
       <PackageReference Include="SixLabors.ImageSharp" Version="2.1.11"/>
     <PackageReference Include="Standart.Hash.xxHash" Version="4.0.5"/>
       <PackageReference Include="AssetsTools.NET" Version="3.0.4" />
@@ -78,7 +93,7 @@
       <PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" Version="10.0.1"/>
       <PackageReference Include="System.Runtime.Serialization.Formatters" Version="10.0.0"/>
       <PackageReference Include="Tomlyn" Version="0.16.3"/>
-      <PackageReference Include="Vanara.Windows.Forms" Version="4.2.1"/>
+    <PackageReference Include="Vanara.Windows.Forms" Version="4.2.1" Condition="'$(IsLinuxBuild)' != 'true'"/>
       <PackageReference Include="Xabe.FFmpeg" Version="6.0.2"/>
       <PackageReference Include="YamlDotNet" Version="16.3.0"/>
       <PackageReference Include="YAXLib" Version="2.15.0"/>
@@ -102,6 +117,27 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Locale.resx</DependentUpon>
     </Compile>
+  </ItemGroup>
+  <ItemGroup Condition="'$(IsLinuxBuild)' == 'true'">
+    <Compile Remove="Program.cs" />
+    <Compile Remove="AppMain.cs" />
+    <Compile Remove="AppMain.g.cs" />
+    <Compile Remove="Browser.cs" />
+    <Compile Remove="Browser.Designer.cs" />
+    <Compile Remove="OobeBrowser.cs" />
+    <Compile Remove="Launcher.cs" />
+    <Compile Remove="Launcher.Designer.cs" />
+    <Compile Remove="AppLifecycleManager.cs" />
+    <Compile Remove="WebViewHelper.cs" />
+    <Compile Remove="IapManager.cs" />
+    <Compile Remove="OfflineReg.cs" />
+    <Compile Remove="Utils/WinUtils.cs" />
+    <Compile Remove="Utils/Audio.cs" />
+    <Compile Remove="Utils/CriUtils.cs" />
+    <Compile Remove="Utils/AudioConvert.cs" />
+    <Compile Remove="Controllers/Music/CueConvertController.cs" />
+    <Compile Remove="Controllers/Music/VrcProcessController.cs" />
+    <Compile Remove="Controllers/Charts/ImportChartController.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="Front\**"/>
@@ -136,13 +172,13 @@
     <None Remove="C:\Users\Clansty\.nuget\packages\naudio.vorbis\1.5.0\contentFiles\any\netstandard2.0\README.md" />
   </ItemGroup>
   <ItemGroup>
-    <Reference Include="AssetStudio">
+    <Reference Include="AssetStudio" Condition="'$(IsLinuxBuild)' != 'true'">
       <HintPath>Libs\AssetStudio.dll</HintPath>
     </Reference>
-    <Reference Include="AssetStudioUtility">
+    <Reference Include="AssetStudioUtility" Condition="'$(IsLinuxBuild)' != 'true'">
       <HintPath>Libs\AssetStudioUtility.dll</HintPath>
     </Reference>
-    <Reference Include="Mono.Cecil">
+    <Reference Include="Mono.Cecil" Condition="'$(IsLinuxBuild)' != 'true'">
       <HintPath>Libs\Mono.Cecil.dll</HintPath>
     </Reference>
   </ItemGroup>
