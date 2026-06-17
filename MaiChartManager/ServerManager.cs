@@ -4,7 +4,6 @@ using System.Net.Sockets;
 using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json.Serialization;
-using System.Windows.Forms;
 using idunno.Authentication.Basic;
 using MaiChartManager.Controllers.Charts.Services;
 using MaiChartManager.Controllers.Mod;
@@ -13,7 +12,6 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.Extensions.FileProviders;
-using Pluralsight.Crypto;
 using Sentry.AspNetCore;
 
 namespace MaiChartManager;
@@ -35,38 +33,17 @@ public static class ServerManager
     private static X509Certificate2 GetCert()
     {
         var path = Path.Combine(StaticSettings.appData, "cert.pfx");
-        if (File.Exists(path))
-        {
-            return new X509Certificate2(path);
-        }
+        if (File.Exists(path)) return X509CertificateLoader.LoadPkcs12FromFile(path, null);
 
-        // ASP.NET 是不是不支持 ecc
-        // var ecdsa = ECDsa.Create();
-        // var req = new CertificateRequest("CN=MaiChartManager", ecdsa, HashAlgorithmName.SHA256);
-        // req.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
-        // req.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, false));
-        // req.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid("1.3.6.1.5.5.7.3.1")], true));
-        // req.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(req.PublicKey, false));
-        // var builder = new SubjectAlternativeNameBuilder();
-        // builder.AddDnsName("MaiChartManager");
-        // req.CertificateExtensions.Add(builder.Build());
-        //
-        // var cert = req.CreateSelfSigned(DateTimeOffset.Now, DateTimeOffset.Now.AddYears(5));
-        using var ctx = new CryptContext();
-        ctx.Open();
-
-        var cert = ctx.CreateSelfSignedCertificate(
-            new SelfSignedCertProperties
-            {
-                IsPrivateKeyExportable = true,
-                KeyBitLength = 4096,
-                Name = new X500DistinguishedName("CN=MaiChartManager"),
-                ValidFrom = DateTime.Today.AddDays(-1),
-                ValidTo = DateTime.Today.AddYears(5),
-            });
-
-        File.WriteAllBytes(path, cert.Export(X509ContentType.Pfx));
-        return cert;
+        using var rsa = System.Security.Cryptography.RSA.Create(4096);
+        var req = new System.Security.Cryptography.X509Certificates.CertificateRequest(
+            "CN=MaiChartManager", rsa,
+            System.Security.Cryptography.HashAlgorithmName.SHA256,
+            System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        var cert = req.CreateSelfSigned(DateTimeOffset.Now.AddDays(-1), DateTimeOffset.Now.AddYears(5));
+        var pfx = cert.Export(X509ContentType.Pfx);
+        File.WriteAllBytes(path, pfx);
+        return X509CertificateLoader.LoadPkcs12(pfx, null);
     }
 
     private static bool IsPortAvailable(int port)

@@ -1,4 +1,6 @@
-﻿using Windows.Services.Store;
+#if WINDOWS
+using Windows.Services.Store;
+#endif
 using Microsoft.AspNetCore.Mvc;
 
 namespace MaiChartManager.Controllers.App;
@@ -7,6 +9,7 @@ namespace MaiChartManager.Controllers.App;
 [Route("MaiChartManagerServlet/[action]Api")]
 public class AppLicenseController : Controller
 {
+#if WINDOWS
     public record RequestPurchaseResult(string? ErrorMessage, StorePurchaseStatus Status);
 
     [HttpPost]
@@ -32,4 +35,22 @@ public class AppLicenseController : Controller
         IapManager.SetOfflineLicenseActive();
         return true;
     }
+#else
+    // Linux: always licensed — no store/IAP available
+    public record RequestPurchaseResult(string? ErrorMessage, int Status);
+
+    [HttpPost]
+    public Task<RequestPurchaseResult> RequestPurchase()
+    {
+        // StorePurchaseStatus.Succeeded = 0
+        return Task.FromResult(new RequestPurchaseResult(null, 0));
+    }
+
+    [HttpPost]
+    public Task<bool> VerifyOfflineKey([FromBody] string key)
+    {
+        // No offline key verification on Linux; treat as always licensed
+        return Task.FromResult(true);
+    }
+#endif
 }
