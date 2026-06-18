@@ -1,5 +1,5 @@
 import { computed, defineComponent, ref } from "vue";
-import api, { getUrl, isLocalHost } from "@/client/api";
+import api, { getUrl, isLocalHost, requestExportMaidata } from "@/client/api";
 import { globalCapture, selectedADir, selectedMusic, selectMusicId, showNeedPurchaseDialog, version } from "@/store/refs";
 import { DropMenu, addToast } from "@munet/ui";
 import { BlobWriter, ZipReader } from "@zip.js/zip.js";
@@ -28,8 +28,8 @@ export default defineComponent({
 
     const copy = async (type: CopyType) => {
       wait.value = true;
-      if (!isLocalHost || type === CopyType.exportMaidata || type === CopyType.exportMaidataIgnoreVideo) {
-        // 浏览器模式，使用 zip.js 获取并解压
+      if (!isLocalHost) {
+        // 远程浏览器模式：用 File System Access API（showDirectoryPicker + zip.js 获取并解压写盘）
         let folderHandle: FileSystemDirectoryHandle;
         try {
           folderHandle = await window.showDirectoryPicker({
@@ -78,12 +78,21 @@ export default defineComponent({
         }
         return;
       }
+      // 本地宿主（Photino/WebKitGTK、WebView2）：所有类型都走后端原生对话框，不用浏览器 File System Access API
       try {
-        // 本地 webview 打开，使用本地模式
-        await api.RequestCopyTo({
-          music: [{id: selectMusicId.value, assetDir: selectedADir.value}],
-          removeEvents: false,
-        });
+        if (type === CopyType.export) {
+          // Opt 导出沿用已有的 RequestCopyTo
+          await api.RequestCopyTo({
+            music: [{id: selectMusicId.value, assetDir: selectedADir.value}],
+            removeEvents: false,
+          });
+        } else {
+          // maidata 导出改用后端新接口 RequestExportMaidata
+          await requestExportMaidata(
+            [{id: selectMusicId.value, assetDir: selectedADir.value}],
+            type === CopyType.exportMaidataIgnoreVideo,
+          );
+        }
       } finally {
         wait.value = false;
       }
