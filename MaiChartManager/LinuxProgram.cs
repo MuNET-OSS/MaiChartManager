@@ -2,6 +2,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Photino.NET;
+using Xabe.FFmpeg;
 
 namespace MaiChartManager;
 
@@ -12,6 +13,7 @@ public static class LinuxProgram
         Directory.CreateDirectory(StaticSettings.appData);
         Directory.CreateDirectory(StaticSettings.tempPath);
         InitConfiguration();
+        ConfigureFfmpeg();
 
         // 启动进程内 Kestrel：loopback + 伺服 SPA（wwwroot）+ API 同源，但不开 LAN 端口。
         // Kestrel 在后台线程运行（StartApp 内部 Task.Run），主线程留给 Photino 开窗。
@@ -45,7 +47,7 @@ public static class LinuxProgram
         var window = new PhotinoWindow()
             .SetTitle("MaiChartManager")
             .SetUseOsDefaultSize(false)
-            .SetSize(1280, 800)
+            .SetSize(1600, 800)
             .Center()
             .Load(new Uri(startUrl));
 
@@ -53,6 +55,32 @@ public static class LinuxProgram
         Platform.Linux.PhotinoWindowHolder.Current = window;
 
         window.WaitForClose();
+    }
+
+    /// <summary>
+    /// 配置 Xabe.FFmpeg 使用系统 ffmpeg/ffprobe。
+    /// Windows 版在 AppMain 里指向内置的 ffmpeg.exe；Linux 不内置，改用系统 PATH 里的 ffmpeg。
+    /// 必须显式传可执行名 "ffmpeg"/"ffprobe"，否则 Xabe 在 Linux 上仍会去找 .exe 后缀的文件。
+    /// </summary>
+    private static void ConfigureFfmpeg()
+    {
+        var dir = ResolveExecutableDir("ffmpeg") ?? "/usr/bin";
+        FFmpeg.SetExecutablesPath(dir, "ffmpeg", "ffprobe");
+        // 检测硬件加速（与 Windows 的 AppMain 一致，失败不影响主流程）
+        _ = MaiChartManager.Utils.VideoConvert.CheckHardwareAcceleration();
+    }
+
+    /// 在 $PATH 中查找可执行文件所在目录，找不到返回 null。
+    private static string? ResolveExecutableDir(string exe)
+    {
+        var path = Environment.GetEnvironmentVariable("PATH");
+        if (string.IsNullOrEmpty(path)) return null;
+        foreach (var d in path.Split(Path.PathSeparator))
+        {
+            if (string.IsNullOrWhiteSpace(d)) continue;
+            if (File.Exists(Path.Combine(d, exe))) return d;
+        }
+        return null;
     }
 
     /// <summary>
