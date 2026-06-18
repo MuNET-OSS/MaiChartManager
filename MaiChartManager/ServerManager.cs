@@ -135,7 +135,7 @@ public static class ServerManager
         builder.Services.AddSingleton<MaiChartManager.Platform.IDesktopDialogService, MaiChartManager.Platform.Linux.PhotinoDialogService>();
         builder.Services.AddSingleton<MaiChartManager.Platform.ITaskbarProgress, MaiChartManager.Platform.Linux.NoopTaskbarProgress>();
         builder.Services.AddSingleton<MaiChartManager.Platform.IShellService, MaiChartManager.Platform.Linux.LinuxShellService>();
-        builder.Services.AddSingleton<MaiChartManager.Platform.IAppShell, MaiChartManager.Platform.Linux.HeadlessAppShell>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IAppShell, MaiChartManager.Platform.Linux.PhotinoAppShell>();
         builder.Services.AddSingleton<MaiChartManager.Platform.IProgressController, MaiChartManager.Platform.Linux.HeadlessProgressController>();
 #endif
 

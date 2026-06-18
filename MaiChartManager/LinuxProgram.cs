@@ -33,16 +33,23 @@ public static class LinuxProgram
 
         Console.WriteLine($"MaiChartManager backend listening at {backendUrl}");
 
+        // 决定初始路由（对齐 Windows AppMain 的逻辑）：
+        // 未配置有效游戏目录时加载 OOBE 引导页（#/oobe），否则加载主界面（根路由）。
+        // 直接加载主界面会让 SPA 立刻调用依赖 GamePath 的接口，导致一连串异常。
+        var startUrl = string.IsNullOrEmpty(StaticSettings.GamePath)
+            ? $"{backendUrl.TrimEnd('/')}/#/oobe"
+            : backendUrl;
+
         // Photino 必须在主线程创建并显示窗口。Linux 下底层走系统 WebKitGTK。
-        // 加载 Kestrel 的 loopback 根地址：SPA 与 API 同源，前端无需注入 backendUrl。
+        // 加载 Kestrel 的 loopback 地址：SPA 与 API 同源，前端无需注入 backendUrl。
         var window = new PhotinoWindow()
             .SetTitle("MaiChartManager")
             .SetUseOsDefaultSize(false)
             .SetSize(1280, 800)
             .Center()
-            .Load(new Uri(backendUrl));
+            .Load(new Uri(startUrl));
 
-        // 把窗口实例交给平台服务持有者，供 Linux 的对话框服务（PhotinoDialogService）使用。
+        // 把窗口实例交给平台服务持有者，供 Linux 的对话框服务与应用外壳（导航/标题等）使用。
         Platform.Linux.PhotinoWindowHolder.Current = window;
 
         window.WaitForClose();

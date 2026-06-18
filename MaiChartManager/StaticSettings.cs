@@ -69,11 +69,14 @@ public partial class StaticSettings
     [GeneratedRegex(@"^[A-Z](\d{3})$")]
     public static partial Regex ADirRegex();
 
-    public static string GamePath { get; set; }
+    // 默认空字符串而非 null：未配置游戏目录（OOBE 阶段）时，下游 Path.Combine(GamePath, ...)
+    // 不会因 null 抛 ArgumentNullException（空字符串得到相对路径，后续 Directory/File.Exists 返回 false，优雅降级）。
+    public static string GamePath { get; set; } = "";
     public static string StreamingAssets => Path.Combine(GamePath, "Sinmai_Data", "StreamingAssets");
 
-    public static IEnumerable<string> AssetsDirs => Directory.EnumerateDirectories(StreamingAssets)
-        .Select(Path.GetFileName).Where(it => ADirRegex().IsMatch(it));
+    public static IEnumerable<string> AssetsDirs => Directory.Exists(StreamingAssets)
+        ? Directory.EnumerateDirectories(StreamingAssets).Select(Path.GetFileName).Where(it => ADirRegex().IsMatch(it))
+        : [];
 
     public int gameVersion;
     private List<MusicXmlWithABJacket> _musicList = [];
