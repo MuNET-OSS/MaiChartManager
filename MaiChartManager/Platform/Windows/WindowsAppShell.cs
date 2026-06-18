@@ -1,5 +1,6 @@
 #if WINDOWS
 using System.Windows.Forms;
+using Windows.ApplicationModel;
 
 namespace MaiChartManager.Platform.Windows;
 
@@ -43,7 +44,7 @@ public class WindowsAppShell : IAppShell
     {
         try
         {
-            var startupTask = await Windows.ApplicationModel.StartupTask.GetAsync("MaiChartManagerStartupId");
+            var startupTask = await StartupTask.GetAsync("MaiChartManagerStartupId");
             if (enabled)
                 await startupTask.RequestEnableAsync();
             else
