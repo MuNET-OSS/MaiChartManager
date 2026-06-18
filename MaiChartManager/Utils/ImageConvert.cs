@@ -31,21 +31,11 @@ public static class ImageConvert
             var baseField = am.GetBaseField(afileInst, info);
             if (baseField.IsDummy || baseField.TypeName != "Texture2D") continue;
 
-            var tex = new TextureFile();
-            tex.m_Width = baseField["m_Width"].AsInt;
-            tex.m_Height = baseField["m_Height"].AsInt;
-            tex.m_TextureFormat = baseField["m_TextureFormat"].AsInt;
-            tex.pictureData = baseField["image data"].AsByteArray;
-            tex.m_StreamData.path = baseField["m_StreamData"]["path"].AsString;
-            tex.m_StreamData.offset = baseField["m_StreamData"]["offset"].AsULong;
-            tex.m_StreamData.size = baseField["m_StreamData"]["size"].AsUInt;
-
-            // If picture data is in an external .resS, fill it from the bundle directory
-            if (tex.pictureData is null || tex.pictureData.Length == 0)
-            {
-                tex.pictureData = tex.FillPictureData(Path.GetDirectoryName(inputAbPath) ?? ".");
-            }
-
+            var tex = TextureFile.ReadTextureFile(baseField);
+            // 从 bundle 内解析贴图像素数据：同时覆盖 inline "image data" 与 bundle 内部的 .resS streamData。
+            // 游戏原始封面的像素数据存在 bundle 内部的 .resS 里，必须用 bundle 解析，
+            // 不能只读文件系统目录（之前用 FillPictureData(目录) 会导致原始封面解析失败、接口返回 404）。
+            tex.SetPictureDataFromBundle(bunInst);
             if (tex.pictureData is null || tex.pictureData.Length == 0) return null;
 
             var bgra = TextureFile.DecodeManagedData(
