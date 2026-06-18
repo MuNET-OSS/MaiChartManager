@@ -23,6 +23,9 @@ public partial class MusicTransferController(
 {
     public record RequestCopyToRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool removeEvents, bool legacyFormat);
 
+    // 原生选目录导出 maidata 的请求体：music 为要导出的歌曲列表，ignoreVideo 控制是否跳过 PV 视频。
+    public record RequestExportMaidataRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool ignoreVideo = false);
+
     private static int[] GetAudioCandidateIds(MusicXmlWithABJacket music)
     {
         return [music.CueId, music.Id, music.NonDxId];
@@ -826,6 +829,273 @@ public partial class MusicTransferController(
                     }
                 }
             }
+        }
+    }
+
+    // 把单首歌导出为 maidata 文件（maidata.txt + 封面 + 音频）写入 targetDir。
+    // 该方法供原生选目录导出复用；与 zip 版 ExportAsMaidata 产物保持一致（Linux 下不导出音频）。
+    private async Task WriteMaidataToDirectory(int id, string assetDir, string targetDir, bool ignoreVideo)
+    {
+        var music = settings.GetMusic(id, assetDir);
+        if (music is null) return;
+        var musicDir = Path.GetDirectoryName(music.FilePath);
+        if (string.IsNullOrWhiteSpace(musicDir) || !Directory.Exists(musicDir))
+        {
+            var message = $"Invalid source directory for music {music.Id}: {music.FilePath}";
+            logger.LogError("{message}", message);
+            throw new DirectoryNotFoundException(message);
+        }
+
+        Directory.CreateDirectory(targetDir);
+
+        var simaiFile = new Maidata();
+        simaiFile.Title = music.Name;
+        simaiFile.Artist = music.Artist;
+        simaiFile.WholeBpm = music.Bpm;
+        simaiFile.First = 0;
+        simaiFile["shortid"] = music.Id.ToString();
+        simaiFile["genreid"] = music.GenreId.ToString();
+        var genre = StaticSettings.GenreList.FirstOrDefault(it => it.Id == music.GenreId);
+        if (genre is not null) simaiFile["genre"] = genre.GenreName;
+        simaiFile["versionid"] = music.AddVersionId.ToString();
+        var version = StaticSettings.VersionList.FirstOrDefault(it => it.Id == music.AddVersionId);
+        if (version is not null) simaiFile["version"] = version.GenreName;
+
+        // demo_seek（预览起止时间），依赖 CriUtils，仅 Windows 可用
+#if WINDOWS
+        try
+        {
+            if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out _, out var previewAcb, out _) && previewAcb is not null)
+            {
+                var previewTime = CriUtils.GetAudioPreviewTime(previewAcb);
+                if (previewTime.StartTime >= 0 && previewTime.EndTime > previewTime.StartTime)
+                {
+                    simaiFile.Demo = ((float)previewTime.StartTime, (float)(previewTime.EndTime - previewTime.StartTime));
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "WriteMaidataToDirectory: 获取音频预览时间失败，已忽略。");
+        }
+#endif
+
+        for (var i = 0; i < music.Charts.Length; i++)
+        {
+            var chart = music.Charts[i];
+            if (chart is null || !chart.Enable || string.IsNullOrWhiteSpace(chart.Path)) continue;
+
+            var chartPath = Path.Combine(musicDir, chart.Path);
+            if (!System.IO.File.Exists(chartPath))
+            {
+                var fallbackPath = Path.Combine(musicDir, chart.Path.Replace(".ma2", "_L.ma2", StringComparison.OrdinalIgnoreCase));
+                if (!System.IO.File.Exists(fallbackPath)) continue;
+                chartPath = fallbackPath;
+            }
+
+            try
+            {
+                if (StaticSettings.Config.UseLegacyMaiLib)
+                {
+                    simaiFile["ChartConvertTool"] = $"MaiLib";
+                    var parser = new MaiLib.Ma2Parser();
+                    var ma2Content = await System.IO.File.ReadAllLinesAsync(chartPath);
+                    var ma2 = parser.ChartOfToken(ma2Content);
+                    var simai = ma2.Compose(MaiLib.ChartEnum.ChartVersion.SimaiFes);
+
+                    var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
+                    simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer), false);
+                }
+                else
+                {
+                    var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
+                    var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
+                    var (simai, _) = new SimaiGenerator().Generate(cvtChart);
+
+                    var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
+                    simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer));
+                    simaiFile.ClockCount = cvtChart.ClockCount; // 通过多次写入，自然实现取最后一个有效难度的clockCount，作为写入maidata中的
+                }
+            }
+            catch (Exception e)
+            {
+                logger.LogError("WriteMaidataToDirectory FAILED! {title}, {filename}: {e}", music.Name, chartPath, e);
+                throw;
+            }
+        }
+
+        var appVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
+        simaiFile["chartconverter"] = $"MaiChartManager v{appVersion}";
+
+        // 写 maidata.txt
+        await System.IO.File.WriteAllTextAsync(Path.Combine(targetDir, "maidata.txt"), simaiFile.ToString(), Encoding.UTF8);
+
+        // 写封面 bg{ext}
+        var img = music.GetMusicJacketPngData();
+        if (img is not null)
+        {
+            var imgExt = (Path.GetExtension(music.RealJacketPath) ?? ".png").ToLowerInvariant();
+            if (imgExt == ".ab") imgExt = ".png";
+            await System.IO.File.WriteAllBytesAsync(Path.Combine(targetDir, $"bg{imgExt}"), img);
+        }
+
+        // 导出音频 track.mp3，依赖 AudioConvert/CriUtils，仅 Windows 可用
+#if WINDOWS
+        var tag = new ID3TagData
+        {
+            Title = music.Name,
+            Artist = music.Artist,
+            Album = genre?.GenreName,
+            Track = music.Id.ToString(),
+            Comment = version?.GenreName,
+            AlbumArt = img,
+        };
+
+        if (!AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out _, out var acbPath, out var awbPath) || acbPath is null || awbPath is null)
+        {
+            var message = BuildAudioResolveErrorMessage(music);
+            logger.LogError("{message}", message);
+            throw new FileNotFoundException(message);
+        }
+        var wav = Audio.AcbToWav(acbPath);
+        await using (var soundStream = System.IO.File.Create(Path.Combine(targetDir, "track.mp3")))
+        {
+            AudioConvert.ConvertWavToMp3Stream(wav, soundStream, tag);
+        }
+#else
+        logger.LogWarning("当前平台不支持音频导出，跳过音乐 {Id} 的 track.mp3。", music.Id);
+#endif
+
+        // 导出 PV 视频 pv.mp4（与 zip 版保持一致，未加 #if WINDOWS 限制）
+        if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
+        {
+            DirectoryInfo? tmpDir = null;
+            try
+            {
+                string? pvMp4Path = null;
+                var ext = Path.GetExtension(movieUsmPath).ToLowerInvariant();
+
+                if (ext == ".dat" || ext == ".usm")
+                {
+                    tmpDir = Directory.CreateTempSubdirectory();
+                    logger.LogInformation("Temp dir: {tmpDir}", tmpDir.FullName);
+                    pvMp4Path = Path.Combine(tmpDir.FullName, "pv.mp4");
+
+                    await VideoConvert.ConvertUsmToMp4(movieUsmPath, pvMp4Path);
+                }
+                else if (ext == ".mp4")
+                {
+                    pvMp4Path = movieUsmPath;
+                }
+
+                if (pvMp4Path is not null && System.IO.File.Exists(pvMp4Path))
+                {
+                    System.IO.File.Copy(pvMp4Path, Path.Combine(targetDir, "pv.mp4"), true);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "导出音乐 {musicId}（{name}）的 pv.mp4 失败，跳过视频。", music.Id, music.Name);
+            }
+            finally
+            {
+                if (tmpDir is not null)
+                {
+                    try
+                    {
+                        tmpDir.Delete(true);
+                    }
+                    catch
+                    {
+                        // 忽略清理错误
+                    }
+                }
+            }
+        }
+    }
+
+    // 把文件名中的非法字符替换为下划线，空结果回退到 fallback。
+    private static string SanitizeFileNameSegment(string name, string fallback)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var builder = new StringBuilder(name.Length);
+        foreach (var ch in name)
+        {
+            builder.Append(Array.IndexOf(invalidChars, ch) >= 0 ? '_' : ch);
+        }
+
+        var result = builder.ToString().Trim();
+        return string.IsNullOrEmpty(result) ? fallback : result;
+    }
+
+    // 原生选目录导出 maidata：弹出系统目录选择对话框，对每首歌在子目录中写入 maidata。
+    // 用于没有 File System Access API 的环境（Linux/Photino/WebKitGTK）。
+    [HttpPost]
+    [Route("/MaiChartManagerServlet/[action]Api")]
+    public async Task RequestExportMaidata([FromBody] RequestExportMaidataRequest request)
+    {
+        var dest = dialogService.PickFolder(Locale.SelectTargetLocation);
+        if (dest is null) return;
+        logger.LogInformation("ExportMaidata: {dest}", dest);
+
+        if (request.music.Length == 0) return;
+
+        var showProgress = request.music.Length > 1;
+        using var progress = showProgress
+            ? progressController.Begin(Locale.Exporting, string.Format(Locale.ExportingMultipleMusic, request.music.Length), Locale.Cancelling)
+            : null;
+        progress?.Report(0, (ulong)request.music.Length);
+
+        // 记录已使用的子目录名，避免不同歌曲互相覆盖
+        var usedDirNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var done = 0;
+        var total = request.music.Length;
+
+        foreach (var musicId in request.music)
+        {
+            if (progress?.IsCancelled == true)
+            {
+                logger.LogInformation("批量导出 maidata 被用户取消。");
+                break;
+            }
+
+            var music = settings.GetMusic(musicId.Id, musicId.AssetDir);
+            if (music is null)
+            {
+                logger.LogWarning("Skip export: music {id} in {assetDir} not found.", musicId.Id, musicId.AssetDir);
+                done++;
+                progress?.Report((ulong)done, (ulong)total);
+                continue;
+            }
+
+            try
+            {
+                // 子目录命名：安全化歌名 + DX 后缀（与前端 remoteExport 保持一致）；为空回退到 id。
+                var suffix = music.Id is > 10000 and < 20000 ? " [DX]" : "";
+                var baseName = SanitizeFileNameSegment(music.Name ?? "", music.Id.ToString()) + suffix;
+
+                // 处理重名：追加 id，再不行追加序号
+                var dirName = baseName;
+                if (!usedDirNames.Add(dirName))
+                {
+                    dirName = $"{baseName}_{music.Id}";
+                    var n = 1;
+                    while (!usedDirNames.Add(dirName))
+                    {
+                        dirName = $"{baseName}_{music.Id}_{n++}";
+                    }
+                }
+
+                var targetDir = Path.Combine(dest, dirName);
+                await WriteMaidataToDirectory(musicId.Id, musicId.AssetDir, targetDir, request.ignoreVideo);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "导出音乐 {id}（{name}）的 maidata 失败，已跳过。", music.Id, music.Name);
+            }
+
+            done++;
+            progress?.Report((ulong)done, (ulong)total, music.Name);
         }
     }
 
