@@ -7,7 +7,6 @@ using MaiChartManager.Models;
 using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.VisualBasic.FileIO;
 using MuConvert.mai;
 using NAudio.Lame;
 
@@ -484,22 +483,22 @@ public partial class MusicTransferController(
             if (Directory.Exists(p))
             {
                 logger.LogInformation("Delete directory: {p}", p);
-                FileSystem.DeleteDirectory(p, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                PlatformFile.DeleteDirectory(p);
             }
 
             if (System.IO.File.Exists(p))
             {
                 logger.LogInformation("Delete file: {p}", p);
-                FileSystem.DeleteFile(p, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                PlatformFile.DeleteFile(p);
             }
         }
     }
 
     private void DeleteAb(string abPath)
     {
-        FileSystem.DeleteFile(abPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+        PlatformFile.DeleteFile(abPath);
         if (System.IO.File.Exists(abPath + ".manifest"))
-            FileSystem.DeleteFile(abPath + ".manifest", UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+            PlatformFile.DeleteFile(abPath + ".manifest");
     }
 
     private void MoveJacketSoundVideo(MusicXmlWithABJacket music, int newId, string assetDir)
@@ -526,7 +525,7 @@ public partial class MusicTransferController(
             var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}{Path.GetExtension(jacketSourcePath)}");
             DeleteIfExists(localJacketTarget);
             logger.LogInformation("Move jacket: {jacketSourcePng} -> {localJacketTarget}", jacketSourcePath, localJacketTarget);
-            FileSystem.MoveFile(jacketSourcePath, localJacketTarget, UIOption.OnlyErrorDialogs);
+            PlatformFile.MoveFile(jacketSourcePath, localJacketTarget);
         }
         else if (music.AssetBundleJacket is not null)
         {
@@ -580,20 +579,20 @@ public partial class MusicTransferController(
         if (StaticSettings.AcbAwb.TryGetValue($"music{music.NonDxId:000000}.acb", out var acb))
         {
             logger.LogInformation("Move acb: {acb} -> {acbawbTarget}.acb", acb, acbawbTarget);
-            FileSystem.MoveFile(acb, acbawbTarget + ".acb", UIOption.OnlyErrorDialogs);
+            PlatformFile.MoveFile(acb, acbawbTarget + ".acb");
         }
 
         if (StaticSettings.AcbAwb.TryGetValue($"music{music.NonDxId:000000}.awb", out var awb))
         {
             logger.LogInformation("Move awb: {awb} -> {acbawbTarget}.awb", awb, acbawbTarget);
-            FileSystem.MoveFile(awb, acbawbTarget + ".awb", UIOption.OnlyErrorDialogs);
+            PlatformFile.MoveFile(awb, acbawbTarget + ".awb");
         }
 
         // 视频数据
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
         {
             logger.LogInformation("Move movie: {movie} -> {movieTarget}", movie, movieTarget);
-            FileSystem.MoveFile(movie, movieTarget + Path.GetExtension(movie), UIOption.OnlyErrorDialogs);
+            PlatformFile.MoveFile(movie, movieTarget + Path.GetExtension(movie));
         }
         #endregion
     }
@@ -629,7 +628,7 @@ public partial class MusicTransferController(
             if (!System.IO.File.Exists(Path.Combine(oldMusicDir, chart.Path))) continue;
             var newFileName = $"{newId:000000}_0{i}.ma2";
             logger.LogInformation("Move chart: {chart.Path} -> {newFileName}", chart.Path, newFileName);
-            FileSystem.MoveFile(Path.Combine(oldMusicDir, chart.Path), Path.Combine(oldMusicDir, newFileName));
+            PlatformFile.MoveFile(Path.Combine(oldMusicDir, chart.Path), Path.Combine(oldMusicDir, newFileName));
             chart.Path = newFileName;
         }
 
@@ -638,7 +637,7 @@ public partial class MusicTransferController(
         music.Save();
         Directory.CreateDirectory(Path.Combine(StaticSettings.StreamingAssets, assetDir, "music"));
         logger.LogInformation("Move music dir: {oldMusicDir} -> {newMusicDir}", oldMusicDir, newMusicDir);
-        FileSystem.MoveDirectory(oldMusicDir, newMusicDir, UIOption.OnlyErrorDialogs);
+        PlatformFile.MoveDirectory(oldMusicDir, newMusicDir);
 
         // 重新扫描全部
         await settings.RescanAll();

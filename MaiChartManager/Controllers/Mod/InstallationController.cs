@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
+using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.VisualBasic.FileIO;
 
 namespace MaiChartManager.Controllers.Mod;
 
@@ -123,7 +123,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
         {
             if (System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, mod)))
             {
-                FileSystem.DeleteFile(Path.Combine(StaticSettings.GamePath, mod), UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                PlatformFile.DeleteFile(Path.Combine(StaticSettings.GamePath, mod));
             }
         }
     }
@@ -316,7 +316,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
     {
         if (System.IO.File.Exists(ModPaths.AquaMaiDllInstalledPath))
         {
-            FileSystem.DeleteFile(ModPaths.AquaMaiDllInstalledPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+            PlatformFile.DeleteFile(ModPaths.AquaMaiDllInstalledPath);
         }
     }
 
@@ -325,7 +325,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
     {
         if (System.IO.File.Exists(ModPaths.MuModDllInstalledPath))
         {
-            FileSystem.DeleteFile(ModPaths.MuModDllInstalledPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+            PlatformFile.DeleteFile(ModPaths.MuModDllInstalledPath);
         }
     }
 

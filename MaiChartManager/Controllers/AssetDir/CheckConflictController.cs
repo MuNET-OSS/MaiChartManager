@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using MaiChartManager.Models;
+using MaiChartManager.Platform;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.VisualBasic.FileIO;
 
 namespace MaiChartManager.Controllers.AssetDir;
 
@@ -116,7 +116,7 @@ public class CheckConflictController(StaticSettings settings, ILogger<CheckConfl
             };
 
             logger.LogInformation("Delete file {path}", Path.Combine(path, req.FileName));
-            FileSystem.DeleteFile(Path.Combine(path, req.FileName), UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+            PlatformFile.DeleteFile(Path.Combine(path, req.FileName));
         }
     }
 }

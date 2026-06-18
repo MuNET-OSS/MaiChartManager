@@ -1,6 +1,6 @@
 ﻿using System.Xml;
+using MaiChartManager.Platform;
 using MaiChartManager.Utils;
-using Microsoft.VisualBasic.FileIO;
 
 namespace MaiChartManager.Models;
 
@@ -131,9 +131,9 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
         Console.WriteLine("删除 jacket: " + RealJacketPath);
         try
         { 
-            FileSystem.DeleteFile(RealJacketPath);
+            PlatformFile.DeleteFile(RealJacketPath);
             if (RealJacketPath.EndsWith(".ab") && File.Exists(RealJacketPath + ".manifest")) // .ab的情况，要额外把manifest也干掉
-                FileSystem.DeleteFile(RealJacketPath + ".manifest");
+                PlatformFile.DeleteFile(RealJacketPath + ".manifest");
         }
         catch
         {
@@ -158,9 +158,9 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
                     Console.WriteLine("删除 jacket_s: " + jacketSPath);
                     try
                     {
-                        FileSystem.DeleteFile(jacketSPath);
+                        PlatformFile.DeleteFile(jacketSPath);
                         if (File.Exists(jacketSPath + ".manifest"))
-                            FileSystem.DeleteFile(jacketSPath + ".manifest");
+                            PlatformFile.DeleteFile(jacketSPath + ".manifest");
                     }
                     catch
                     {
@@ -181,7 +181,7 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
             Console.WriteLine("删除 acb: " + acb);
             try
             {
-                FileSystem.DeleteFile(acb);
+                PlatformFile.DeleteFile(acb);
             }
             catch
             {
@@ -194,7 +194,7 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
             Console.WriteLine("删除 awb: " + awb);
             try
             {
-                FileSystem.DeleteFile(awb);
+                PlatformFile.DeleteFile(awb);
             }
             catch
             {
@@ -207,7 +207,7 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
             Console.WriteLine("删除 movieData: " + movieData);
             try
             {
-                FileSystem.DeleteFile(movieData);
+                PlatformFile.DeleteFile(movieData);
             }
             catch
             {
@@ -218,7 +218,7 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
         try
         {
             Console.WriteLine("删除目录: " + Path.GetDirectoryName(FilePath));
-            FileSystem.DeleteDirectory(Path.GetDirectoryName(FilePath), DeleteDirectoryOption.DeleteAllContents);
+            PlatformFile.DeleteDirectoryPermanent(Path.GetDirectoryName(FilePath));
         }
         catch
         {

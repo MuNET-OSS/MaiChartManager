@@ -1,4 +1,4 @@
-using Microsoft.VisualBasic.FileIO;
+using MaiChartManager.Platform;
 using Xabe.FFmpeg;
 
 namespace MaiChartManager.Utils;
@@ -147,7 +147,7 @@ public static class VideoConvert
             // 第二步：VP9 直接打包到目标 USM，避免中间 USM 文件再复制。
             if (options.UseH264)
             {
-                FileSystem.CopyFile(intermediateFile, options.OutputPath, true);
+                PlatformFile.CopyFile(intermediateFile, options.OutputPath);
             }
             else
             {
@@ -342,7 +342,7 @@ public static class VideoConvert
                 var movieUsm = Path.Combine(tmpDir.FullName, "movie.usm");
 
                 onProgress?.Invoke(10);
-                FileSystem.CopyFile(inputPath, movieUsm, UIOption.OnlyErrorDialogs);
+                PlatformFile.CopyFile(inputPath, movieUsm);
 
                 // 解包 USM
                 onProgress?.Invoke(30);
