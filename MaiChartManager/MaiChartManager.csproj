@@ -122,6 +122,14 @@
     <PackageReference Include="System.Resources.Extensions" Version="10.0.0" />
     <PackageReference Include="System.Drawing.Common" Version="9.0.0" />
     <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+    <!-- Photino.NET：Linux 下作为原生窗口宿主（底层走系统 WebKitGTK），仅 Linux 构建引用 -->
+    <PackageReference Include="Photino.NET" Version="4.0.16" />
+  </ItemGroup>
+  <!-- Linux 下把已构建好的 Vue SPA（wwwroot）复制到输出目录，使其位于 exe 同级，
+       与 StaticSettings.wwwroot（非 DEBUG 时为 exeDir/wwwroot）的查找路径一致，供 Kestrel 伺服。
+       使用 Update 而非 Include：wwwroot 已被 Web SDK 隐式作为 Content 包含，这里只补充复制元数据，避免重复项。 -->
+  <ItemGroup Condition="'$(IsLinuxBuild)' == 'true'">
+    <Content Update="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup Condition="'$(IsLinuxBuild)' == 'true'">
     <Compile Remove="Program.cs" />

@@ -1,6 +1,7 @@
 #if !WINDOWS
 using System.Globalization;
 using System.Text.Json;
+using Photino.NET;
 
 namespace MaiChartManager;
 
@@ -11,8 +12,36 @@ public static class LinuxProgram
         Directory.CreateDirectory(StaticSettings.appData);
         Directory.CreateDirectory(StaticSettings.tempPath);
         InitConfiguration();
-        ServerManager.StartApp(false, url => Console.WriteLine($"MaiChartManager backend listening at {url}"));
-        Thread.Sleep(Timeout.Infinite);
+
+        // 启动进程内 Kestrel：loopback + 伺服 SPA（wwwroot）+ API 同源，但不开 LAN 端口。
+        // Kestrel 在后台线程运行（StartApp 内部 Task.Run），主线程留给 Photino 开窗。
+        var serverReady = new ManualResetEventSlim(false);
+        string? backendUrl = null;
+        ServerManager.StartApp(export: false, serveSpa: true, onStart: url =>
+        {
+            backendUrl = url;
+            serverReady.Set();
+        });
+
+        // 等待后端就绪拿到 loopback url，超时 30 秒视为启动失败。
+        if (!serverReady.Wait(TimeSpan.FromSeconds(30)) || string.IsNullOrWhiteSpace(backendUrl))
+        {
+            Console.Error.WriteLine("后端在 30 秒内未能就绪，退出。");
+            Environment.Exit(1);
+            return;
+        }
+
+        Console.WriteLine($"MaiChartManager backend listening at {backendUrl}");
+
+        // Photino 必须在主线程创建并显示窗口。Linux 下底层走系统 WebKitGTK。
+        // 加载 Kestrel 的 loopback 根地址：SPA 与 API 同源，前端无需注入 backendUrl。
+        new PhotinoWindow()
+            .SetTitle("MaiChartManager")
+            .SetUseOsDefaultSize(false)
+            .SetSize(1280, 800)
+            .Center()
+            .Load(new Uri(backendUrl))
+            .WaitForClose();
     }
 
     /// <summary>

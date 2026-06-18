@@ -73,7 +73,9 @@ public static class ServerManager
         return port;
     }
 
-    public static void StartApp(bool export, Action<string>? onStart = null)
+    // serveSpa：在 loopback 上伺服 wwwroot 里的 Vue SPA（用于 Photino 桌面宿主），
+    // 但不开放 LAN 端口。放在 onStart 之后以保持现有位置参数调用的兼容性。
+    public static void StartApp(bool export, Action<string>? onStart = null, bool serveSpa = false)
     {
         var builder = WebApplication.CreateBuilder();
 
@@ -197,7 +199,8 @@ public static class ServerManager
             .UseSwagger()
             .UseSwaggerUI()
             .UseCors("qwq");
-        if (export)
+        // 当 export 或 serveSpa 时都伺服 SPA：export 是导出场景，serveSpa 是 Photino 桌面宿主场景
+        if (export || serveSpa)
             app.UseFileServer(new FileServerOptions
             {
                 FileProvider = new PhysicalFileProvider(StaticSettings.wwwroot),
