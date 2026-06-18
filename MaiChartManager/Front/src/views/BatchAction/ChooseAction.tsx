@@ -2,7 +2,7 @@ import { defineComponent, PropType, ref } from "vue";
 import { MusicXmlWithABJacket } from "@/client/apiGen";
 import { Button, Radio, Select, Popover, addToast } from "@munet/ui";
 import { STEP } from "@/views/BatchAction/index";
-import api, { isWebView } from "@/client/api";
+import api, { isLocalHost } from "@/client/api";
 import { showNeedPurchaseDialog, updateMusicList, version } from "@/store/refs";
 import remoteExport from "@/views/BatchAction/remoteExport";
 import TransitionVertical from "@/components/TransitionVertical.vue";
@@ -53,14 +53,14 @@ export default defineComponent({
           break;
         case OPTIONS.CreateNewOpt:
         case OPTIONS.CreateNewOptCompatible:
-          if (isWebView) {
+          if (isLocalHost) {
             props.continue(STEP.Select);
             await api.RequestCopyTo({music: props.selectedMusic, removeEvents: selectedOption.value === OPTIONS.CreateNewOptCompatible, legacyFormat: false});
             addToast({message: t('music.batch.exportSuccess'), type: 'success'});
             break;
           }
         case OPTIONS.CreateNewOptMa2_103:
-          if (isWebView) {
+          if (isLocalHost) {
             props.continue(STEP.Select);
             await api.RequestCopyTo({music: props.selectedMusic, removeEvents: true, legacyFormat: true});
             addToast({message: t('music.batch.exportSuccess'), type: 'success'});

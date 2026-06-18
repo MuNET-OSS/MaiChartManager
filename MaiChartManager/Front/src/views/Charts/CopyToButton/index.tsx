@@ -1,5 +1,5 @@
 import { computed, defineComponent, ref } from "vue";
-import api, { getUrl, isWebView } from "@/client/api";
+import api, { getUrl, isLocalHost } from "@/client/api";
 import { globalCapture, selectedADir, selectedMusic, selectMusicId, showNeedPurchaseDialog, version } from "@/store/refs";
 import { DropMenu, addToast } from "@munet/ui";
 import { BlobWriter, ZipReader } from "@zip.js/zip.js";
@@ -28,7 +28,7 @@ export default defineComponent({
 
     const copy = async (type: CopyType) => {
       wait.value = true;
-      if (!isWebView || type === CopyType.exportMaidata || type === CopyType.exportMaidataIgnoreVideo) {
+      if (!isLocalHost || type === CopyType.exportMaidata || type === CopyType.exportMaidataIgnoreVideo) {
         // 浏览器模式，使用 zip.js 获取并解压
         let folderHandle: FileSystemDirectoryHandle;
         try {

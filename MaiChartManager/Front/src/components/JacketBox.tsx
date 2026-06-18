@@ -5,6 +5,7 @@ import { showTransactionalDialog } from "@munet/ui";
 import { globalCapture, selectedADir, selectedMusic } from "@/store/refs";
 import { MusicXmlWithABJacket } from "@/client/apiGen";
 import { useI18n } from 'vue-i18n';
+import { pickFile } from "@/utils/pickFile";
 
 export let upload = async (fileHandle?: FileSystemFileHandle) => {
 }
@@ -24,23 +25,15 @@ export default defineComponent({
       upload = async (fileHandle?: FileSystemFileHandle) => {
         if (!props.upload) return;
         try {
+          let file: File;
           if (!fileHandle) {
-            [fileHandle] = await window.showOpenFilePicker({
-              id: 'jacket',
-              startIn: 'downloads',
-              types: [
-                {
-                  description: t('genre.imageDescription'),
-                  accept: {
-                    "application/jpeg": [".jpeg", ".jpg"],
-                    "application/png": [".png"],
-                  },
-                },
-              ],
-            });
+            // 封面图片，使用通用单文件选择（兼容 WebKitGTK）
+            const picked = await pickFile('image/jpeg,image/png');
+            if (!picked) return;
+            file = picked;
+          } else {
+            file = await fileHandle.getFile();
           }
-          if (!fileHandle) return;
-          const file = await fileHandle.getFile();
 
           const res = await api.SetMusicJacket(props.info.id!, selectedADir.value, { file });
           if (res.error) {

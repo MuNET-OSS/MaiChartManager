@@ -8,6 +8,7 @@ import { globalCapture, selectedADir, showNeedPurchaseDialog, version } from "@/
 import { fetchEventSource } from "@microsoft/fetch-event-source";
 import { handleSseOpen } from "@/utils/sseOpen";
 import { t } from "@/locales";
+import { pickFile } from "@/utils/pickFile";
 
 enum STEP {
   None,
@@ -80,24 +81,17 @@ export default defineComponent({
     uploadFlow = async (fileHandle?: FileSystemFileHandle) => {
       step.value = STEP.Select
       try {
+        let file: File;
         if (!fileHandle) {
-          [fileHandle] = await window.showOpenFilePicker({
-            id: 'movie',
-            startIn: 'downloads',
-            types: [
-              {
-                description: t('music.edit.supportedFileTypes'),
-                accept: {
-                  "video/*": [".dat"],
-                  "image/*": [],
-                },
-              },
-            ],
-          });
+          // 视频/图片文件，使用通用单文件选择（兼容 WebKitGTK）
+          const picked = await pickFile('video/*,image/*,.dat');
+          step.value = STEP.None
+          if (!picked) return;
+          file = picked;
+        } else {
+          step.value = STEP.None
+          file = await fileHandle.getFile() as File;
         }
-        step.value = STEP.None
-        if (!fileHandle) return;
-        const file = await fileHandle.getFile() as File;
 
         if (file.name.endsWith('.dat')) {
           load.value = true;
