@@ -35,8 +35,12 @@ export const aquaMaiVersionConfig = new AquaMaiVersionConfigApi({
 }).api
 
 export const getUrl = (suffix: string) => {
+  // 必须返回绝对地址：部分代码（如 fetchEventSource）内部会 new URL(getUrl(...))，
+  // 相对地址在 WebKitGTK 上会抛 "The string did not match the expected pattern"。
+  // WebView2 下 backendUrl 已注入为绝对地址；Photino/远程浏览器/export 下回退到当前 origin（同源）。
   // @ts-ignore
-  return `${globalThis.backendUrl ?? ''}/MaiChartManagerServlet/${suffix}`;
+  const base = (globalThis.backendUrl as string | undefined) ?? location.origin;
+  return `${base}/MaiChartManagerServlet/${suffix}`;
 }
 
 // 是否运行在 Photino(WebKitGTK) 宿主：本地宿主但不是 Windows WebView2。
