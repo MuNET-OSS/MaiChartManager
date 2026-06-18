@@ -1,13 +1,23 @@
 import { ImportDirectory } from "@/utils/importDirectory";
-import { buildDirectoryFromFileList } from "@/utils/webkitDirectoryAdapter";
+import { httpImportDirectory } from "@/utils/httpImportDirectory";
+import { getUrl, isLocalHost } from "@/client/api";
+
+// 抛一个 AbortError，与 showDirectoryPicker 取消时的语义一致（startProcess 里会 catch 掉）
+function abort(message = '用户取消选择目录'): never {
+  const err = new Error(message);
+  err.name = 'AbortError';
+  throw err;
+}
 
 // 通用选目录：
-// - 若浏览器支持 window.showDirectoryPicker（Chromium / WebView2 / 远程 Chrome）→ 返回真实 handle，
+// - 浏览器支持 window.showDirectoryPicker（Chromium / WebView2 / 远程 Chrome）→ 返回真实 handle，
 //   行为与原先完全一致；
-// - 否则（WebKitGTK / Photino）→ 用 <input type=file webkitdirectory multiple> 选目录，
-//   把扁平 FileList 交给适配器，返回实现 ImportDirectory 接口的「句柄」。
-// 用户取消时返回 null（与原先 showDirectoryPicker 抛 AbortError 的处理在 startProcess 里都被 catch）。
-export function pickDirectory(
+// - 否则是本地桌面宿主（isLocalHost，含 Photino/WebKitGTK 的 loopback 与 WebView2 的 mcm.invalid）→
+//   走后端：弹原生选文件夹对话框，再用 httpImportDirectory 适配器通过 HTTP 提供目录内容。
+//   （WebKitGTK 没有 showDirectoryPicker，<input webkitdirectory> 又只能选单文件，所以一律走后端。）
+// - 其余情况（远程浏览器且不支持 File System Access API）→ 不支持，按取消处理。
+// 用户取消时抛 AbortError。
+export async function pickDirectory(
   options?: { id?: string; startIn?: string },
 ): Promise<ImportDirectory> {
   // 真实 File System Access API
@@ -16,45 +26,16 @@ export function pickDirectory(
     return window.showDirectoryPicker(options as any) as unknown as Promise<ImportDirectory>;
   }
 
-  // WebKitGTK 回退：<input webkitdirectory>
-  return new Promise<ImportDirectory>((resolve, reject) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    // webkitdirectory 不是标准 TS 属性，这里用 setAttribute 兼容
-    input.setAttribute('webkitdirectory', '');
-    input.multiple = true;
-    input.style.display = 'none';
-    document.body.appendChild(input);
+  // 本地桌面宿主：后端原生选目录 + HTTP 提供目录内容
+  if (isLocalHost) {
+    const res = await fetch(getUrl('PickImportFolderApi'));
+    if (!res.ok) abort('选择目录失败');
+    // 后端返回 JSON：选中的绝对路径字符串，取消时为 null
+    const path: string | null = await res.json();
+    if (!path) abort();
+    return httpImportDirectory(path);
+  }
 
-    let settled = false;
-    const cleanup = () => input.remove();
-
-    input.addEventListener('change', () => {
-      settled = true;
-      const files = input.files;
-      if (!files || files.length === 0) {
-        cleanup();
-        // 没选到任何文件，按取消处理：抛 AbortError，与 showDirectoryPicker 取消语义一致
-        const err = new Error('用户取消选择目录');
-        err.name = 'AbortError';
-        reject(err);
-        return;
-      }
-      const dir = buildDirectoryFromFileList(files);
-      cleanup();
-      resolve(dir);
-    });
-
-    // 取消时多数内核不触发 change；用 window focus 兜底判定取消
-    window.addEventListener('focus', () => setTimeout(() => {
-      if (!settled) {
-        cleanup();
-        const err = new Error('用户取消选择目录');
-        err.name = 'AbortError';
-        reject(err);
-      }
-    }, 500), { once: true });
-
-    input.click();
-  });
+  // 远程浏览器且无 File System Access API：不支持，按取消处理
+  abort('当前环境不支持选择目录');
 }
