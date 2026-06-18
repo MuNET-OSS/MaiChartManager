@@ -131,7 +131,8 @@ public static class ServerManager
         builder.Services.AddSingleton<MaiChartManager.Platform.IAppShell, MaiChartManager.Platform.Windows.WindowsAppShell>();
         builder.Services.AddSingleton<MaiChartManager.Platform.IProgressController, MaiChartManager.Platform.Windows.WindowsProgressController>();
 #else
-        builder.Services.AddSingleton<MaiChartManager.Platform.IDesktopDialogService, MaiChartManager.Platform.Linux.HeadlessDialogService>();
+        // 使用 Photino 原生对话框（替换原 HeadlessDialogService 占位实现），让 OOBE 选目录可用。
+        builder.Services.AddSingleton<MaiChartManager.Platform.IDesktopDialogService, MaiChartManager.Platform.Linux.PhotinoDialogService>();
         builder.Services.AddSingleton<MaiChartManager.Platform.ITaskbarProgress, MaiChartManager.Platform.Linux.NoopTaskbarProgress>();
         builder.Services.AddSingleton<MaiChartManager.Platform.IShellService, MaiChartManager.Platform.Linux.LinuxShellService>();
         builder.Services.AddSingleton<MaiChartManager.Platform.IAppShell, MaiChartManager.Platform.Linux.HeadlessAppShell>();

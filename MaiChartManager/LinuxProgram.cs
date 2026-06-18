@@ -35,13 +35,17 @@ public static class LinuxProgram
 
         // Photino 必须在主线程创建并显示窗口。Linux 下底层走系统 WebKitGTK。
         // 加载 Kestrel 的 loopback 根地址：SPA 与 API 同源，前端无需注入 backendUrl。
-        new PhotinoWindow()
+        var window = new PhotinoWindow()
             .SetTitle("MaiChartManager")
             .SetUseOsDefaultSize(false)
             .SetSize(1280, 800)
             .Center()
-            .Load(new Uri(backendUrl))
-            .WaitForClose();
+            .Load(new Uri(backendUrl));
+
+        // 把窗口实例交给平台服务持有者，供 Linux 的对话框服务（PhotinoDialogService）使用。
+        Platform.Linux.PhotinoWindowHolder.Current = window;
+
+        window.WaitForClose();
     }
 
     /// <summary>
