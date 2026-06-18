@@ -36,7 +36,7 @@ public class AppLicenseController : Controller
         return true;
     }
 #else
-    // Linux: always licensed — no store/IAP available
+    // Linux：始终已授权——不支持商店 / IAP
     public record RequestPurchaseResult(string? ErrorMessage, int Status);
 
     [HttpPost]
@@ -49,7 +49,7 @@ public class AppLicenseController : Controller
     [HttpPost]
     public Task<bool> VerifyOfflineKey([FromBody] string key)
     {
-        // No offline key verification on Linux; treat as always licensed
+        // Linux 不做离线密钥验证；始终视为已授权
         return Task.FromResult(true);
     }
 #endif

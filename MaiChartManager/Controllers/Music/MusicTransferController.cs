@@ -44,10 +44,10 @@ public partial class MusicTransferController(
     }
 
     /// <summary>
-    /// Given an AssetBundle jacket path (e.g. ".../AssetBundleImages/jacket/ui_jacket_000123.ab"),
-    /// compute the companion small jacket path in the sibling "jacket_s" directory
-    /// (e.g. ".../AssetBundleImages/jacket_s/ui_jacket_000123_s.ab").
-    /// Returns null if the path shape is unexpected.
+    /// 根据 AssetBundle 封面路径（如 ".../AssetBundleImages/jacket/ui_jacket_000123.ab"），
+    /// 计算同级 "jacket_s" 目录下的小封面路径
+    /// （如 ".../AssetBundleImages/jacket_s/ui_jacket_000123_s.ab"）。
+    /// 若路径格式不符则返回 null。
     /// </summary>
     private static string? GetAssetBundleJacketSmallPath(string assetBundleJacketPath)
     {
@@ -177,7 +177,7 @@ public partial class MusicTransferController(
             return;
         }
 
-        // copy music
+        // 复制音乐数据
         var musicDestDir = Path.Combine(musicRootDir, $"music{music.Id:000000}");
         CopyDirectoryIfChanged(musicDir, musicDestDir);
 
@@ -222,7 +222,7 @@ public partial class MusicTransferController(
             }
         }
 
-        // copy jacket
+        // 复制封面
         if (music.JacketPath is not null)
         {
             var jacketDest = Path.Combine(jacketRootDir, $"ui_jacket_{music.NonDxId:000000}{Path.GetExtension(music.JacketPath)}");
@@ -237,7 +237,7 @@ public partial class MusicTransferController(
                 CopySharedFileIfNeeded(music.AssetBundleJacket + ".manifest", Path.Combine(jacketRootDir, jacketFileName + ".manifest"), copiedSharedDestinations);
             }
 
-            // Issue #42: jacket_s lives in a sibling directory, must be exported into AssetBundleImages/jacket_s/
+            // Issue #42: jacket_s 位于同级目录，导出时必须写入 AssetBundleImages/jacket_s/
             var jacketSPath = GetAssetBundleJacketSmallPath(music.AssetBundleJacket);
             if (jacketSPath is not null && System.IO.File.Exists(jacketSPath))
             {
@@ -256,7 +256,7 @@ public partial class MusicTransferController(
             CopySharedFileIfNeeded(music.PseudoAssetBundleJacket, Path.Combine(jacketRootDir, jacketFileName), copiedSharedDestinations);
         }
 
-        // copy acbawb
+        // 复制 ACB/AWB 音频
 #if WINDOWS
         if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out var resolvedAudioId, out var acb, out var awb)
             && acb is not null
@@ -270,10 +270,10 @@ public partial class MusicTransferController(
             logger.LogWarning("{message}", BuildAudioResolveErrorMessage(music));
         }
 #else
-        logger.LogWarning("Audio export not supported on this platform; skipping ACB/AWB for music {Id}.", music.Id);
+        logger.LogWarning("当前平台不支持音频导出，跳过音乐 {Id} 的 ACB/AWB。", music.Id);
 #endif
 
-        // copy movie data
+        // 复制视频数据
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
         {
             CopySharedFileIfNeeded(movie, Path.Combine(movieRootDir, $"{music.NonDxId:000000}{Path.GetExtension(movie)}"), copiedSharedDestinations);
@@ -364,7 +364,7 @@ public partial class MusicTransferController(
         }
         catch (OperationCanceledException)
         {
-            logger.LogInformation("Batch export cancelled by user.");
+            logger.LogInformation("批量导出被用户取消。");
         }
     }
 
@@ -384,12 +384,12 @@ public partial class MusicTransferController(
         var zipStream = HttpContext.Response.BodyWriter.AsStream();
         using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
 
-        // copy music
+        // 复制音乐数据
         foreach (var file in Directory.EnumerateFiles(musicDir))
         {
             if (Path.GetFileName(file).Equals("Music.xml", StringComparison.InvariantCultureIgnoreCase) && removeEvents)
             {
-                logger.LogInformation("Remove events and rights from Music.xml");
+                logger.LogInformation("从 Music.xml 中移除 Events 和版权信息");
                 var xmlDoc = music.GetXmlWithoutEventsAndRights();
                 var entry = zipArchive.CreateEntry($"music/music{music.Id:000000}/Music.xml");
                 using var stream = entry.Open();
@@ -427,7 +427,7 @@ public partial class MusicTransferController(
             }
         }
 
-        // copy jacket
+        // 复制封面
         if (music.JacketPath is not null)
         {
             zipArchive.CreateEntryFromFile(music.JacketPath, $"AssetBundleImages/jacket/ui_jacket_{music.NonDxId:000000}{Path.GetExtension(music.JacketPath)}");
@@ -440,7 +440,7 @@ public partial class MusicTransferController(
                 zipArchive.CreateEntryFromFile(music.AssetBundleJacket + ".manifest", $"AssetBundleImages/jacket/{Path.GetFileName(music.AssetBundleJacket)}.manifest");
             }
 
-            // Issue #42: jacket_s lives in a sibling directory, must be exported into AssetBundleImages/jacket_s/
+            // Issue #42: jacket_s 位于同级目录，导出时必须写入 AssetBundleImages/jacket_s/
             var jacketSPath = GetAssetBundleJacketSmallPath(music.AssetBundleJacket);
             if (jacketSPath is not null && System.IO.File.Exists(jacketSPath))
             {
@@ -456,7 +456,7 @@ public partial class MusicTransferController(
             zipArchive.CreateEntryFromFile(music.PseudoAssetBundleJacket, $"AssetBundleImages/jacket/{Path.GetFileName(music.PseudoAssetBundleJacket)}");
         }
 
-        // copy acbawb
+        // 复制 ACB/AWB 音频
 #if WINDOWS
         if (!AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out var resolvedAudioId, out var acb, out var awb) || acb is null || awb is null)
         {
@@ -467,10 +467,10 @@ public partial class MusicTransferController(
         zipArchive.CreateEntryFromFile(acb, $"SoundData/music{resolvedAudioId:000000}.acb");
         zipArchive.CreateEntryFromFile(awb, $"SoundData/music{resolvedAudioId:000000}.awb");
 #else
-        logger.LogWarning("Audio export not supported on this platform; skipping ACB/AWB for music {Id}.", music.Id);
+        logger.LogWarning("当前平台不支持音频导出，跳过音乐 {Id} 的 ACB/AWB。", music.Id);
 #endif
 
-        // copy movie data
+        // 复制视频数据
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
         {
             zipArchive.CreateEntryFromFile(movie, $"MovieData/{music.NonDxId:000000}{Path.GetExtension(movie)}");
@@ -589,7 +589,7 @@ public partial class MusicTransferController(
             FileSystem.MoveFile(awb, acbawbTarget + ".awb", UIOption.OnlyErrorDialogs);
         }
 
-        // movie data
+        // 视频数据
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
         {
             logger.LogInformation("Move movie: {movie} -> {movieTarget}", movie, movieTarget);
@@ -633,14 +633,14 @@ public partial class MusicTransferController(
             chart.Path = newFileName;
         }
 
-        // xml
+        // 保存 XML
         music.Id = newId;
         music.Save();
         Directory.CreateDirectory(Path.Combine(StaticSettings.StreamingAssets, assetDir, "music"));
         logger.LogInformation("Move music dir: {oldMusicDir} -> {newMusicDir}", oldMusicDir, newMusicDir);
         FileSystem.MoveDirectory(oldMusicDir, newMusicDir, UIOption.OnlyErrorDialogs);
 
-        // rescan all
+        // 重新扫描全部
         await settings.RescanAll();
     }
 
@@ -670,7 +670,7 @@ public partial class MusicTransferController(
         var version = StaticSettings.VersionList.FirstOrDefault(it => it.Id == music.AddVersionId);
         if (version is not null) simaiFile["version"] = version.GenreName;
 
-        // demo_seek
+        // demo_seek（预览起止时间）
 #if WINDOWS
         try
         {
@@ -685,7 +685,7 @@ public partial class MusicTransferController(
         }
         catch (Exception e)
         {
-            logger.LogWarning(e, "ExportAsMaidata: Failed to get audio preview time, ignoring.");
+            logger.LogWarning(e, "ExportAsMaidata: 获取音频预览时间失败，已忽略。");
         }
 #endif
         
@@ -744,7 +744,7 @@ public partial class MusicTransferController(
         await maidataStream.WriteAsync(Encoding.UTF8.GetBytes(simaiFile.ToString()));
         maidataStream.Close();
 
-        // copy jacket
+        // 复制封面
         var img = music.GetMusicJacketPngData();
         if (img is not null)
         {
@@ -780,7 +780,7 @@ public partial class MusicTransferController(
         AudioConvert.ConvertWavToMp3Stream(wav, soundStream, tag);
         soundStream.Close();
 #else
-        logger.LogWarning("Audio export not supported on this platform; skipping track.mp3 for music {Id}.", music.Id);
+        logger.LogWarning("当前平台不支持音频导出，跳过音乐 {Id} 的 track.mp3。", music.Id);
 #endif
 
         if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
@@ -811,7 +811,7 @@ public partial class MusicTransferController(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Failed to export pv.mp4 for music {musicId} ({name}), skipping video.", music.Id, music.Name);
+                logger.LogWarning(ex, "导出音乐 {musicId}（{name}）的 pv.mp4 失败，跳过视频。", music.Id, music.Name);
             }
             finally
             {
@@ -823,7 +823,7 @@ public partial class MusicTransferController(
                     }
                     catch
                     {
-                        // ignore cleanup errors
+                        // 忽略清理错误
                     }
                 }
             }

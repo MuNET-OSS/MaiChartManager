@@ -4,8 +4,8 @@ using Microsoft.Extensions.Logging;
 namespace MaiChartManager.Platform.Linux;
 
 /// <summary>
-/// Headless dialog service for Linux. Native file pickers are not available in the
-/// current headless host; Phase 3 will replace this with Photino dialogs.
+/// Linux 无头模式的对话框服务。当前无头宿主不支持原生文件选择对话框；
+/// 第三阶段将替换为基于 Photino 的对话框。
 /// </summary>
 public class HeadlessDialogService(ILogger<HeadlessDialogService> logger) : IDesktopDialogService
 {

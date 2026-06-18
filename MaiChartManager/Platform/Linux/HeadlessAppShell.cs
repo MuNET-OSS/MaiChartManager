@@ -4,8 +4,8 @@ using Microsoft.Extensions.Logging;
 namespace MaiChartManager.Platform.Linux;
 
 /// <summary>
-/// Headless app-shell for Linux. Window / tray / startup-task operations are no-ops;
-/// Phase 3 Photino wires the real native behaviour.
+/// Linux 无头模式的应用外壳。窗口 / 托盘 / 开机启动等操作均为空操作；
+/// 第三阶段 Photino 会接入真正的原生行为。
 /// </summary>
 public class HeadlessAppShell(ILogger<HeadlessAppShell> logger) : IAppShell
 {

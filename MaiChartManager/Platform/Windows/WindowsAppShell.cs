@@ -5,8 +5,8 @@ using Windows.ApplicationModel;
 namespace MaiChartManager.Platform.Windows;
 
 /// <summary>
-/// Windows app-shell, delegating to AppLifecycleManager / AppMain / Browser /
-/// Application / UWP StartupTask exactly as the original controllers did.
+/// Windows 应用外壳，委托给 AppLifecycleManager / AppMain / Browser /
+/// Application / UWP StartupTask，与原来各控制器的实现完全一致。
 /// </summary>
 public class WindowsAppShell : IAppShell
 {
@@ -59,8 +59,8 @@ public class WindowsAppShell : IAppShell
 
     public void ReloadLocale(string locale)
     {
-        // Locale state (CurrentLocale/Config/Culture) is applied by LocaleController in a
-        // platform-independent way. Nothing extra to refresh on the WinForms shell for now.
+        // 语言区域状态（CurrentLocale/Config/Culture）已由 LocaleController 以平台无关的方式应用。
+        // WinForms 外壳目前不需要额外刷新任何内容。
     }
 
     public double GetTargetDpiScale() => Browser.TargetDpiScale;

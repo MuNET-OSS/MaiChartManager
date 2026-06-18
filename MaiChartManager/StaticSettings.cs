@@ -140,7 +140,7 @@ public partial class StaticSettings
             }
         }
 
-        _logger.LogInformation("Scan music list, found {0} music.", _musicList.Count);
+        _logger.LogInformation("扫描音乐列表，共找到 {0} 首音乐。", _musicList.Count);
     }
 
     public void ScanGenre()
@@ -176,7 +176,7 @@ public partial class StaticSettings
             }
         }
 
-        _logger.LogInformation("Scan genre list, found {0} genre.", GenreList.Count);
+        _logger.LogInformation("扫描流派列表，共找到 {0} 个流派。", GenreList.Count);
     }
 
     public void ScanVersionList()
@@ -211,7 +211,7 @@ public partial class StaticSettings
             }
         }
 
-        _logger.LogInformation("Scan version list, found {VersionListCount} version.", VersionList.Count);
+        _logger.LogInformation("扫描版本列表，共找到 {VersionListCount} 个版本。", VersionList.Count);
     }
 
     public void ScanAssetBundles()
@@ -233,7 +233,7 @@ public partial class StaticSettings
             }
         }
 
-        _logger.LogInformation($"Scan AssetBundles, found {AssetBundleJacketMap.Count} AssetBundles.");
+        _logger.LogInformation($"扫描 AssetBundle，共找到 {AssetBundleJacketMap.Count} 个 AssetBundle。");
     }
 
     public void ScanSoundData()
@@ -248,7 +248,7 @@ public partial class StaticSettings
             }
         }
 
-        _logger.LogInformation($"Scan SoundData, found {AcbAwb.Count} SoundData.");
+        _logger.LogInformation($"扫描 SoundData，共找到 {AcbAwb.Count} 个音频文件。");
     }
 
     public void ScanMovieData()
@@ -264,7 +264,7 @@ public partial class StaticSettings
             }
         }
 
-        _logger.LogInformation($"Scan MovieData, found {MovieDataMap.Count} MovieData.");
+        _logger.LogInformation($"扫描 MovieData，共找到 {MovieDataMap.Count} 个视频文件。");
     }
 
     public void GetGameVersion()

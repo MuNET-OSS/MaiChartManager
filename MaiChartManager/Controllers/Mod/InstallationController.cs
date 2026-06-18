@@ -196,7 +196,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
     {
         if (IsMelonInstalled())
         {
-            logger.LogInformation("MelonLoader is already installed.");
+            logger.LogInformation("MelonLoader 已安装，跳过。");
             return;
         }
 
@@ -249,9 +249,9 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
             "ci" => CI_KEY,
             "slow" => CI_KEY,
             "release" => RELEASE_KEY,
-            _ => throw new ArgumentException("Invalid type", nameof(req.Type)),
+            _ => throw new ArgumentException("无效的类型", nameof(req.Type)),
         };
-        // Download from url
+        // 从 URL 下载
         using var client = new HttpClient();
         client.Timeout = TimeSpan.FromSeconds(15);
         Exception? lastException = null;
@@ -264,16 +264,16 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
 
                 if (!VerifyBinary(data, req.Sign, key))
                 {
-                    throw new InvalidOperationException("Invalid signature");
+                    throw new InvalidOperationException("签名无效");
                 }
             }
             catch (Exception e)
             {
-                logger.LogError(e, "Failed to download AquaMai from {Url}", url);
+                logger.LogError(e, "从 {Url} 下载 AquaMai 失败", url);
                 lastException = e;
                 continue;
             }
-            // Save to Mods folder
+            // 保存到 Mods 目录
             var dest = Path.Combine(StaticSettings.GamePath, "Mods", "AquaMai.dll");
             Directory.CreateDirectory(Path.GetDirectoryName(dest));
             await System.IO.File.WriteAllBytesAsync(dest, data);
@@ -283,7 +283,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
             }
             return;
         }
-        throw new InvalidOperationException("Failed to download AquaMai from all urls", lastException);
+        throw new InvalidOperationException("从所有 URL 下载 AquaMai 均失败", lastException);
     }
 
     [HttpPost]
@@ -307,7 +307,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to download MuMod cache during install, but DLL was installed successfully");
+            logger.LogError(e, "安装期间下载 MuMod 缓存失败，但 DLL 已成功安装");
         }
     }
 

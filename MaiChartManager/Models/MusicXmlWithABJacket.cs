@@ -144,7 +144,7 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
         StaticSettings.AssetBundleJacketMap.Remove(NonDxId);
         StaticSettings.PseudoAssetBundleJacketMap.Remove(NonDxId);
 
-        // Issue #42: AB jackets come with a companion jacket_s/ui_jacket_xxx_s.ab, delete it too to avoid orphan
+        // Issue #42: AB 封面带有同级目录 jacket_s/ui_jacket_xxx_s.ab，一并删除以避免孤立文件
         if (assetBundleJacket is not null)
         {
             var abDir = Path.GetDirectoryName(assetBundleJacket);

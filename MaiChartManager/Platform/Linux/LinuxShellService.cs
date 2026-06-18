@@ -4,12 +4,12 @@ using Microsoft.Extensions.Logging;
 
 namespace MaiChartManager.Platform.Linux;
 
-/// <summary>Shell integration for Linux via xdg-open / xdg-utils.</summary>
+/// <summary>通过 xdg-open / xdg-utils 实现 Linux 系统集成。</summary>
 public class LinuxShellService(ILogger<LinuxShellService> logger) : IShellService
 {
     public void RevealInFileManager(string path)
     {
-        // No portable "select file" on Linux file managers; open the containing directory.
+        // Linux 文件管理器没有通用的"选中文件"功能；改为打开所在目录。
         var target = Directory.Exists(path) ? path : Path.GetDirectoryName(path) ?? path;
         XdgOpen(target);
     }

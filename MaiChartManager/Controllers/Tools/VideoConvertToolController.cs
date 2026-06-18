@@ -354,7 +354,7 @@ public class VideoConvertToolController(ILogger<VideoConvertToolController> logg
         }
         catch (OperationCanceledException)
         {
-            // ignore
+            // 忽略取消异常
         }
     }
 }

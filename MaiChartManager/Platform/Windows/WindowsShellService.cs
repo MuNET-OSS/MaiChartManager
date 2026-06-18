@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace MaiChartManager.Platform.Windows;
 
-/// <summary>Windows shell integration via explorer.exe / ShellExecute.</summary>
+/// <summary>通过 explorer.exe / ShellExecute 实现 Windows 系统集成。</summary>
 public class WindowsShellService : IShellService
 {
     public void RevealInFileManager(string path)

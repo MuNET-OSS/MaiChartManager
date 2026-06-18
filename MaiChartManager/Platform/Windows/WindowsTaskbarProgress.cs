@@ -3,7 +3,7 @@ using MaiChartManager.Utils;
 
 namespace MaiChartManager.Platform.Windows;
 
-/// <summary>Windows taskbar progress, delegating to the existing Vanara-backed WinUtils helpers.</summary>
+/// <summary>Windows 任务栏进度，委托给基于 Vanara 的 WinUtils 辅助方法。</summary>
 public class WindowsTaskbarProgress : ITaskbarProgress
 {
     public void Set(ulong value, ulong total = 100) => WinUtils.SetTaskbarProgress(value, total);

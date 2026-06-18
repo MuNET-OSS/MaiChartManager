@@ -79,10 +79,10 @@ public static class ServerManager
 
         builder.WebHost.UseSentry((SentryAspNetCoreOptions o) =>
             {
-                // Tells which project in Sentry to send events to:
+                // 指定 Sentry 项目，将事件发送到对应的项目：
                 o.Dsn = "https://be7a9ae3a9a88f4660737b25894b3c20@sentry.c5y.moe/3";
-                // Set TracesSampleRate to 1.0 to capture 100% of transactions for tracing.
-                // We recommend adjusting this value in production.
+                // 将 TracesSampleRate 设为 1.0 可捕获 100% 的事务用于追踪。
+                // 建议在生产环境中适当调低该值。
                 o.TracesSampleRate = 0.5;
             })
             .ConfigureKestrel(serverOptions =>

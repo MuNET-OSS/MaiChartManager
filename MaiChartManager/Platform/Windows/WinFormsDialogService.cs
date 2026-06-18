@@ -5,8 +5,8 @@ using MaiChartManager.Utils;
 namespace MaiChartManager.Platform.Windows;
 
 /// <summary>
-/// WinForms-backed dialog service. Mirrors the original WinUtils.ShowDialog +
-/// per-controller FolderBrowserDialog/OpenFileDialog/MessageBox usage.
+/// 基于 WinForms 的对话框服务，对应原来 WinUtils.ShowDialog +
+/// 各控制器中 FolderBrowserDialog/OpenFileDialog/MessageBox 的用法。
 /// </summary>
 public class WinFormsDialogService : IDesktopDialogService
 {
