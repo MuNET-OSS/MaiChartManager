@@ -54,7 +54,45 @@ public static class LinuxProgram
         // 把窗口实例交给平台服务持有者，供 Linux 的对话框服务与应用外壳（导航/标题等）使用。
         Platform.Linux.PhotinoWindowHolder.Current = window;
 
+        // 处理前端发来的「开新窗口」请求（预览谱面等）。WebKitGTK 不支持 window.open，
+        // 前端改为 window.external.sendMessage 通知宿主，由宿主开一个内置 webview 子窗口。
+        window.RegisterWebMessageReceivedHandler((sender, message) => HandleWebMessage(window, message));
+
         window.WaitForClose();
+    }
+
+    /// <summary>
+    /// 处理前端通过 window.external.sendMessage 发来的消息。
+    /// 目前支持 { type:"open-window", url, title, width, height }：开一个内置 webview 子窗口加载 url。
+    /// </summary>
+    private static void HandleWebMessage(PhotinoWindow parent, string message)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(message);
+            var root = doc.RootElement;
+            if (!root.TryGetProperty("type", out var typeProp) || typeProp.GetString() != "open-window") return;
+
+            var url = root.TryGetProperty("url", out var urlProp) ? urlProp.GetString() : null;
+            if (string.IsNullOrWhiteSpace(url)) return;
+            var title = root.TryGetProperty("title", out var titleProp) ? titleProp.GetString() ?? "MaiChartManager" : "MaiChartManager";
+            var width = root.TryGetProperty("width", out var wProp) && wProp.TryGetInt32(out var w) ? w : 960;
+            var height = root.TryGetProperty("height", out var hProp) && hProp.TryGetInt32(out var h) ? h : 640;
+
+            // 在宿主 UI 线程上创建子窗口（消息回调本身就在 UI 线程）。
+            // child.WaitForClose() 会进入一个嵌套的 GTK 事件循环：父窗口仍可交互，子窗口关闭后返回。
+            var child = new PhotinoWindow(parent)
+                .SetTitle(title)
+                .SetUseOsDefaultSize(false)
+                .SetSize(width, height)
+                .Center()
+                .Load(new Uri(url));
+            child.WaitForClose();
+        }
+        catch (Exception e)
+        {
+            Console.Error.WriteLine($"处理 WebMessage 失败：{e}");
+        }
     }
 
     /// <summary>
