@@ -1,6 +1,5 @@
 ﻿using System.Text.Json.Serialization;
 using System.Xml;
-using Microsoft.VisualBasic.FileIO;
 
 namespace MaiChartManager.Models;
 
@@ -12,7 +11,7 @@ public class VersionXml
 
     // name.str 在游戏里不会被用到
     public int Id { get; }
-    public string FilePath => Path.Combine(GamePath, "Sinmai_Data", "StreamingAssets", AssetDir, $"musicVersion/MusicVersion{Id:000000}/MusicVersion.xml");
+    public string FilePath => MaiChartManager.Utils.PathUtils.ResolveIgnoreCase(GamePath, "Sinmai_Data", "StreamingAssets", AssetDir, "musicVersion", $"MusicVersion{Id:000000}", "MusicVersion.xml");
 
     public VersionXml(int id, string assetDir, string gamePath)
     {
@@ -25,7 +24,7 @@ public class VersionXml
 
     public static VersionXml CreateNew(int id, string assetDir, string gamePath)
     {
-        var dir = Path.Combine(gamePath, "Sinmai_Data", "StreamingAssets", assetDir, $"musicVersion/MusicVersion{id:000000}");
+        var dir = MaiChartManager.Utils.PathUtils.ResolveIgnoreCase(gamePath, "Sinmai_Data", "StreamingAssets", assetDir, "musicVersion", $"MusicVersion{id:000000}");
         Directory.CreateDirectory(dir);
         var text = $"""
                     <?xml version="1.0" encoding="utf-8"?>
@@ -103,6 +102,7 @@ public class VersionXml
 
     public void Delete()
     {
-        FileSystem.DeleteDirectory(Path.Combine(GamePath, "Sinmai_Data", "StreamingAssets", AssetDir, $"musicVersion/MusicVersion{Id:000000}"), UIOption.AllDialogs, RecycleOption.SendToRecycleBin);
+        // 跨平台删除（Windows 进回收站，Linux 直接删除）
+        MaiChartManager.Platform.PlatformFile.DeleteDirectory(MaiChartManager.Utils.PathUtils.ResolveIgnoreCase(GamePath, "Sinmai_Data", "StreamingAssets", AssetDir, "musicVersion", $"MusicVersion{Id:000000}"));
     }
 }
