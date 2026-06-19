@@ -259,7 +259,6 @@ public partial class MusicTransferController(
         }
 
         // 复制 ACB/AWB 音频
-#if WINDOWS
         if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out var resolvedAudioId, out var acb, out var awb)
             && acb is not null
             && awb is not null)
@@ -271,9 +270,6 @@ public partial class MusicTransferController(
         {
             logger.LogWarning("{message}", BuildAudioResolveErrorMessage(music));
         }
-#else
-        logger.LogWarning("当前平台不支持音频导出，跳过音乐 {Id} 的 ACB/AWB。", music.Id);
-#endif
 
         // 复制视频数据
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
@@ -459,7 +455,6 @@ public partial class MusicTransferController(
         }
 
         // 复制 ACB/AWB 音频
-#if WINDOWS
         if (!AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out var resolvedAudioId, out var acb, out var awb) || acb is null || awb is null)
         {
             var message = BuildAudioResolveErrorMessage(music);
@@ -468,9 +463,6 @@ public partial class MusicTransferController(
         }
         zipArchive.CreateEntryFromFile(acb, $"SoundData/music{resolvedAudioId:000000}.acb");
         zipArchive.CreateEntryFromFile(awb, $"SoundData/music{resolvedAudioId:000000}.awb");
-#else
-        logger.LogWarning("当前平台不支持音频导出，跳过音乐 {Id} 的 ACB/AWB。", music.Id);
-#endif
 
         // 复制视频数据
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
@@ -673,7 +665,6 @@ public partial class MusicTransferController(
         if (version is not null) simaiFile["version"] = version.GenreName;
 
         // demo_seek（预览起止时间）
-#if WINDOWS
         try
         {
             if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out _, out var previewAcb, out _) && previewAcb is not null)
@@ -689,7 +680,6 @@ public partial class MusicTransferController(
         {
             logger.LogWarning(e, "ExportAsMaidata: 获取音频预览时间失败，已忽略。");
         }
-#endif
         
         for (var i = 0; i < music.Charts.Length; i++)
         {
@@ -759,7 +749,6 @@ public partial class MusicTransferController(
         }
 
         // 导出音频
-#if WINDOWS
         var soundEntry = zipArchive.CreateEntry("track.mp3");
         await using var soundStream = soundEntry.Open();
         var tag = new ID3TagData
@@ -781,9 +770,7 @@ public partial class MusicTransferController(
         var wav = Audio.AcbToWav(acbPath);
         AudioConvert.ConvertWavToMp3Stream(wav, soundStream, tag);
         soundStream.Close();
-#else
-        logger.LogWarning("当前平台不支持音频导出，跳过音乐 {Id} 的 track.mp3。", music.Id);
-#endif
+
 
         if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
         {
@@ -861,8 +848,7 @@ public partial class MusicTransferController(
         var version = StaticSettings.VersionList.FirstOrDefault(it => it.Id == music.AddVersionId);
         if (version is not null) simaiFile["version"] = version.GenreName;
 
-        // demo_seek（预览起止时间），依赖 CriUtils，仅 Windows 可用
-#if WINDOWS
+        // demo_seek（预览起止时间），依赖 CriUtils
         try
         {
             if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out _, out var previewAcb, out _) && previewAcb is not null)
@@ -878,7 +864,6 @@ public partial class MusicTransferController(
         {
             logger.LogWarning(e, "WriteMaidataToDirectory: 获取音频预览时间失败，已忽略。");
         }
-#endif
 
         for (var i = 0; i < music.Charts.Length; i++)
         {
@@ -939,8 +924,7 @@ public partial class MusicTransferController(
             await System.IO.File.WriteAllBytesAsync(Path.Combine(targetDir, $"bg{imgExt}"), img);
         }
 
-        // 导出音频 track.mp3，依赖 AudioConvert/CriUtils，仅 Windows 可用
-#if WINDOWS
+        // 导出音频 track.mp3，依赖 AudioConvert/CriUtils
         var tag = new ID3TagData
         {
             Title = music.Name,
@@ -962,9 +946,7 @@ public partial class MusicTransferController(
         {
             AudioConvert.ConvertWavToMp3Stream(wav, soundStream, tag);
         }
-#else
-        logger.LogWarning("当前平台不支持音频导出，跳过音乐 {Id} 的 track.mp3。", music.Id);
-#endif
+
 
         // 导出 PV 视频 pv.mp4（与 zip 版保持一致，未加 #if WINDOWS 限制）
         if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))

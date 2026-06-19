@@ -67,8 +67,10 @@ public static class Audio
         using WaveStream reader = extension switch
         {
             ".ogg" => new NAudio.Vorbis.VorbisWaveReader(src, true),
-            ".mp3" when !forceUseNAudio => new WaveFileReader(ConvertMp3ToWavViaFfmpeg(src)), // 默认情况下，优先使用ffmpeg
-            _ => new StreamMediaFoundationReader(src), // WAV, WMA, AAC, 以及 MP3+forceUseNAudio，NAudio不支持MP3 Gapless，所以作为一种“兼容模式”提供
+            ".mp3" when !forceUseNAudio => new WaveFileReader(ConvertToWavViaFfmpeg(src, ".mp3")), // 默认情况下，优先使用ffmpeg
+            // WAV / WMA / AAC（以及 MP3+forceUseNAudio 的兼容模式）原本走 Windows-only 的 MediaFoundation，
+            // 跨平台改为用 ffmpeg 把任意输入解码成 16bit PCM wav，再用 NAudio WaveFileReader 读取。
+            _ => new WaveFileReader(ConvertToWavViaFfmpeg(src, extension)),
         };
         // 关于上述MP3 Gapless问题的影响等具体讨论，详见 https://github.com/MuNET-OSS/MaiChartManager/issues/40
         var sample = reader.ToSampleProvider();
@@ -98,10 +100,14 @@ public static class Audio
         return stream;
     }
 
-    private static MemoryStream ConvertMp3ToWavViaFfmpeg(Stream src)
+    // 用 ffmpeg 把任意输入流（按 ext 写到临时文件）解码成 16bit PCM wav，返回 wav 的内存流。
+    // 替代 Windows-only 的 MediaFoundation，跨平台可用（系统 ffmpeg 已配好）。
+    private static MemoryStream ConvertToWavViaFfmpeg(Stream src, string ext)
     {
         var tempFileGuid = Guid.NewGuid();
-        var inputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToWav_{tempFileGuid:N}.mp3");
+        // ext 形如 ".mp3"/".wav"/".aac" 等；去掉前导点用作临时输入文件后缀
+        var inputExt = string.IsNullOrEmpty(ext) ? "" : (ext.StartsWith('.') ? ext : "." + ext);
+        var inputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToWav_{tempFileGuid:N}{inputExt}");
         var outputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToWav_{tempFileGuid:N}.wav");
         try
         {
@@ -120,7 +126,7 @@ public static class Audio
             conversion.Start().GetAwaiter().GetResult();
 
             if (!File.Exists(outputPath) || new FileInfo(outputPath).Length == 0)
-                throw new InvalidOperationException("ffmpeg produced empty wav file from mp3 input.");
+                throw new InvalidOperationException("ffmpeg produced empty wav file from input.");
 
             return new MemoryStream(File.ReadAllBytes(outputPath));
         }
@@ -149,7 +155,20 @@ public static class Audio
         if (options.Loop)
             options.LoopEnd = int.MaxValue;
 
-        byte[] track = ConvertStream.ConvertFile(options, s, encodeType, convertToType);
+        // AcbCore 的 ConvertStream.ConvertFile 要求传入 MemoryStream；若来源不是则拷贝一份
+        MemoryStream ms;
+        if (s is MemoryStream existing)
+        {
+            ms = existing;
+        }
+        else
+        {
+            ms = new MemoryStream();
+            s.CopyTo(ms);
+            ms.Position = 0;
+        }
+
+        byte[] track = ConvertStream.ConvertFile(options, ms, encodeType, convertToType);
 
         //if (convertToType == FileType.Hca && loop)
         //    track = HCA.EncodeLoop(track, loop);
@@ -194,11 +213,41 @@ public static class Audio
     // 从MP4视频文件中提取音频轨道并保存为WAV文件
     public static void ExtractAudioFromMp4(string mp4Path, string outputWavPath)
     {
-        using (var reader = new MediaFoundationReader(mp4Path))
+        // 原本用 Windows-only 的 MediaFoundationReader 解码 mp4 内的音频流，
+        // 跨平台改为先用 ffmpeg 把 mp4 的音频解码成 16bit PCM wav，再用 NAudio 读取写出。
+        var wavPath = ConvertMp4AudioToWavViaFfmpeg(mp4Path);
+        try
         {
-            // MediaFoundationReader 会自动解码视频中的音频流（如AAC）为PCM
+            using var reader = new WaveFileReader(wavPath);
             WaveFileWriter.CreateWaveFile(outputWavPath, reader);
         }
+        finally
+        {
+            File.Delete(wavPath);
+        }
+    }
+
+    // 用 ffmpeg 把 mp4（或其它视频容器）里的音频流解码成 16bit PCM wav，返回临时 wav 文件路径（调用方负责删除）。
+    private static string ConvertMp4AudioToWavViaFfmpeg(string mp4Path)
+    {
+        Directory.CreateDirectory(StaticSettings.tempPath);
+        var outputPath = Path.Combine(StaticSettings.tempPath, $"ExtractMp4Audio_{Guid.NewGuid():N}.wav");
+
+        var conversion = FFmpeg.Conversions.New()
+            .AddParameter("-i " + FFmpegHelper.Escape(mp4Path))
+            .AddParameter("-vn") // 丢弃视频流，只要音频
+            .AddParameter("-c:a pcm_s16le") // 转为16-bit little-endian PCM
+            .SetOutput(outputPath)
+            .SetOverwriteOutput(true);
+        conversion.Start().GetAwaiter().GetResult();
+
+        if (!File.Exists(outputPath) || new FileInfo(outputPath).Length == 0)
+        {
+            File.Delete(outputPath);
+            throw new InvalidOperationException("ffmpeg produced empty wav file from mp4 input.");
+        }
+
+        return outputPath;
     }
 
     // 将 WAV 字节数据转换为 MP3 文件

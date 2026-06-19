@@ -65,9 +65,11 @@
     <ProjectReference Include="..\MaiLib\MaiLib.csproj" />
     <ProjectReference Include="..\SimaiSharp\SimaiSharp\SimaiSharp.csproj" />
     <ProjectReference Include="..\MuConvert\MuConvert.csproj" />
-    <ProjectReference Include="..\SonicAudioTools\Source\SonicAudioLib\SonicAudioLib.csproj" Condition="'$(IsLinuxBuild)' != 'true'" />
-    <ProjectReference Include="..\XV2-Tools\LB_Common\LB_Common.csproj" Condition="'$(IsLinuxBuild)' != 'true'" />
-    <ProjectReference Include="..\XV2-Tools\Xv2CoreLib\Xv2CoreLib.csproj" Condition="'$(IsLinuxBuild)' != 'true'" />
+    <!-- 音频依赖已跨平台化：SonicAudioLib 已转 netstandard2.0，两平台都引（去掉 Condition） -->
+    <ProjectReference Include="..\SonicAudioTools\Source\SonicAudioLib\SonicAudioLib.csproj" />
+    <!-- AcbCore（netstandard2.0）包含 ACB（Xv2CoreLib.ACB）+ VGAudio，覆盖主项目所需，
+         替代原来的 net47 大库 LB_Common / Xv2CoreLib，两平台都引 -->
+    <ProjectReference Include="..\XV2-Tools\AcbCore\AcbCore.csproj" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="DesktopBridge.Helpers" Version="1.2.2" Condition="'$(IsLinuxBuild)' != 'true'"/>
@@ -145,13 +147,6 @@
     <Compile Remove="IapManager.cs" />
     <Compile Remove="OfflineReg.cs" />
     <Compile Remove="Utils/WinUtils.cs" />
-    <Compile Remove="Utils/Audio.cs" />
-    <Compile Remove="Utils/CriUtils.cs" />
-    <Compile Remove="Utils/AudioConvert.cs" />
-    <Compile Remove="Controllers/Music/CueConvertController.cs" />
-    <Compile Remove="Controllers/Music/VrcProcessController.cs" />
-    <Compile Remove="Controllers/Charts/ImportChartController.cs" />
-    <Compile Remove="Controllers/Tools/AudioConvertToolController.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Remove="Front\**"/>
