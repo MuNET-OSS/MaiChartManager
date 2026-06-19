@@ -1,0 +1,89 @@
+# Maintainer: MuNET-OSS
+# 自用 Arch 打包：从本地已 checkout（含 submodule）的仓库构建。
+# 因为本仓库依赖多个 submodule（部分为 SSH/私有源），不走 makepkg 克隆，
+# 直接用当前工作树构建。请在仓库内 `Packaging/arch/` 目录执行 `makepkg -si`。
+
+pkgname=maichartmanager
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="maimai 谱面管理工具（Linux 原生，Photino + WebKitGTK）"
+arch=('x86_64')
+url="https://github.com/MuNET-OSS/MaiChartManager"
+license=('custom')
+# 运行时依赖：
+#   aspnet-runtime —— ASP.NET Core 10 共享框架（Kestrel 后端），含并依赖 dotnet-runtime
+#   webkit2gtk-4.1 —— Photino 在 Linux 的窗口宿主（libwebkit2gtk-4.1 / gtk3 / libsoup3）
+#   ffmpeg         —— 音视频转码（系统 ffmpeg/ffprobe，已不内置）
+depends=('aspnet-runtime' 'webkit2gtk-4.1' 'gtk3' 'ffmpeg')
+makedepends=('dotnet-sdk' 'npm')
+# vaapi 硬件视频编码（可选，没有则自动回退软件编码）
+optdepends=('libva-mesa-driver: AMD/Intel VAAPI 硬件视频编码'
+            'intel-media-driver: Intel QSV/VAAPI 硬件视频编码')
+options=('!strip')  # 已发布的托管程序集无需 strip
+install=
+source=()
+
+# 仓库根：PKGBUILD 在 <repo>/Packaging/arch/ 下
+_reporoot() { realpath "$startdir/../.." ; }
+
+pkgver() {
+  cd "$(_reporoot)"
+  # 用 git 描述生成版本号；无 tag 时退化为 r<提交数>.<短哈希>
+  if git describe --tags >/dev/null 2>&1; then
+    git describe --tags | sed 's/^v//;s/-/.r/;s/-/./g'
+  else
+    printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+  fi
+}
+
+build() {
+  local root; root="$(_reporoot)"
+
+  # 1) 构建前端（Vite → MaiChartManager/wwwroot）
+  cd "$root/MaiChartManager/Front"
+  npm ci
+  npm run build
+
+  # 2) 框架依赖发布后端到 srcdir/out（不打包运行时，依赖系统 aspnet-runtime）
+  cd "$root"
+  dotnet publish MaiChartManager/MaiChartManager.csproj \
+    -c LinuxRelease \
+    -o "$srcdir/out" \
+    --no-self-contained \
+    --nologo
+}
+
+package() {
+  local root; root="$(_reporoot)"
+
+  # 应用本体装到 /opt/maichartmanager
+  install -dm755 "$pkgdir/opt/$pkgname"
+  cp -a "$srcdir/out/." "$pkgdir/opt/$pkgname/"
+
+  # 启动器：apphost 以自身路径定位 exeDir/wwwroot，故直接 exec 即可
+  install -dm755 "$pkgdir/usr/bin"
+  cat > "$pkgdir/usr/bin/$pkgname" <<EOF
+#!/bin/sh
+exec /opt/$pkgname/MaiChartManager "\$@"
+EOF
+  chmod 755 "$pkgdir/usr/bin/$pkgname"
+
+  # 桌面入口
+  install -dm755 "$pkgdir/usr/share/applications"
+  cat > "$pkgdir/usr/share/applications/$pkgname.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=MaiChartManager
+Comment=maimai 谱面管理工具
+Exec=/usr/bin/$pkgname
+Icon=$pkgname
+Categories=Utility;AudioVideo;
+Terminal=false
+StartupWMClass=MaiChartManager
+EOF
+
+  # 图标：复用 Windows appx 的方形 app 图标（256x256），装进 hicolor 主题，
+  # .desktop 以图标主题名 $pkgname 引用
+  install -Dm644 "$root/Packaging/Base/Square44x44Logo.targetsize-256.png" \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/$pkgname.png"
+}
