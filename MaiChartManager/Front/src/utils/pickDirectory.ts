@@ -11,16 +11,11 @@ function abort(message = '用户取消选择目录'): never {
 
 // 走后端：弹原生选文件夹对话框，再用 httpImportDirectory 适配器通过 HTTP 提供目录内容。
 async function pickViaBackend(): Promise<ImportDirectory> {
-  const pickUrl = getUrl('PickImportFolderApi');
-  console.log('[imp] pickViaBackend origin=' + location.origin + ' href=' + location.href + ' pickUrl=' + pickUrl);
-  const res = await fetch(pickUrl);
-  console.log('[imp] PickImportFolder responded ok=' + res.ok + ' status=' + res.status + ' ct=' + res.headers.get('content-type'));
+  const res = await fetch(getUrl('PickImportFolderApi'));
   if (!res.ok) abort('选择目录失败');
-  // 后端返回 JSON：选中的绝对路径字符串，取消时为 null
-  const text = await res.text();
-  console.log('[imp] PickImportFolder raw body=' + JSON.stringify(text));
-  const path: string | null = text ? JSON.parse(text) : null;
-  console.log('[imp] picked path=' + JSON.stringify(path));
+  // 后端 Ok(string) 走 ASP.NET 的 string 特例，以 text/plain 返回裸路径（不是 JSON），取消时为空。
+  // 所以必须用 res.text() 而不是 res.json()。
+  const path = (await res.text()) || null;
   if (!path) abort();
   return httpImportDirectory(path);
 }
