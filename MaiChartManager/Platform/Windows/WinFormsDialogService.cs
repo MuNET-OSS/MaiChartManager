@@ -17,7 +17,14 @@ public class WinFormsDialogService : IDesktopDialogService
             ShowNewFolderButton = false,
         };
         if (title is not null) dialog.Description = title;
-        return WinUtils.ShowDialog(dialog) == DialogResult.OK ? dialog.SelectedPath : null;
+        // 上次选过的目录作为初始目录（没有则用系统默认）
+        if (StaticSettings.Config.LastDialogFolder is { Length: > 0 } last && Directory.Exists(last))
+            dialog.SelectedPath = last;
+        if (WinUtils.ShowDialog(dialog) != DialogResult.OK) return null;
+        // 记住本次目录
+        StaticSettings.Config.LastDialogFolder = dialog.SelectedPath;
+        try { StaticSettings.Config.Save(); } catch { /* 保存失败忽略 */ }
+        return dialog.SelectedPath;
     }
 
     public string? PickFile(string? title = null, string? filter = null)

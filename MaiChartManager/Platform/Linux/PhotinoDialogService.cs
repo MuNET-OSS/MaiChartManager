@@ -28,13 +28,15 @@ public class PhotinoDialogService(ILogger<PhotinoDialogService> logger) : IDeskt
 
         string[]? result = null;
         var done = new ManualResetEventSlim();
+        // 上次选过的目录作为初始目录（没有则交给系统默认）
+        var startDir = StaticSettings.Config.LastDialogFolder is { Length: > 0 } d && Directory.Exists(d) ? d : "";
         // 必须在 UI 线程调用 ShowOpenFolder。
         window.Invoke(() =>
         {
             try
             {
                 // ShowOpenFolder(string title, string defaultPath, bool multiSelect)
-                result = window.ShowOpenFolder(title ?? "", null, false);
+                result = window.ShowOpenFolder(title ?? "", startDir, false);
             }
             catch (Exception e)
             {
@@ -46,7 +48,14 @@ public class PhotinoDialogService(ILogger<PhotinoDialogService> logger) : IDeskt
             }
         });
         done.Wait();
-        return result is { Length: > 0 } ? result[0] : null;
+        var picked = result is { Length: > 0 } ? result[0] : null;
+        if (picked is not null)
+        {
+            // 记住本次目录，下次从这里开始
+            StaticSettings.Config.LastDialogFolder = picked;
+            try { StaticSettings.Config.Save(); } catch (Exception e) { logger.LogWarning(e, "保存 LastDialogFolder 失败"); }
+        }
+        return picked;
     }
 
     public string? PickFile(string? title = null, string? filter = null)

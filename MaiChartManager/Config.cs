@@ -30,6 +30,9 @@ public class Config
     public bool ConvertJacketToAssetBundle { get; set; } = true;
     public int UiZoom { get; set; } = 0;
 
+    // 记住上次文件夹选择对话框选中的目录，下次打开时从这里开始（而不是每次都回到 Documents）。
+    public string? LastDialogFolder { get; set; } = null;
+
     public void Save()
     {
         var json = JsonSerializer.Serialize(this);
