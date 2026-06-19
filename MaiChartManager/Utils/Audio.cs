@@ -1,5 +1,6 @@
 ﻿using NAudio.Lame;
 using NAudio.Wave;
+using System.Diagnostics;
 using Xabe.FFmpeg;
 using VGAudio;
 using VGAudio.Cli;
@@ -118,12 +119,10 @@ public static class Audio
                 src.CopyTo(inputFile);
             }
 
-            var conversion = FFmpeg.Conversions.New()
-                .AddParameter("-i " + FFmpegHelper.Escape(inputPath))
-                .AddParameter("-c:a pcm_s16le") // 转为16-bit little-endian PCM
-                .SetOutput(outputPath)
-                .SetOverwriteOutput(true);
-            conversion.Start().GetAwaiter().GetResult();
+            // 用 Process + ArgumentList 直接调 ffmpeg（每个参数独立、不拼引号）。
+            // Xabe 在 Linux 上会把路径里的引号字面传给 ffmpeg，导致输出名变成 ...wav" → "Couldn't initialize muxer"；
+            // ArgumentList 既能正确处理带空格的路径（Windows），又不引入引号问题（Linux）。
+            RunFfmpeg("-y", "-i", inputPath, "-c:a", "pcm_s16le", outputPath);
 
             if (!File.Exists(outputPath) || new FileInfo(outputPath).Length == 0)
                 throw new InvalidOperationException("ffmpeg produced empty wav file from input.");
@@ -233,13 +232,8 @@ public static class Audio
         Directory.CreateDirectory(StaticSettings.tempPath);
         var outputPath = Path.Combine(StaticSettings.tempPath, $"ExtractMp4Audio_{Guid.NewGuid():N}.wav");
 
-        var conversion = FFmpeg.Conversions.New()
-            .AddParameter("-i " + FFmpegHelper.Escape(mp4Path))
-            .AddParameter("-vn") // 丢弃视频流，只要音频
-            .AddParameter("-c:a pcm_s16le") // 转为16-bit little-endian PCM
-            .SetOutput(outputPath)
-            .SetOverwriteOutput(true);
-        conversion.Start().GetAwaiter().GetResult();
+        // 同 ConvertToWavViaFfmpeg：用 Process + ArgumentList 直接调，避免 Xabe 在 Linux 上的引号问题。
+        RunFfmpeg("-y", "-i", mp4Path, "-vn", "-c:a", "pcm_s16le", outputPath);
 
         if (!File.Exists(outputPath) || new FileInfo(outputPath).Length == 0)
         {
@@ -248,6 +242,46 @@ public static class Audio
         }
 
         return outputPath;
+    }
+
+    /// <summary>
+    /// 直接用 Process + ArgumentList 调系统/内置 ffmpeg，每个参数作为独立 argv（不拼引号）。
+    /// 跨平台正确处理带空格的路径，且规避 Xabe.FFmpeg 在 Linux 上把引号字面传给 ffmpeg 的问题。
+    /// </summary>
+    private static void RunFfmpeg(params string[] args)
+    {
+        var psi = new ProcessStartInfo
+        {
+            FileName = FfmpegExePath(),
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+            CreateNoWindow = true,
+        };
+        foreach (var a in args) psi.ArgumentList.Add(a);
+
+        using var p = Process.Start(psi) ?? throw new InvalidOperationException("无法启动 ffmpeg 进程");
+        var err = p.StandardError.ReadToEnd();
+        p.WaitForExit();
+        if (p.ExitCode != 0)
+            throw new InvalidOperationException($"ffmpeg 转换失败（exit {p.ExitCode}）：{err}");
+    }
+
+    /// 解析 ffmpeg 可执行文件路径：Windows 用内置 ffmpeg.exe，Linux 在 PATH 里找系统 ffmpeg。
+    private static string FfmpegExePath()
+    {
+#if WINDOWS
+        return Path.Combine(StaticSettings.exeDir, "ffmpeg.exe");
+#else
+        var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+        foreach (var d in path.Split(Path.PathSeparator))
+        {
+            if (string.IsNullOrWhiteSpace(d)) continue;
+            var candidate = Path.Combine(d, "ffmpeg");
+            if (File.Exists(candidate)) return candidate;
+        }
+        return "ffmpeg";
+#endif
     }
 
     // 将 WAV 字节数据转换为 MP3 文件
