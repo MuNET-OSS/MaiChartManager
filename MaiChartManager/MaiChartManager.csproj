@@ -167,7 +167,9 @@
     <None Update="AquaMai\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
-    <None Update="FFMpeg\**">
+    <!-- 仅 Windows 构建内置 ffmpeg.exe/ffprobe.exe；Linux 用系统 ffmpeg，复制这些 PE 文件
+         不仅没用，还会被 File.Exists 命中导致误用（exec 报 EACCES）。 -->
+    <None Update="FFMpeg\**" Condition="'$(IsLinuxBuild)' != 'true'">
       <TargetPath>%(Filename)%(Extension)</TargetPath>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
