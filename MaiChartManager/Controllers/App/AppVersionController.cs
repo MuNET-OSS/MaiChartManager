@@ -22,7 +22,13 @@ public class AppVersionController(StaticSettings settings, ILogger<AppVersionCon
     [HttpGet]
     public AppVersionResult GetAppVersion()
     {
-        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "linux";
+        // 与 Windows 的 Application.ProductVersion 语义一致：取程序集 InformationalVersion
+        //（由 PKGBUILD 在 publish 时通过 -p:InformationalVersion 注入 git 派生的版本号），
+        // 去掉 SourceLink 可能附带的 "+<commit>" 后缀。
+        var asm = System.Reflection.Assembly.GetExecutingAssembly();
+        var info = (System.Reflection.AssemblyInformationalVersionAttribute?)System.Attribute
+            .GetCustomAttribute(asm, typeof(System.Reflection.AssemblyInformationalVersionAttribute));
+        var version = info?.InformationalVersion?.Split('+')[0] ?? "linux";
         return new AppVersionResult(version, settings.gameVersion, LicenseStatus.Active, VideoConvert.HardwareAcceleration, VideoConvert.H264Encoder, StaticSettings.CurrentLocale);
     }
 #endif

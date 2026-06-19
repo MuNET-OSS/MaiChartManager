@@ -4,7 +4,7 @@
 # 直接用当前工作树构建。请在仓库内 `Packaging/arch/` 目录执行 `makepkg -si`。
 
 pkgname=maichartmanager
-pkgver=1.0.0
+pkgver=26.3.r46.gf68ebc1
 pkgrel=1
 pkgdesc="maimai 谱面管理工具（Linux 原生，Photino + WebKitGTK）"
 arch=('x86_64')
@@ -15,7 +15,7 @@ license=('custom')
 #   webkit2gtk-4.1 —— Photino 在 Linux 的窗口宿主（libwebkit2gtk-4.1 / gtk3 / libsoup3）
 #   ffmpeg         —— 音视频转码（系统 ffmpeg/ffprobe，已不内置）
 depends=('aspnet-runtime' 'webkit2gtk-4.1' 'gtk3' 'ffmpeg')
-makedepends=('dotnet-sdk' 'npm')
+makedepends=('dotnet-sdk' 'pnpm')
 # vaapi 硬件视频编码（可选，没有则自动回退软件编码）
 optdepends=('libva-mesa-driver: AMD/Intel VAAPI 硬件视频编码'
             'intel-media-driver: Intel QSV/VAAPI 硬件视频编码')
@@ -36,13 +36,41 @@ pkgver() {
   fi
 }
 
+# 应用内显示版本号：对齐 Packaging/Build.ps1 的 Release 逻辑——
+# git describe --tags --long 形如 v26.3-46-gf68ebc1 → 取 tag 基号 26.3 作为显示版本。
+_appbasever() {
+  cd "$(_reporoot)"
+  local d
+  d=$(git describe --tags --long 2>/dev/null) || { echo "1.0.0"; return; }
+  if [[ "$d" =~ ^v?([0-9]+\.[0-9]+(\.[0-9]+)?)-([0-9]+)-g[0-9a-f]+$ ]]; then
+    echo "${BASH_REMATCH[1]}"
+  else
+    echo "1.0.0"
+  fi
+}
+
 build() {
   local root; root="$(_reporoot)"
+  local base; base="$(_appbasever)"
 
-  # 1) 构建前端（Vite → MaiChartManager/wwwroot）
+  # 写入应用内显示版本号到 AppMain.g.cs（与 Packaging/Build.ps1 的做法一致）。
+  # 该常量由 Properties/AssemblyInfo.cs 生成程序集版本特性，AppVersionController 读取显示。
+  cat > "$root/MaiChartManager/AppMain.g.cs" <<EOF
+    // Auto-generated file. Do not modify manually.
+    namespace MaiChartManager;
+
+    public partial class AppMain
+    {
+        public const string Version = "$base";
+    }
+EOF
+
+  # 1) 构建前端（pnpm workspace；@munet/ui 来自 MuNET-UI submodule，
+  #    须在仓库根 pnpm install 才能链接 workspace 包）
+  cd "$root"
+  pnpm install --frozen-lockfile
   cd "$root/MaiChartManager/Front"
-  npm ci
-  npm run build
+  pnpm run build
 
   # 2) 框架依赖发布后端到 srcdir/out（不打包运行时，依赖系统 aspnet-runtime）
   cd "$root"

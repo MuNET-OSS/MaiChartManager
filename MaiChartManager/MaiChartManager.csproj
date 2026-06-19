@@ -149,7 +149,6 @@
   <ItemGroup Condition="'$(IsLinuxBuild)' == 'true'">
     <Compile Remove="Program.cs" />
     <Compile Remove="AppMain.cs" />
-    <Compile Remove="AppMain.g.cs" />
     <Compile Remove="Browser.cs" />
     <Compile Remove="Browser.Designer.cs" />
     <Compile Remove="OobeBrowser.cs" />
