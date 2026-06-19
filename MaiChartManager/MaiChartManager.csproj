@@ -127,7 +127,6 @@
       <AutoGen>True</AutoGen>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
-    <Compile Remove="Libs\**" />
     <Compile Update="Locale.Designer.cs">
       <DesignTime>True</DesignTime>
       <AutoGen>True</AutoGen>
@@ -158,7 +157,6 @@
   <ItemGroup>
     <Content Remove="Front\**" />
     <Content Remove="WannaCRI\**" />
-    <Content Remove="Libs\**" />
     <None Include="..\LICENSE">
       <Link>LICENSE</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -167,7 +165,6 @@
   <ItemGroup>
     <None Remove="Front\**" />
     <None Remove="WannaCRI\**" />
-    <None Remove="Libs\**" />
     <None Update="AquaMai\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
