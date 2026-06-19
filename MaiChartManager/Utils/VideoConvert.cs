@@ -14,9 +14,10 @@ public static class VideoConvert
     }
 
     public static HardwareAccelerationStatus HardwareAcceleration { get; private set; } = HardwareAccelerationStatus.Pending;
-    public static string H264Encoder { get; private set; } = "libx264";
 
-    private static string Vp9Encoding => HardwareAcceleration == HardwareAccelerationStatus.Enabled ? "vp9_qsv" : "vp9";
+    // 暴露给前端显示的选中 H264 编码器名（保持原 API 契约）。
+    public static string H264Encoder => VideoEncoderProbe.H264Profile.Name;
+
     private static readonly SemaphoreSlim UsmToMp4Semaphore = new(
         Math.Max(1, Environment.ProcessorCount / 4),
         Math.Max(1, Environment.ProcessorCount / 4));
@@ -35,49 +36,41 @@ public static class VideoConvert
         $"{(int)time.TotalHours:D}:{time.Minutes:D2}:{time.Seconds:D2}.{time.Milliseconds:D3}";
 
     /// <summary>
-    /// 检测硬件加速支持
+    /// 软件专属输出参数（-cpu-used/-pix_fmt）只对软件 VP9 编码器发出；-threads 与今天一致始终发出。
+    /// 顺序对齐今天：-c:v &lt;codec&gt; -map 0:0 [图片 -r 1 -t 2] -threads N [软件VP9: -cpu-used 5 [pix_fmt]] [profile 硬件额外]
+    /// </summary>
+    private static List<string> BuildPostArgs(VideoEncoderProfile p, VideoConvertOptions options, bool isImage)
+    {
+        var post = new List<string> { $"-c:v {p.Codec}", "-map 0:0" };
+        if (isImage) post.Add("-r 1 -t 2");
+        post.Add(MultiThreadArg);
+        if (p.Kind == VideoCodecKind.Vp9 && !p.IsHardware)
+        {
+            post.Add("-cpu-used 5");
+            if (options.UseYuv420p) post.Add("-pix_fmt yuv420p");
+        }
+        post.AddRange(p.ExtraOutputArgs);
+        return post;
+    }
+
+    /// <summary>
+    /// 把硬件上传节点追加到软件 filter 链末尾（软件 profile 原样返回 vf）。
+    /// </summary>
+    private static string AppendUpload(string vf, VideoEncoderProfile p)
+    {
+        if (string.IsNullOrEmpty(p.UploadFilter)) return vf;
+        return string.IsNullOrEmpty(vf) ? p.UploadFilter : $"{vf},{p.UploadFilter}";
+    }
+
+    /// <summary>
+    /// 探测并选定 H264/VP9 编码器 profile。启动时调用（AppMain / LinuxProgram）。
     /// </summary>
     public static async Task CheckHardwareAcceleration()
     {
-        var tmpDir = Directory.CreateTempSubdirectory();
-        try
-        {
-            // 测试 VP9 QSV 硬件加速
-            // 等价 Xabe 命令行：-t 0:00:02.000 -f lavfi -i color=c=black:s=720x720:r=1 -c:v vp9_qsv -threads N <out.ivf>
-            var blankPath = Path.Combine(tmpDir.FullName, "blank.ivf");
-            await FFMpegArguments
-                .FromFileInput("color=c=black:s=720x720:r=1", verifyExists: false,
-                    opt => opt.WithCustomArgument($"-t {FormatFFmpegTime(TimeSpan.FromSeconds(2))} -f lavfi"))
-                .OutputToFile(blankPath, overwrite: true,
-                    opt => opt.WithCustomArgument($"-c:v vp9_qsv {MultiThreadArg}"))
-                .ProcessAsynchronously();
-            HardwareAcceleration = HardwareAccelerationStatus.Enabled;
-        }
-        catch
-        {
-            HardwareAcceleration = HardwareAccelerationStatus.Disabled;
-        }
-
-        // 检测 H264 硬件编码器
-        foreach (var encoder in (string[])["h264_nvenc", "h264_qsv", "h264_vaapi", "h264_amf", "h264_mf", "h264_vulkan"])
-        {
-            try
-            {
-                // 等价 Xabe 命令行：-t 0:00:02.000 -f lavfi -i color=c=black:s=720x720:r=1 -c:v <encoder> -threads N <out.mp4>
-                var blankPath = Path.Combine(tmpDir.FullName, $"{encoder}.mp4");
-                await FFMpegArguments
-                    .FromFileInput("color=c=black:s=720x720:r=1", verifyExists: false,
-                        opt => opt.WithCustomArgument($"-t {FormatFFmpegTime(TimeSpan.FromSeconds(2))} -f lavfi"))
-                    .OutputToFile(blankPath, overwrite: true,
-                        opt => opt.WithCustomArgument($"-c:v {encoder} {MultiThreadArg}"))
-                    .ProcessAsynchronously();
-                H264Encoder = encoder;
-                break;
-            }
-            catch { }
-        }
-
-        Console.WriteLine($"H264 encoder: {H264Encoder}");
+        await VideoEncoderProbe.Probe(StaticSettings.Config.ForceSoftwareVideo);
+        HardwareAcceleration = (VideoEncoderProbe.H264Profile.IsHardware || VideoEncoderProbe.Vp9Profile.IsHardware)
+            ? HardwareAccelerationStatus.Enabled
+            : HardwareAccelerationStatus.Disabled;
     }
 
     public class VideoConvertOptions
@@ -197,7 +190,7 @@ public static class VideoConvert
     private static async Task ConvertToVp9OrH264(VideoConvertOptions options, string outputPath, string tmpDir)
     {
         var srcMedia = await FFProbe.AnalyseAsync(options.InputPath);
-        var codec = options.UseH264 ? H264Encoder : Vp9Encoding;
+        var profile = options.UseH264 ? VideoEncoderProbe.H264Profile : VideoEncoderProbe.Vp9Profile;
         var srcWidth = srcMedia.PrimaryVideoStream!.Width;
         var srcHeight = srcMedia.PrimaryVideoStream!.Height;
         var srcDuration = srcMedia.Duration;
@@ -244,76 +237,48 @@ public static class VideoConvert
                 .NotifyOnError(logCollector.AddLine)
                 .ProcessAsynchronously();
 
-            await RunConcatenate(vf, codec, [blankPath, options.InputPath], outputPath, options, logCollector, srcDuration);
+            await RunConcatenate(vf, profile, [blankPath, options.InputPath], outputPath, options, logCollector, srcDuration);
             return;
         }
 
-        // 非 padding>0 的常规路径
-        // PostInput 顺序（对应原代码）：
-        //   -c:v <codec>（来自 stream.SetCodec）
-        //   -map 0:0（来自 stream）
-        //   [图片] -r 1 -t 2
-        //   -threads N（UseMultiThread）
-        //   [VP9] -cpu-used 5 [+ -pix_fmt yuv420p]
-        //   [缩放] -vf <vf>
-        var postArgs = new List<string>
-        {
-            $"-c:v {codec}",
-            "-map 0:0",
-        };
-
-        if (isImage)
-        {
-            // 原 Xabe：AddParameter("-r 1 -t 2")（PostInput）
-            postArgs.Add("-r 1 -t 2");
-        }
-
-        // PreInput 参数：图片用 -loop 1，Windows 上再加 -hwaccel dxva2。
-        // 原 Xabe 添加顺序：先 -loop 1（图片时），后 -hwaccel dxva2。
+        // 非 padding>0 的常规路径，消费选定的编码器 profile。
+        // PreInput：图片 -loop 1 在前，随后 profile.PreInputArgs（Windows=-hwaccel dxva2，Linux VAAPI=-vaapi_device …）。
         var preArgs = new List<string>();
         if (isImage)
         {
             preArgs.Add("-loop 1");
         }
-#if WINDOWS
-        // dxva2 是 Windows 专有的 DirectX 视频加速。Linux 上没有该设备，ffmpeg 会直接报错
-        //（No device available for decoder: device type dxva2 needed），整个转换中断；
-        // 故仅 Windows 启用以保持原行为，Linux 走软件解码（唯一可用方式）。
-        preArgs.Add("-hwaccel dxva2");
-#endif
+        preArgs.AddRange(profile.PreInputArgs);
 
-        // -threads N（UseMultiThread）
-        postArgs.Add(MultiThreadArg);
+        // PostInput：-c:v <codec> -map 0:0 [图片 -r 1 -t 2] -threads N [软件VP9: -cpu-used 5 [pix_fmt]] [硬件额外]
+        var postArgs = BuildPostArgs(profile, options, isImage);
 
-        // VP9 特定参数
-        if (!options.UseH264)
-        {
-            postArgs.Add("-cpu-used 5");
-            if (options.UseYuv420p)
-                postArgs.Add("-pix_fmt yuv420p");
-        }
-
-        // 负数 padding：裁剪开头，对应 Xabe 的 SetSeek → PostInput 的 -ss <time>
-        // 注意：原代码在“基本参数”段才调用 SetSeek，对应 GetParameters(PostInput)，
-        // 拼装位置在 stream 段之后；此处统一并入 postArgs，顺序与原一致（在 -threads 等之后）。
+        // 负数 padding：裁剪开头（-ss），位置与今天一致（用户 PostInput 段、在 -threads 之后）。
         if (options.Padding < 0)
         {
-            // SetSeek 是 PostInput（pos 1），但 Build 时用户 PostInput 整体在 stream 段之后。
-            // 这里把 -ss 放在用户 PostInput 段，保持相对顺序。
             postArgs.Add($"-ss {FormatFFmpegTime(TimeSpan.FromSeconds(-options.Padding))}");
         }
 
-        // 应用缩放参数
+        // 应用 filter：软件缩放 + 硬件上传节点（hwupload）。
         if (!options.NoScale && options.Padding <= 0)
         {
-            postArgs.Add($"-vf {vf}");
+            postArgs.Add($"-vf {AppendUpload(vf, profile)}");
+        }
+        else if (profile.UploadFilter is not null)
+        {
+            // NoScale 但硬件编码器仍需要把帧上传到硬件表面
+            postArgs.Add($"-vf {AppendUpload("", profile)}");
         }
 
-        // preArgs 在 Linux 非图片场景下可能为空（dxva2 被 #if 排除），此时不附加任何 input 参数。
+        // preArgs 在 Linux 软件编码非图片场景下可能为空，此时不附加任何 input 参数。
         var args = preArgs.Count > 0
             ? FFMpegArguments.FromFileInput(options.InputPath, verifyExists: false,
                 opt => opt.WithCustomArgument(string.Join(" ", preArgs)))
             : FFMpegArguments.FromFileInput(options.InputPath, verifyExists: false);
+
+#if DEBUG
+        Console.WriteLine($"[ffargs] kind={(options.UseH264 ? "H264" : "VP9")} profile={profile.Name} pre=[{string.Join(" ", preArgs)}] post=[{string.Join(" ", postArgs)}]");
+#endif
 
         var processor = args
             .OutputToFile(outputPath, overwrite: true,
@@ -363,25 +328,24 @@ public static class VideoConvert
     /// 然后再 AddParameter("-c:v &lt;codec&gt;") 与基本段的 -hwaccel(PreInput)/-threads，
     /// 此处一并按相同顺序拼出。
     /// </summary>
-    private static async Task RunConcatenate(string vf, string codec, string[] inputs, string outputPath,
+    private static async Task RunConcatenate(string vf, VideoEncoderProfile profile, string[] inputs, string outputPath,
         VideoConvertOptions options, FfmpegLogCollector logCollector, TimeSpan totalDuration)
     {
-        // filter_complex 串，完全照搬原 Concatenate 的拼接逻辑
+        // filter_complex 串，完全照搬原 Concatenate 的拼接逻辑；末尾把硬件上传节点接到 [vout] 前。
         var fc = "";
         for (var index = 0; index < inputs.Length; ++index)
             fc += $"[{index}:v]setsar=1[{index}s];";
         for (var index = 0; index < inputs.Length; ++index)
             fc += $"[{index}s] ";
-        fc += $"concat=n={inputs.Length}:v=1 [v]; [v]{vf}[vout]";
+        var tail = AppendUpload(vf, profile); // 软件: vf；硬件: vf,format=nv12,hwupload（vf 可空）
+        fc += $"concat=n={inputs.Length}:v=1 [v]; [v]{tail}[vout]";
 
-        // 输入：保持原顺序（blank 在前，源在后）
-        // dxva2 仅 Windows 启用（同上：Linux 无该硬件解码设备，加上会导致 ffmpeg 报错中断）。
-#if WINDOWS
-        var args = FFMpegArguments.FromFileInput(inputs[0], verifyExists: false,
-            opt => opt.WithCustomArgument("-hwaccel dxva2"));
-#else
-        var args = FFMpegArguments.FromFileInput(inputs[0], verifyExists: false);
-#endif
+        // 输入：保持原顺序（blank 在前，源在后）。第一个输入的 PreInput 用 profile.PreInputArgs
+        //（Windows=-hwaccel dxva2，Linux VAAPI=-vaapi_device …；软件为空串无害）。
+        var args = profile.PreInputArgs.Count > 0
+            ? FFMpegArguments.FromFileInput(inputs[0], verifyExists: false,
+                opt => opt.WithCustomArgument(string.Join(" ", profile.PreInputArgs)))
+            : FFMpegArguments.FromFileInput(inputs[0], verifyExists: false);
         for (var i = 1; i < inputs.Length; i++)
         {
             args = args.AddFileInput(inputs[i], verifyExists: false);
@@ -392,21 +356,27 @@ public static class VideoConvert
         //   -aspect 1:1                          （来自 Concatenate）
         //   -c:v <codec>                         （Concatenate 后 AddParameter）
         //   -threads N                           （基本段 UseMultiThread）
-        //   [VP9] -cpu-used 5 [+ -pix_fmt yuv420p]
+        //   [软件VP9] -cpu-used 5 [+ -pix_fmt yuv420p]
+        //   [硬件额外]
         var postArgs = new List<string>
         {
             $"-filter_complex \"{fc}\" -map \"[vout]\"",
             "-aspect 1:1",
-            $"-c:v {codec}",
+            $"-c:v {profile.Codec}",
             MultiThreadArg,
         };
 
-        if (!options.UseH264)
+        if (profile.Kind == VideoCodecKind.Vp9 && !profile.IsHardware)
         {
             postArgs.Add("-cpu-used 5");
             if (options.UseYuv420p)
                 postArgs.Add("-pix_fmt yuv420p");
         }
+        postArgs.AddRange(profile.ExtraOutputArgs);
+
+#if DEBUG
+        Console.WriteLine($"[ffargs] concat profile={profile.Name} pre=[{string.Join(" ", profile.PreInputArgs)}] post=[{string.Join(" ", postArgs)}]");
+#endif
 
         var processor = args
             .OutputToFile(outputPath, overwrite: true,
