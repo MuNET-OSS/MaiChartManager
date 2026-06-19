@@ -280,7 +280,9 @@ export default defineComponent({
         }
       } catch (e) {
         if (isAbortError(e)) return
-        console.log(e)
+        // WebKit 的 console 直接 log 异常对象时无法正确转文本，这里显式打印字符串便于定位
+        const err = e as any;
+        console.log('[imp] FAILED step=' + step.value + ' message=' + String(err?.message ?? err) + ' stack=' + String(err?.stack ?? '(无栈)'));
         globalCapture(e, t('chart.import.error.importErrorGlobal'))
       } finally {
         if (step.value !== STEP.showResultError)

@@ -22,6 +22,7 @@ async function readFile(path: string, displayName: string, name?: string): Promi
   if (name !== undefined) {
     url += '&name=' + encodeURIComponent(name);
   }
+  console.log('[imp] readFile fetch:', url);
   const res = await fetch(url);
   if (!res.ok) throw new Error('文件不存在: ' + displayName);
   return new File([await res.blob()], displayName);
@@ -47,7 +48,9 @@ export function httpImportDirectory(absPath: string, name?: string): ImportDirec
 
     // 迭代目录直接子项：目录递归构造适配器，文件构造文件句柄
     async *values(): AsyncIterableIterator<ImportFileHandle | ImportDirectory> {
-      const res = await fetch(getUrl('ListImportDirApi') + '?path=' + encodeURIComponent(absPath));
+      const listUrl = getUrl('ListImportDirApi') + '?path=' + encodeURIComponent(absPath);
+      console.log('[imp] listDir fetch:', listUrl);
+      const res = await fetch(listUrl);
       if (!res.ok) return;
       const entries: BackendEntry[] = await res.json();
       for (const child of entries) {
