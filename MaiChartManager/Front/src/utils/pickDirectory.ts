@@ -11,10 +11,16 @@ function abort(message = '用户取消选择目录'): never {
 
 // 走后端：弹原生选文件夹对话框，再用 httpImportDirectory 适配器通过 HTTP 提供目录内容。
 async function pickViaBackend(): Promise<ImportDirectory> {
-  const res = await fetch(getUrl('PickImportFolderApi'));
+  const pickUrl = getUrl('PickImportFolderApi');
+  console.log('[imp] pickViaBackend origin=' + location.origin + ' href=' + location.href + ' pickUrl=' + pickUrl);
+  const res = await fetch(pickUrl);
+  console.log('[imp] PickImportFolder responded ok=' + res.ok + ' status=' + res.status + ' ct=' + res.headers.get('content-type'));
   if (!res.ok) abort('选择目录失败');
   // 后端返回 JSON：选中的绝对路径字符串，取消时为 null
-  const path: string | null = await res.json();
+  const text = await res.text();
+  console.log('[imp] PickImportFolder raw body=' + JSON.stringify(text));
+  const path: string | null = text ? JSON.parse(text) : null;
+  console.log('[imp] picked path=' + JSON.stringify(path));
   if (!path) abort();
   return httpImportDirectory(path);
 }
