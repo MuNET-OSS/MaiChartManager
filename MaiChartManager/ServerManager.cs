@@ -77,8 +77,14 @@ public static class ServerManager
     // 但不开放 LAN 端口。放在 onStart 之后以保持现有位置参数调用的兼容性。
     public static void StartApp(bool export, Action<string>? onStart = null, bool serveSpa = false)
     {
-        var builder = WebApplication.CreateBuilder();
-
+        // ContentRoot 必须显式指定为应用自身目录：WebApplication 默认用当前工作目录(cwd)，
+        // 而桌面宿主常从用户 HOME 启动，host 启动时会对 ContentRoot 做文件监视/扫描，
+        // HOME 下海量文件会让 CreateBuilder 卡上几十秒。指向 exeDir 即可（wwwroot 伺服
+        // 走独立 PhysicalFileProvider，不受 ContentRoot 影响）。
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            ContentRootPath = StaticSettings.exeDir,
+        });
         builder.WebHost.UseSentry((SentryAspNetCoreOptions o) =>
             {
                 // 指定 Sentry 项目，将事件发送到对应的项目：
