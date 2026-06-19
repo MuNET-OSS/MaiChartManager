@@ -338,22 +338,22 @@ public static class VideoConvert
     /// <summary>
     /// 把进度回调挂到 FFMpegCore 的 NotifyOnProgress 上，用源时长换算百分比，
     /// 语义对应原 Xabe 的 conversion.OnProgress += (s, args) => cb((int)args.Percent)。
+    /// 注意：FFMpegCore 的 NotifyOnProgress 只保留最后一次注册的回调（不像 Xabe 的事件可叠加），
+    /// 所以必须把「前端进度」和「任务栏进度」合并到同一个回调里，否则后者会把前者覆盖掉，
+    /// 导致 Linux 上（任务栏回调是 #if WINDOWS 空实现）前端进度恒为 0。
     /// </summary>
     private static void AttachProgress(FFMpegArgumentProcessor processor, VideoConvertOptions options, TimeSpan totalDuration)
     {
-        if (options.OnProgress != null)
+        if (options.OnProgress == null && !options.TaskbarProgress) return;
+
+        processor.NotifyOnProgress(percent =>
         {
-            processor.NotifyOnProgress(percent => options.OnProgress((int)percent), totalDuration);
-        }
-        if (options.TaskbarProgress)
-        {
-            processor.NotifyOnProgress(percent =>
-            {
+            options.OnProgress?.Invoke((int)percent);
 #if WINDOWS
+            if (options.TaskbarProgress)
                 WinUtils.SetTaskbarProgress((ulong)percent);
 #endif
-            }, totalDuration);
-        }
+        }, totalDuration);
     }
 
     /// <summary>
