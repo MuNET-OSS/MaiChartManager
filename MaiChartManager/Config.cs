@@ -24,6 +24,8 @@ public class Config
     public MovieCodec MovieCodec { get; set; } = MovieCodec.ForceVP9;
     public bool Yuv420p { get; set; } = true;
     public bool NoScale { get; set; } = false;
+    // 强制视频走软件编码：硬件 H264 产物若游戏不认，改 config.json 设为 true 即可一键退回软件。
+    public bool ForceSoftwareVideo { get; set; } = false;
     public bool IgnoreLevel { get; set; } = false;
     public bool DisableBga { get; set; } = false;
     public bool UseLegacyMaiLib { get; set; } = false;
