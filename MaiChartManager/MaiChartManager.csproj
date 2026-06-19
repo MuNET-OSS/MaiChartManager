@@ -35,6 +35,15 @@
     <OutputType>Exe</OutputType>
     <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
     <StartupObject>MaiChartManager.LinuxProgram</StartupObject>
+    <!-- Linux 走框架依赖发布：依赖系统的 aspnet-runtime（官方源），不打包运行时。
+         仍保留 RID 以带上 Photino.Native.so 等 RID 专属原生库。ReadyToRun 关掉
+         （框架依赖下意义不大，且会触发 crossgen 卫星资源复制问题）。 -->
+    <SelfContained>false</SelfContained>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <!-- 关掉静态 Web 资产清单：Linux 发布(Production)下它生成的 endpoints.json 会干扰
+         我们用 UseFileServer 显式伺服 wwwroot 的方式，导致 SPA/静态文件 404。
+         wwwroot 仍由下方显式 Content 复制到输出，伺服走 UseFileServer。 -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
     <IsPublishable>False</IsPublishable>
@@ -87,8 +96,6 @@
     <PackageReference Include="Photino.NET" Version="4.0.16" />
   </ItemGroup>
   <ItemGroup>
-    <!-- Mono.Cecil：mod 配置/手动安装读 .NET 程序集用，两平台统一走 NuGet
-         （原 Windows 用 Libs\Mono.Cecil.dll，已去掉） -->
     <PackageReference Include="Mono.Cecil" Version="0.11.6" />
     <PackageReference Include="idunno.Authentication.Basic" Version="2.4.0" />
     <PackageReference Include="LibNMeCab" Version="0.10.2" />
@@ -193,10 +200,10 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Locale.Designer.cs</LastGenOutput>
     </EmbeddedResource>
-    <EmbeddedResource Update="Locale.zh-hans.resx">
+    <EmbeddedResource Update="Locale.zh-Hans.resx">
       <DependentUpon>Locale.resx</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Update="Locale.zh-hant.resx">
+    <EmbeddedResource Update="Locale.zh-Hant.resx">
       <DependentUpon>Locale.resx</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
