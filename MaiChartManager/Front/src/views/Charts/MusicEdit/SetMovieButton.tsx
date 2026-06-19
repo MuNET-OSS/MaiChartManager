@@ -162,7 +162,8 @@ export default defineComponent({
       >
         <div class="flex flex-col gap-2">
           <Progress status="success" percentage={progress.value} showIndicator/>
-          <div class="text-center text-sm">{progress.value === 100 ? t('tools.videoOptions.processing') : `${progress.value}%`}</div>
+          {/* 进度条自带百分比，这里只在 100% 后（ffmpeg 完成、仍在打包 USM）提示「正在处理」 */}
+          {progress.value === 100 && <div class="text-center text-sm">{t('tools.videoOptions.processing')}</div>}
         </div>
       </Modal>
     </Button>;
