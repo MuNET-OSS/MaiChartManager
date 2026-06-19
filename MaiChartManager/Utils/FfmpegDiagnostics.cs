@@ -1,24 +1,27 @@
 using System.Collections.Concurrent;
-using Xabe.FFmpeg;
-using Xabe.FFmpeg.Exceptions;
 
 namespace MaiChartManager.Utils;
 
+/// <summary>
+/// 收集 ffmpeg 运行期间输出到 stderr 的日志行（ffmpeg 几乎所有诊断信息都走 stderr）。
+/// 迁移到 FFMpegCore 后，不再有 Xabe 的 IConversion / OnDataReceived 事件，
+/// 改为把 <see cref="AddLine"/> 直接挂到 FFMpegArgumentProcessor 的 NotifyOnError 上。
+/// </summary>
 public sealed class FfmpegLogCollector
 {
     private const int MaxLines = 400;
     private readonly ConcurrentQueue<string> lines = new();
 
-    public void Attach(IConversion conversion)
+    /// <summary>
+    /// 接收一行 ffmpeg 输出。用法：<c>processor.NotifyOnError(collector.AddLine)</c>。
+    /// </summary>
+    public void AddLine(string? data)
     {
-        conversion.OnDataReceived += (_, args) =>
+        if (string.IsNullOrWhiteSpace(data)) return;
+        lines.Enqueue(data);
+        while (lines.Count > MaxLines && lines.TryDequeue(out _))
         {
-            if (string.IsNullOrWhiteSpace(args.Data)) return;
-            lines.Enqueue(args.Data);
-            while (lines.Count > MaxLines && lines.TryDequeue(out var _))
-            {
-            }
-        };
+        }
     }
 
     public string GetLog() => string.Join(Environment.NewLine, lines);
@@ -30,13 +33,7 @@ public static class FfmpegDiagnostics
     {
         var parts = new List<string>();
 
-        if (exception is ConversionException conversionException &&
-            !string.IsNullOrWhiteSpace(conversionException.InputParameters))
-        {
-            parts.Add("FFmpeg parameters:");
-            parts.Add(conversionException.InputParameters);
-        }
-
+        // FFMpegCore 的异常不携带 Xabe 的 InputParameters，关键信息全在收集到的 ffmpeg 日志里。
         if (!string.IsNullOrWhiteSpace(ffmpegLog))
         {
             parts.Add("FFmpeg output:");

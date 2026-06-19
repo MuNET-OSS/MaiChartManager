@@ -8,7 +8,7 @@ using MaiChartManager.Utils;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.AspNetCore.Hosting.Server;
 using Microsoft.AspNetCore.Hosting.Server.Features;
-using Xabe.FFmpeg;
+using FFMpegCore;
 
 namespace MaiChartManager;
 
@@ -75,7 +75,13 @@ public partial class AppMain : ISingleInstance
             ApplicationConfiguration.Initialize();
             SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
             UiContext = SynchronizationContext.Current;
-            FFmpeg.SetExecutablesPath(StaticSettings.exeDir);
+            // FFMpegCore：Windows 内置 ffmpeg.exe/ffprobe.exe 在 exeDir，临时文件用 tempPath。
+            // FFMpegCore 会按 OS 自动给可执行名补 .exe 后缀。
+            GlobalFFOptions.Configure(o =>
+            {
+                o.BinaryFolder = StaticSettings.exeDir;
+                o.TemporaryFilesFolder = StaticSettings.tempPath;
+            });
             VideoConvert.CheckHardwareAcceleration();
 
             Directory.CreateDirectory(StaticSettings.appData);

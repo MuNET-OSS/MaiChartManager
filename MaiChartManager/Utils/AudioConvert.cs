@@ -1,6 +1,6 @@
 ﻿using NAudio.Lame;
 using Standart.Hash.xxHash;
-using Xabe.FFmpeg;
+using FFMpegCore;
 
 namespace MaiChartManager.Utils;
 
@@ -84,36 +84,45 @@ public static class AudioConvert
             Directory.CreateDirectory(StaticSettings.tempPath);
             File.WriteAllBytes(inputPath, wav);
 
-            var conversion = FFmpeg.Conversions.New()
-                .AddParameter($"-i " + FFmpegHelper.Escape(inputPath));
+            // 输出参数（PostInput）：按原 Xabe 调用顺序拼装，保持 ffmpeg 命令行等价。
+            // FFMpegCore 用 ArgumentList 传递，不会像 Xabe 那样产生引号问题；
+            // 但 -metadata 的值可能含空格，这里仍用 Escape() 把值包成带引号的单个 token，
+            // 与原先 FFmpegHelper.Escape 行为一致。
+            var output = new List<string>();
 
             if (tagData != null)
             {
-                if (tagData.AlbumArt != null && tagData.AlbumArt.Length > 0)
-                {
-                    // 把专辑封面写到临时文件，然后让ffmpeg把它嵌入mp3
-                    albumArtPath = Path.Combine(StaticSettings.tempPath, $"ConvertToMp3_{tempFileGuid:N}.png");
-                    File.WriteAllBytes(albumArtPath, tagData.AlbumArt);
-                    conversion.AddParameter($"-i {FFmpegHelper.Escape(albumArtPath)}");
-                } // 顺序不能换！这个必须在第一个，因为-i必须在任何其他参数之前。
-                if (!string.IsNullOrEmpty(tagData.Title)) conversion.AddParameter($"-metadata title=" + FFmpegHelper.Escape(tagData.Title));
-                if (!string.IsNullOrEmpty(tagData.Artist)) conversion.AddParameter($"-metadata artist=" + FFmpegHelper.Escape(tagData.Artist));
-                if (!string.IsNullOrEmpty(tagData.Album)) conversion.AddParameter($"-metadata album=" + FFmpegHelper.Escape(tagData.Album));
-                if (!string.IsNullOrEmpty(tagData.Year)) conversion.AddParameter($"-metadata date=" + FFmpegHelper.Escape(tagData.Year));
-                if (!string.IsNullOrEmpty(tagData.Comment)) conversion.AddParameter($"-metadata comment=" + FFmpegHelper.Escape(tagData.Comment));
-                if (!string.IsNullOrEmpty(tagData.Genre)) conversion.AddParameter($"-metadata genre=" + FFmpegHelper.Escape(tagData.Genre));
-                if (!string.IsNullOrEmpty(tagData.Track)) conversion.AddParameter($"-metadata track=" + FFmpegHelper.Escape(tagData.Track));
+                // 注意：第二个输入（专辑封面）由 AddFileInput 处理，必须在所有输出参数之前，
+                // 对应原注释“-i 必须在任何其他参数之前”。
+                if (!string.IsNullOrEmpty(tagData.Title)) output.Add("-metadata title=" + Escape(tagData.Title));
+                if (!string.IsNullOrEmpty(tagData.Artist)) output.Add("-metadata artist=" + Escape(tagData.Artist));
+                if (!string.IsNullOrEmpty(tagData.Album)) output.Add("-metadata album=" + Escape(tagData.Album));
+                if (!string.IsNullOrEmpty(tagData.Year)) output.Add("-metadata date=" + Escape(tagData.Year));
+                if (!string.IsNullOrEmpty(tagData.Comment)) output.Add("-metadata comment=" + Escape(tagData.Comment));
+                if (!string.IsNullOrEmpty(tagData.Genre)) output.Add("-metadata genre=" + Escape(tagData.Genre));
+                if (!string.IsNullOrEmpty(tagData.Track)) output.Add("-metadata track=" + Escape(tagData.Track));
             }
-            
-            conversion.AddParameter("-c:a libmp3lame -b:a 256k"); // 把wav编码为256kbps的LAME mp3
 
-            if (albumArtPath != null)
-            { // 如果有专辑封面，还需要加一堆参数以写入专辑封面
-                conversion.AddParameter("-map 0:a -map 1:v -c:v copy -disposition:v attached_pic");
+            output.Add("-c:a libmp3lame -b:a 256k"); // 把wav编码为256kbps的LAME mp3
+
+            if (tagData?.AlbumArt is { Length: > 0 })
+            {
+                // 把专辑封面写到临时文件，然后让ffmpeg把它嵌入mp3
+                albumArtPath = Path.Combine(StaticSettings.tempPath, $"ConvertToMp3_{tempFileGuid:N}.png");
+                File.WriteAllBytes(albumArtPath, tagData.AlbumArt);
+                // 如果有专辑封面，还需要加一堆参数以写入专辑封面
+                output.Add("-map 0:a -map 1:v -c:v copy -disposition:v attached_pic");
             }
-            
-            conversion.SetOutput(outputPath).SetOverwriteOutput(true);
-            conversion.Start().GetAwaiter().GetResult();
+
+            var args = FFMpegArguments.FromFileInput(inputPath, verifyExists: false);
+            if (albumArtPath != null)
+            {
+                args = args.AddFileInput(albumArtPath, verifyExists: false);
+            }
+
+            args
+                .OutputToFile(outputPath, overwrite: true, o => o.WithCustomArgument(string.Join(" ", output)))
+                .ProcessSynchronously();
 
             if (!File.Exists(outputPath) || new FileInfo(outputPath).Length == 0)
             {
@@ -130,4 +139,12 @@ public static class AudioConvert
             if (albumArtPath != null) File.Delete(albumArtPath);
         }
     }
+
+    /// <summary>
+    /// 将字符串转义后用双引号包裹，作为单个 ffmpeg 参数 token。
+    /// 等价于原 FFmpegHelper.Escape：正确转义内容中的反斜杠和双引号。
+    /// 用于 -metadata 值，避免含空格的值被拆成多个参数。
+    /// </summary>
+    private static string Escape(string value) =>
+        "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 }

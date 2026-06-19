@@ -2,7 +2,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Photino.NET;
-using Xabe.FFmpeg;
+using FFMpegCore;
 
 namespace MaiChartManager;
 
@@ -96,14 +96,18 @@ public static class LinuxProgram
     }
 
     /// <summary>
-    /// 配置 Xabe.FFmpeg 使用系统 ffmpeg/ffprobe。
-    /// Windows 版在 AppMain 里指向内置的 ffmpeg.exe；Linux 不内置，改用系统 PATH 里的 ffmpeg。
-    /// 必须显式传可执行名 "ffmpeg"/"ffprobe"，否则 Xabe 在 Linux 上仍会去找 .exe 后缀的文件。
+    /// 配置 FFMpegCore 使用系统 ffmpeg/ffprobe。
+    /// Windows 版在 AppMain 里指向内置的 ffmpeg.exe；Linux 不内置，改用系统 PATH 里的 ffmpeg 所在目录。
+    /// FFMpegCore 用参数数组传给 ffmpeg（无引号问题），按 OS 自动补可执行名后缀。
     /// </summary>
     private static void ConfigureFfmpeg()
     {
         var dir = ResolveExecutableDir("ffmpeg") ?? "/usr/bin";
-        FFmpeg.SetExecutablesPath(dir, "ffmpeg", "ffprobe");
+        GlobalFFOptions.Configure(o =>
+        {
+            o.BinaryFolder = dir;
+            o.TemporaryFilesFolder = StaticSettings.tempPath;
+        });
         // 检测硬件加速（与 Windows 的 AppMain 一致，失败不影响主流程）
         _ = MaiChartManager.Utils.VideoConvert.CheckHardwareAcceleration();
     }

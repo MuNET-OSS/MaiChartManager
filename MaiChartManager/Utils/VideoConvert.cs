@@ -1,5 +1,6 @@
 using MaiChartManager.Platform;
-using Xabe.FFmpeg;
+using FFMpegCore;
+using FFMpegCore.Enums;
 
 namespace MaiChartManager.Utils;
 
@@ -21,6 +22,19 @@ public static class VideoConvert
         Math.Max(1, Environment.ProcessorCount / 4));
 
     /// <summary>
+    /// 等价于 Xabe 的 UseMultiThread(true)：渲染为 "-threads {Min(ProcessorCount, 16)}"。
+    /// </summary>
+    private static string MultiThreadArg => $"-threads {Math.Min(Environment.ProcessorCount, 16)}";
+
+    /// <summary>
+    /// 把 TimeSpan 格式化为 ffmpeg 时间字符串 H:MM:SS.mmm，
+    /// 与原 Xabe TimeExtensions.ToFFmpeg 行为一致（"{0:D}:{1:D2}:{2:D2}.{3:D3}"，
+    /// 参数为 (int)TotalHours, Minutes, Seconds, Milliseconds）。
+    /// </summary>
+    private static string FormatFFmpegTime(TimeSpan time) =>
+        $"{(int)time.TotalHours:D}:{time.Minutes:D2}:{time.Seconds:D2}.{time.Milliseconds:D3}";
+
+    /// <summary>
     /// 检测硬件加速支持
     /// </summary>
     public static async Task CheckHardwareAcceleration()
@@ -29,15 +43,14 @@ public static class VideoConvert
         try
         {
             // 测试 VP9 QSV 硬件加速
+            // 等价 Xabe 命令行：-t 0:00:02.000 -f lavfi -i color=c=black:s=720x720:r=1 -c:v vp9_qsv -threads N <out.ivf>
             var blankPath = Path.Combine(tmpDir.FullName, "blank.ivf");
-            await FFmpeg.Conversions.New()
-                .SetOutputTime(TimeSpan.FromSeconds(2))
-                .SetInputFormat(Format.lavfi)
-                .AddParameter("-i color=c=black:s=720x720:r=1")
-                .AddParameter("-c:v vp9_qsv")
-                .UseMultiThread(true)
-                .SetOutput(blankPath)
-                .Start();
+            await FFMpegArguments
+                .FromFileInput("color=c=black:s=720x720:r=1", verifyExists: false,
+                    opt => opt.WithCustomArgument($"-t {FormatFFmpegTime(TimeSpan.FromSeconds(2))} -f lavfi"))
+                .OutputToFile(blankPath, overwrite: true,
+                    opt => opt.WithCustomArgument($"-c:v vp9_qsv {MultiThreadArg}"))
+                .ProcessAsynchronously();
             HardwareAcceleration = HardwareAccelerationStatus.Enabled;
         }
         catch
@@ -50,15 +63,14 @@ public static class VideoConvert
         {
             try
             {
+                // 等价 Xabe 命令行：-t 0:00:02.000 -f lavfi -i color=c=black:s=720x720:r=1 -c:v <encoder> -threads N <out.mp4>
                 var blankPath = Path.Combine(tmpDir.FullName, $"{encoder}.mp4");
-                await FFmpeg.Conversions.New()
-                    .SetOutputTime(TimeSpan.FromSeconds(2))
-                    .SetInputFormat(Format.lavfi)
-                    .AddParameter("-i color=c=black:s=720x720:r=1")
-                    .AddParameter($"-c:v {encoder}")
-                    .UseMultiThread(true)
-                    .SetOutput(blankPath)
-                    .Start();
+                await FFMpegArguments
+                    .FromFileInput("color=c=black:s=720x720:r=1", verifyExists: false,
+                        opt => opt.WithCustomArgument($"-t {FormatFFmpegTime(TimeSpan.FromSeconds(2))} -f lavfi"))
+                    .OutputToFile(blankPath, overwrite: true,
+                        opt => opt.WithCustomArgument($"-c:v {encoder} {MultiThreadArg}"))
+                    .ProcessAsynchronously();
                 H264Encoder = encoder;
                 break;
             }
@@ -184,20 +196,19 @@ public static class VideoConvert
 
     private static async Task ConvertToVp9OrH264(VideoConvertOptions options, string outputPath, string tmpDir)
     {
-        var srcMedia = await FFmpeg.GetMediaInfo(options.InputPath);
+        var srcMedia = await FFProbe.AnalyseAsync(options.InputPath);
         var codec = options.UseH264 ? H264Encoder : Vp9Encoding;
-        var firstStream = srcMedia.VideoStreams.First().SetCodec(codec);
-        var conversion = FFmpeg.Conversions.New()
-            .AddStream(firstStream);
+        var srcWidth = srcMedia.PrimaryVideoStream!.Width;
+        var srcHeight = srcMedia.PrimaryVideoStream!.Height;
+        var srcDuration = srcMedia.Duration;
+
         var logCollector = new FfmpegLogCollector();
-        logCollector.Attach(conversion);
 
         // 处理图片输入
-        if (options.ContentType?.StartsWith("image/") == true)
+        var isImage = options.ContentType?.StartsWith("image/") == true;
+        if (isImage)
         {
             options.Padding = 0;
-            conversion.AddParameter("-r 1 -t 2");
-            conversion.AddParameter("-loop 1", ParameterPosition.PreInput);
         }
 
         // 处理极小的 padding
@@ -214,71 +225,106 @@ public static class VideoConvert
             vf = $"scale={scale}:-1,pad={scale}:{scale}:({scale}-iw)/2:({scale}-ih)/2:black";
         }
 
-        // 处理 padding
-        if (options.Padding < 0)
+        // 与 Xabe 行为一致：源视频流默认通过 -map 0:0 选取并以 -c:v <codec> 编码。
+        // PreInput 参数（如 -loop 1 / -hwaccel dxva2）放到 FromFileInput 的 input options；
+        // PostInput 参数（-c:v / -t / -vf / -threads 等）放到 OutputToFile 的 output options，
+        // 顺序严格对应原 Xabe 的拼装顺序：
+        //   [streams PostInput: -c:v <codec> -map 0:0] [user PostInput...]
+
+        if (options.Padding > 0)
         {
-            // 负数：裁剪开头
-            conversion.SetSeek(TimeSpan.FromSeconds(-options.Padding));
-        }
-        else if (options.Padding > 0)
-        {
-            // 正数：添加前置空白
+            // 正数：添加前置空白，先生成 blank，再 concat。
+            // 等价 Xabe：-t <padding> -f lavfi -i color=c=black:s=WxH:r=30 -threads N <blank.mp4>
             var blankPath = Path.Combine(tmpDir, "blank.mp4");
-            var blank = FFmpeg.Conversions.New()
-                .SetOutputTime(TimeSpan.FromSeconds(options.Padding))
-                .SetInputFormat(Format.lavfi)
-                .AddParameter($"-i color=c=black:s={srcMedia.VideoStreams.First().Width}x{srcMedia.VideoStreams.First().Height}:r=30")
-                .UseMultiThread(true)
-                .SetOutput(blankPath);
-            logCollector.Attach(blank);
-            await blank.Start();
-            var blankVideoInfo = await FFmpeg.GetMediaInfo(blankPath);
-            conversion = Concatenate(vf, blankVideoInfo, srcMedia);
-            logCollector.Attach(conversion);
-            conversion.AddParameter($"-c:v {codec}");
+            await FFMpegArguments
+                .FromFileInput($"color=c=black:s={srcWidth}x{srcHeight}:r=30", verifyExists: false,
+                    opt => opt.WithCustomArgument($"-t {FormatFFmpegTime(TimeSpan.FromSeconds(options.Padding))} -f lavfi"))
+                .OutputToFile(blankPath, overwrite: true,
+                    opt => opt.WithCustomArgument(MultiThreadArg))
+                .NotifyOnError(logCollector.AddLine)
+                .ProcessAsynchronously();
+
+            await RunConcatenate(vf, codec, [blankPath, options.InputPath], outputPath, options, logCollector, srcDuration);
+            return;
         }
 
-        // 基本参数
-        conversion
-            .SetOutput(outputPath)
-            .AddParameter("-hwaccel dxva2", ParameterPosition.PreInput)
-            .UseMultiThread(true);
+        // 非 padding>0 的常规路径
+        // PostInput 顺序（对应原代码）：
+        //   -c:v <codec>（来自 stream.SetCodec）
+        //   -map 0:0（来自 stream）
+        //   [图片] -r 1 -t 2
+        //   -threads N（UseMultiThread）
+        //   [VP9] -cpu-used 5 [+ -pix_fmt yuv420p]
+        //   [缩放] -vf <vf>
+        var postArgs = new List<string>
+        {
+            $"-c:v {codec}",
+            "-map 0:0",
+        };
+
+        if (isImage)
+        {
+            // 原 Xabe：AddParameter("-r 1 -t 2")（PostInput）
+            postArgs.Add("-r 1 -t 2");
+        }
+
+        // PreInput 参数：图片用 -loop 1，Windows 上再加 -hwaccel dxva2。
+        // 原 Xabe 添加顺序：先 -loop 1（图片时），后 -hwaccel dxva2。
+        var preArgs = new List<string>();
+        if (isImage)
+        {
+            preArgs.Add("-loop 1");
+        }
+#if WINDOWS
+        // dxva2 是 Windows 专有的 DirectX 视频加速。Linux 上没有该设备，ffmpeg 会直接报错
+        //（No device available for decoder: device type dxva2 needed），整个转换中断；
+        // 故仅 Windows 启用以保持原行为，Linux 走软件解码（唯一可用方式）。
+        preArgs.Add("-hwaccel dxva2");
+#endif
+
+        // -threads N（UseMultiThread）
+        postArgs.Add(MultiThreadArg);
 
         // VP9 特定参数
         if (!options.UseH264)
         {
-            conversion.AddParameter("-cpu-used 5");
+            postArgs.Add("-cpu-used 5");
             if (options.UseYuv420p)
-                conversion.AddParameter("-pix_fmt yuv420p");
+                postArgs.Add("-pix_fmt yuv420p");
+        }
+
+        // 负数 padding：裁剪开头，对应 Xabe 的 SetSeek → PostInput 的 -ss <time>
+        // 注意：原代码在“基本参数”段才调用 SetSeek，对应 GetParameters(PostInput)，
+        // 拼装位置在 stream 段之后；此处统一并入 postArgs，顺序与原一致（在 -threads 等之后）。
+        if (options.Padding < 0)
+        {
+            // SetSeek 是 PostInput（pos 1），但 Build 时用户 PostInput 整体在 stream 段之后。
+            // 这里把 -ss 放在用户 PostInput 段，保持相对顺序。
+            postArgs.Add($"-ss {FormatFFmpegTime(TimeSpan.FromSeconds(-options.Padding))}");
         }
 
         // 应用缩放参数
         if (!options.NoScale && options.Padding <= 0)
         {
-            conversion.AddParameter($"-vf {vf}");
+            postArgs.Add($"-vf {vf}");
         }
 
-        // 进度回调
-        if (options.OnProgress != null)
-        {
-            conversion.OnProgress += (sender, args) =>
-            {
-                options.OnProgress((int)args.Percent);
-            };
-        }
-        if (options.TaskbarProgress)
-        {
-            conversion.OnProgress += (sender, args) =>
-            {
-#if WINDOWS
-                WinUtils.SetTaskbarProgress((ulong)args.Percent);
-#endif
-            };
-        }
+        // preArgs 在 Linux 非图片场景下可能为空（dxva2 被 #if 排除），此时不附加任何 input 参数。
+        var args = preArgs.Count > 0
+            ? FFMpegArguments.FromFileInput(options.InputPath, verifyExists: false,
+                opt => opt.WithCustomArgument(string.Join(" ", preArgs)))
+            : FFMpegArguments.FromFileInput(options.InputPath, verifyExists: false);
+
+        var processor = args
+            .OutputToFile(outputPath, overwrite: true,
+                opt => opt.WithCustomArgument(string.Join(" ", postArgs)))
+            .NotifyOnError(logCollector.AddLine);
+
+        AttachProgress(processor, options, srcDuration);
 
         try
         {
-            await conversion.Start();
+            await processor.ProcessAsynchronously();
         }
         catch (Exception ex)
         {
@@ -289,23 +335,97 @@ public static class VideoConvert
         }
     }
 
-    private static IConversion Concatenate(string vf, params IMediaInfo[] mediaInfos)
+    /// <summary>
+    /// 把进度回调挂到 FFMpegCore 的 NotifyOnProgress 上，用源时长换算百分比，
+    /// 语义对应原 Xabe 的 conversion.OnProgress += (s, args) => cb((int)args.Percent)。
+    /// </summary>
+    private static void AttachProgress(FFMpegArgumentProcessor processor, VideoConvertOptions options, TimeSpan totalDuration)
     {
-        var conversion = FFmpeg.Conversions.New();
-        foreach (var inputVideo in mediaInfos)
+        if (options.OnProgress != null)
         {
-            conversion.AddParameter("-i " + FFmpegHelper.Escape(inputVideo.Path) + " ");
+            processor.NotifyOnProgress(percent => options.OnProgress((int)percent), totalDuration);
+        }
+        if (options.TaskbarProgress)
+        {
+            processor.NotifyOnProgress(percent =>
+            {
+#if WINDOWS
+                WinUtils.SetTaskbarProgress((ulong)percent);
+#endif
+            }, totalDuration);
+        }
+    }
+
+    /// <summary>
+    /// 等价于原 Concatenate + 启动转换：把多个输入用 concat 滤镜拼接后输出。
+    /// 原 Xabe 拼装（按输入顺序）：
+    ///   -i in0 -i in1 ... -filter_complex "[0:v]setsar=1[0s];...[0s] [1s] ...concat=n=K:v=1 [v]; [v]<vf>[vout]" -map "[vout]" -aspect 1:1
+    /// 然后再 AddParameter("-c:v &lt;codec&gt;") 与基本段的 -hwaccel(PreInput)/-threads，
+    /// 此处一并按相同顺序拼出。
+    /// </summary>
+    private static async Task RunConcatenate(string vf, string codec, string[] inputs, string outputPath,
+        VideoConvertOptions options, FfmpegLogCollector logCollector, TimeSpan totalDuration)
+    {
+        // filter_complex 串，完全照搬原 Concatenate 的拼接逻辑
+        var fc = "";
+        for (var index = 0; index < inputs.Length; ++index)
+            fc += $"[{index}:v]setsar=1[{index}s];";
+        for (var index = 0; index < inputs.Length; ++index)
+            fc += $"[{index}s] ";
+        fc += $"concat=n={inputs.Length}:v=1 [v]; [v]{vf}[vout]";
+
+        // 输入：保持原顺序（blank 在前，源在后）
+        // dxva2 仅 Windows 启用（同上：Linux 无该硬件解码设备，加上会导致 ffmpeg 报错中断）。
+#if WINDOWS
+        var args = FFMpegArguments.FromFileInput(inputs[0], verifyExists: false,
+            opt => opt.WithCustomArgument("-hwaccel dxva2"));
+#else
+        var args = FFMpegArguments.FromFileInput(inputs[0], verifyExists: false);
+#endif
+        for (var i = 1; i < inputs.Length; i++)
+        {
+            args = args.AddFileInput(inputs[i], verifyExists: false);
         }
 
-        conversion.AddParameter("-filter_complex \"");
-        for (var index = 0; index < mediaInfos.Length; ++index)
-            conversion.AddParameter($"[{index}:v]setsar=1[{index}s];");
-        for (var index = 0; index < mediaInfos.Length; ++index)
-            conversion.AddParameter($"[{index}s] ");
-        conversion.AddParameter($"concat=n={mediaInfos.Length}:v=1 [v]; [v]{vf}[vout]\" -map \"[vout]\"");
+        // PostInput 段顺序对应原代码：
+        //   -filter_complex "..." -map "[vout]"  （来自 Concatenate）
+        //   -aspect 1:1                          （来自 Concatenate）
+        //   -c:v <codec>                         （Concatenate 后 AddParameter）
+        //   -threads N                           （基本段 UseMultiThread）
+        //   [VP9] -cpu-used 5 [+ -pix_fmt yuv420p]
+        var postArgs = new List<string>
+        {
+            $"-filter_complex \"{fc}\" -map \"[vout]\"",
+            "-aspect 1:1",
+            $"-c:v {codec}",
+            MultiThreadArg,
+        };
 
-        conversion.AddParameter("-aspect 1:1");
-        return conversion;
+        if (!options.UseH264)
+        {
+            postArgs.Add("-cpu-used 5");
+            if (options.UseYuv420p)
+                postArgs.Add("-pix_fmt yuv420p");
+        }
+
+        var processor = args
+            .OutputToFile(outputPath, overwrite: true,
+                opt => opt.WithCustomArgument(string.Join(" ", postArgs)))
+            .NotifyOnError(logCollector.AddLine);
+
+        AttachProgress(processor, options, totalDuration);
+
+        try
+        {
+            await processor.ProcessAsynchronously();
+        }
+        catch (Exception ex)
+        {
+            throw new VideoConversionException(
+                FfmpegDiagnostics.CreateSummary(ex, logCollector.GetLog()),
+                FfmpegDiagnostics.CreateDetail(ex, logCollector.GetLog()),
+                ex);
+        }
     }
 
     /// <summary>
@@ -357,26 +477,24 @@ public static class VideoConvert
                 }
 
                 // 转换为 MP4
-                var conversion = FFmpeg.Conversions.New()
-                    .AddParameter("-i " + FFmpegHelper.Escape(outputIvfFile))
-                    .AddParameter("-c:v copy")
-                    .SetOutput(outputPath);
+                // 等价 Xabe 命令行：-i <ivf> -c:v copy <mp4>
                 var logCollector = new FfmpegLogCollector();
-                logCollector.Attach(conversion);
+                var srcDuration = (await FFProbe.AnalyseAsync(outputIvfFile)).Duration;
+
+                var processor = FFMpegArguments
+                    .FromFileInput(outputIvfFile, verifyExists: false)
+                    .OutputToFile(outputPath, overwrite: true, opt => opt.WithCustomArgument("-c:v copy"))
+                    .NotifyOnError(logCollector.AddLine);
 
                 if (onProgress != null)
                 {
-                    conversion.OnProgress += (sender, args) =>
-                    {
-                        // FFmpeg 进度从 50% 开始，映射到 50-100%
-                        var percent = 50 + (int)(args.Percent / 2);
-                        onProgress(percent);
-                    };
+                    // FFmpeg 进度从 50% 开始，映射到 50-100%
+                    processor.NotifyOnProgress(percent => onProgress(50 + (int)(percent / 2)), srcDuration);
                 }
 
                 try
                 {
-                    await conversion.Start();
+                    await processor.ProcessAsynchronously();
                 }
                 catch (Exception ex)
                 {
