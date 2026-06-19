@@ -4,7 +4,7 @@
 # 直接用当前工作树构建。请在仓库内 `Packaging/arch/` 目录执行 `makepkg -si`。
 
 pkgname=maichartmanager
-pkgver=26.3.r46.gf68ebc1
+pkgver=26.3.r47.gf7a8d6e
 pkgrel=1
 pkgdesc="maimai 谱面管理工具（Linux 原生，Photino + WebKitGTK）"
 arch=('x86_64')
@@ -72,9 +72,11 @@ EOF
   cd "$root/MaiChartManager/Front"
   pnpm run build
 
-  # 2) 框架依赖发布后端到 srcdir/out（不打包运行时，依赖系统 aspnet-runtime）
+  # 2) 框架依赖发布到 srcdir/out（不打包运行时，依赖系统 aspnet-runtime）。
+  #    发布 CLI 项目即可：它引用主项目，产物是超集——同时含 GUI 主程序 apphost
+  #    (MaiChartManager)、CLI (MaiChartManager.CLI)、MuConvert、wwwroot 与全部共享 dll。
   cd "$root"
-  dotnet publish MaiChartManager/MaiChartManager.csproj \
+  dotnet publish MaiChartManager.CLI/MaiChartManager.CLI.csproj \
     -c LinuxRelease \
     -o "$srcdir/out" \
     --no-self-contained \
@@ -88,22 +90,33 @@ package() {
   install -dm755 "$pkgdir/opt/$pkgname"
   cp -a "$srcdir/out/." "$pkgdir/opt/$pkgname/"
 
-  # 启动器：apphost 以自身路径定位 exeDir/wwwroot，故直接 exec 即可
+  # 三个命令（apphost 各自以自身路径定位 exeDir，故直接 exec）：
+  #   maichartmanager —— 启动 GUI 主程序
+  #   mcm             —— 命令行工具
+  #   muconvert       —— 音游转谱器
   install -dm755 "$pkgdir/usr/bin"
-  cat > "$pkgdir/usr/bin/$pkgname" <<EOF
+  cat > "$pkgdir/usr/bin/maichartmanager" <<EOF
 #!/bin/sh
 exec /opt/$pkgname/MaiChartManager "\$@"
 EOF
-  chmod 755 "$pkgdir/usr/bin/$pkgname"
+  cat > "$pkgdir/usr/bin/mcm" <<EOF
+#!/bin/sh
+exec /opt/$pkgname/MaiChartManager.CLI "\$@"
+EOF
+  cat > "$pkgdir/usr/bin/muconvert" <<EOF
+#!/bin/sh
+exec /opt/$pkgname/MuConvert "\$@"
+EOF
+  chmod 755 "$pkgdir/usr/bin/maichartmanager" "$pkgdir/usr/bin/mcm" "$pkgdir/usr/bin/muconvert"
 
-  # 桌面入口
+  # 桌面入口（仅 GUI 主程序）
   install -dm755 "$pkgdir/usr/share/applications"
   cat > "$pkgdir/usr/share/applications/$pkgname.desktop" <<EOF
 [Desktop Entry]
 Type=Application
 Name=MaiChartManager
 Comment=maimai 谱面管理工具
-Exec=/usr/bin/$pkgname
+Exec=/usr/bin/maichartmanager
 Icon=$pkgname
 Categories=Utility;AudioVideo;
 Terminal=false

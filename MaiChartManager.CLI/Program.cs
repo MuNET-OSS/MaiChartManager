@@ -21,8 +21,15 @@ try
 #endif
     });
 
+#if WINDOWS
     AppMain.InitConfiguration(true);
     await IapManager.Init();
+#else
+    // Linux：复用 LinuxProgram 的无头初始化（加载配置 + 配置系统 ffmpeg），
+    // 不走 Windows-only 的 AppMain/IapManager。
+    LinuxProgram.InitConfiguration();
+    LinuxProgram.ConfigureFfmpeg();
+#endif
 
     var app = new CommandApp();
 

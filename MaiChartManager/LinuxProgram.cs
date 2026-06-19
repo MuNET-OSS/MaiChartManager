@@ -99,8 +99,9 @@ public static class LinuxProgram
     /// 配置 FFMpegCore 使用系统 ffmpeg/ffprobe。
     /// Windows 版在 AppMain 里指向内置的 ffmpeg.exe；Linux 不内置，改用系统 PATH 里的 ffmpeg 所在目录。
     /// FFMpegCore 用参数数组传给 ffmpeg（无引号问题），按 OS 自动补可执行名后缀。
+    /// 公开以便 CLI 等其它 Linux 入口复用。
     /// </summary>
-    private static void ConfigureFfmpeg()
+    public static void ConfigureFfmpeg()
     {
         var dir = ResolveExecutableDir("ffmpeg") ?? "/usr/bin";
         GlobalFFOptions.Configure(o =>
@@ -128,8 +129,9 @@ public static class LinuxProgram
     /// <summary>
     /// Linux 的最小化无头配置加载。对应 AppMain.InitConfiguration，但去掉了
     /// Sentry / MessageBox / WinForms 相关部分（这些代码在被排除的 AppMain.cs 中）。
+    /// 公开以便 CLI 等其它 Linux 入口复用。
     /// </summary>
-    private static void InitConfiguration()
+    public static void InitConfiguration()
     {
         var cfgFilePath = Path.Combine(StaticSettings.appData, "config.json");
         if (File.Exists(cfgFilePath))
