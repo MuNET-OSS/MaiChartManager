@@ -836,27 +836,13 @@ public partial class MusicTransferController(
 
             try
             {
-                if (StaticSettings.Config.UseLegacyMaiLib)
-                {
-                    simaiFile["ChartConvertTool"] = $"MaiLib";
-                    var parser = new MaiLib.Ma2Parser();
-                    var ma2Content = await System.IO.File.ReadAllLinesAsync(chartPath);
-                    var ma2 = parser.ChartOfToken(ma2Content);
-                    var simai = ma2.Compose(MaiLib.ChartEnum.ChartVersion.SimaiFes);
+                var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
+                var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
+                var (simai, _) = new SimaiGenerator().Generate(cvtChart);
 
-                    var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
-                    simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer), false);
-                }
-                else
-                {
-                    var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
-                    var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
-                    var (simai, _) = new SimaiGenerator().Generate(cvtChart);
-
-                    var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
-                    simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer));
-                    simaiFile.ClockCount = cvtChart.ClockCount; // 通过多次写入，自然实现取最后一个有效难度的clockCount，作为写入maidata中的
-                }
+                var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
+                simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer));
+                simaiFile.ClockCount = cvtChart.ClockCount; // 通过多次写入，自然实现取最后一个有效难度的clockCount，作为写入maidata中的
             }
             catch (Exception e)
             {
