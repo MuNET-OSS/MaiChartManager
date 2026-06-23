@@ -71,10 +71,7 @@
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference
-      Include="..\AquaMai\AquaMai.Config.HeadlessLoader\AquaMai.Config.HeadlessLoader.csproj" />
-    <ProjectReference Include="..\MaiLib\MaiLib.csproj" />
-    <ProjectReference Include="..\SimaiSharp\SimaiSharp\SimaiSharp.csproj" />
+    <ProjectReference Include="..\AquaMai\AquaMai.Config.HeadlessLoader\AquaMai.Config.HeadlessLoader.csproj" />
     <ProjectReference Include="..\MuConvert\MuConvert.csproj" />
     <!-- 音频依赖已跨平台化：SonicAudioLib 已转 netstandard2.0，两平台都引（去掉 Condition） -->
     <ProjectReference Include="..\SonicAudioTools\Source\SonicAudioLib\SonicAudioLib.csproj" />

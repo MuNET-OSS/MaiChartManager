@@ -30,7 +30,6 @@ export default defineComponent({
           <CheckBox v-model:value={appSettings.value.yuv420p} onChange={onSettingChange}>{t('settings.yuv420p')}</CheckBox>
           <CheckBox v-model:value={appSettings.value.noScale} onChange={onSettingChange}>{t('settings.noScale')}</CheckBox>
           <CheckBox v-model:value={appSettings.value.convertJacketToAssetBundle} onChange={onSettingChange}>{t('settings.convertJacketToAssetBundle')}</CheckBox>
-          <CheckBox v-model:value={appSettings.value.useLegacyMaiLib} onChange={onSettingChange}>{t('settings.useLegacyMaiLib')}</CheckBox>
         </div>
       </div>
     );

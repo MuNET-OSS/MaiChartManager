@@ -196,31 +196,10 @@ public partial class MusicTransferController(
                 var originalContent = System.IO.File.ReadAllText(file);
                 int.TryParse(MA2VersionRegex().Match(originalContent).Groups[1].Value, out var ma2Version);
                 if (ma2Version == 3) continue; // 已经是103，不需要再转换
-                if (!StaticSettings.Config.UseLegacyMaiLib)
-                {
-                    var (chart, _) = new MA2Parser().Parse(originalContent);
-                    var (ma2_103, _) = new MA2_103Generator().Generate(chart);
-                    System.IO.File.WriteAllText(file, ma2_103);
-                }
-                else
-                {
-                    var parser = new MaiLib.Ma2Parser();
-                    var ma2Lines = new List<string>();
-                    using (var reader = new StringReader(originalContent))
-                    {
-                        string? line;
-                        while ((line = reader.ReadLine()) is not null)
-                        {
-                            ma2Lines.Add(line);
-                        }
-                    }
-
-                    var ma2_103 = parser.ChartOfToken(ma2Lines.ToArray()).Compose(MaiLib.ChartEnum.ChartVersion.Ma2_103);
-                    if (!string.Equals(originalContent, ma2_103, StringComparison.Ordinal))
-                    {
-                        System.IO.File.WriteAllText(file, ma2_103);
-                    }
-                }
+                
+                var (chart, _) = new MA2Parser().Parse(originalContent);
+                var (ma2_103, _) = new MA2_103Generator().Generate(chart);
+                System.IO.File.WriteAllText(file, ma2_103);
             }
         }
 
@@ -401,17 +380,8 @@ public partial class MusicTransferController(
                 int.TryParse(MA2VersionRegex().Match(ma2).Groups[1].Value, out var ma2Version);
                 if (ma2Version != 3)
                 { // 不是103才进行转换，如果已经是103的话，不需要再转换
-                    if (!StaticSettings.Config.UseLegacyMaiLib)
-                    {
-                        var (chart, _) = new MA2Parser().Parse(ma2);
-                        (ma2, _) = new MA2_103Generator().Generate(chart);
-                    }
-                    else
-                    {
-                        var ma2Lines = System.IO.File.ReadAllLines(file);
-                        ma2 = new MaiLib.Ma2Parser().ChartOfToken(ma2Lines)
-                            .Compose(MaiLib.ChartEnum.ChartVersion.Ma2_103);
-                    }
+                    var (chart, _) = new MA2Parser().Parse(ma2);
+                    (ma2, _) = new MA2_103Generator().Generate(chart);
                 }
                 var entry = zipArchive.CreateEntry($"music/music{music.Id:000000}/{Path.GetFileName(file)}");
                 using var stream = entry.Open();
@@ -696,27 +666,13 @@ public partial class MusicTransferController(
 
             try
             {
-                if (StaticSettings.Config.UseLegacyMaiLib)
-                {
-                    simaiFile["ChartConvertTool"] = $"MaiLib";
-                    var parser = new MaiLib.Ma2Parser();
-                    var ma2Content = await System.IO.File.ReadAllLinesAsync(chartPath);
-                    var ma2 = parser.ChartOfToken(ma2Content);
-                    var simai = ma2.Compose(MaiLib.ChartEnum.ChartVersion.SimaiFes);
+                var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
+                var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
+                var (simai, _) = new SimaiGenerator().Generate(cvtChart);
 
-                    var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
-                    simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer), false);
-                }
-                else
-                {
-                    var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
-                    var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
-                    var (simai, _) = new SimaiGenerator().Generate(cvtChart);
-
-                    var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
-                    simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer));
-                    simaiFile.ClockCount = cvtChart.ClockCount; // 通过多次写入，自然实现取最后一个有效难度的clockCount，作为写入maidata中的
-                }
+                var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
+                simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer));
+                simaiFile.ClockCount = cvtChart.ClockCount; // 通过多次写入，自然实现取最后一个有效难度的clockCount，作为写入maidata中的
             }
             catch (Exception e)
             {
