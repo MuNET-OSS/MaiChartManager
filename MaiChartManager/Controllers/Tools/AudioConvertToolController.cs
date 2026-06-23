@@ -1,25 +1,21 @@
-﻿using MaiChartManager.Utils;
+﻿using MaiChartManager.Platform;
+using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MaiChartManager.Controllers.Tools;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api")]
-public class AudioConvertToolController : ControllerBase
+public class AudioConvertToolController(IDesktopDialogService dialogService) : ControllerBase
 {
     [HttpPost]
     public IActionResult AudioConvertTool()
     {
-        var dialog = new OpenFileDialog()
-        {
-            Title = Locale.SelectAudioToConvert,
-            Filter = Locale.AudioFileFilter,
-        };
-
-        if (WinUtils.ShowDialog(dialog) != DialogResult.OK)
+        // 用平台原生文件对话框选音频文件（Windows=WinForms，Linux=Photino），转换逻辑跨平台。
+        var inputFile = dialogService.PickFile(Locale.SelectAudioToConvert, Locale.AudioFileFilter);
+        if (inputFile is null)
             return BadRequest(Locale.FileNotSelected);
 
-        var inputFile = dialog.FileName;
         var extension = Path.GetExtension(inputFile).ToLowerInvariant();
         var directory = Path.GetDirectoryName(inputFile);
         var fileNameWithoutExt = Path.GetFileNameWithoutExtension(inputFile);

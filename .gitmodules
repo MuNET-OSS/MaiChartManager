@@ -9,7 +9,7 @@
 	url = git@github.com:clansty/SonicAudioTools.git
 [submodule "XV2-Tools"]
 	path = XV2-Tools
-	url = git@github.com:clansty/XV2-Tools.git
+	url = git@github.com:MuNET-OSS/XV2-Tools.git
 [submodule "AquaMai"]
 	path = AquaMai
 	url = git@github.com:MewoLab/AquaMai.git

@@ -4,7 +4,6 @@ using System.Net.Sockets;
 using System.Security.Claims;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json.Serialization;
-using System.Windows.Forms;
 using idunno.Authentication.Basic;
 using MaiChartManager.Controllers.Charts.Services;
 using MaiChartManager.Controllers.Mod;
@@ -13,7 +12,6 @@ using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Https;
 using Microsoft.Extensions.FileProviders;
-using Pluralsight.Crypto;
 using Sentry.AspNetCore;
 
 namespace MaiChartManager;
@@ -35,38 +33,17 @@ public static class ServerManager
     private static X509Certificate2 GetCert()
     {
         var path = Path.Combine(StaticSettings.appData, "cert.pfx");
-        if (File.Exists(path))
-        {
-            return new X509Certificate2(path);
-        }
+        if (File.Exists(path)) return X509CertificateLoader.LoadPkcs12FromFile(path, null);
 
-        // ASP.NET 是不是不支持 ecc
-        // var ecdsa = ECDsa.Create();
-        // var req = new CertificateRequest("CN=MaiChartManager", ecdsa, HashAlgorithmName.SHA256);
-        // req.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
-        // req.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature | X509KeyUsageFlags.KeyEncipherment, false));
-        // req.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension([new Oid("1.3.6.1.5.5.7.3.1")], true));
-        // req.CertificateExtensions.Add(new X509SubjectKeyIdentifierExtension(req.PublicKey, false));
-        // var builder = new SubjectAlternativeNameBuilder();
-        // builder.AddDnsName("MaiChartManager");
-        // req.CertificateExtensions.Add(builder.Build());
-        //
-        // var cert = req.CreateSelfSigned(DateTimeOffset.Now, DateTimeOffset.Now.AddYears(5));
-        using var ctx = new CryptContext();
-        ctx.Open();
-
-        var cert = ctx.CreateSelfSignedCertificate(
-            new SelfSignedCertProperties
-            {
-                IsPrivateKeyExportable = true,
-                KeyBitLength = 4096,
-                Name = new X500DistinguishedName("CN=MaiChartManager"),
-                ValidFrom = DateTime.Today.AddDays(-1),
-                ValidTo = DateTime.Today.AddYears(5),
-            });
-
-        File.WriteAllBytes(path, cert.Export(X509ContentType.Pfx));
-        return cert;
+        using var rsa = System.Security.Cryptography.RSA.Create(4096);
+        var req = new System.Security.Cryptography.X509Certificates.CertificateRequest(
+            "CN=MaiChartManager", rsa,
+            System.Security.Cryptography.HashAlgorithmName.SHA256,
+            System.Security.Cryptography.RSASignaturePadding.Pkcs1);
+        var cert = req.CreateSelfSigned(DateTimeOffset.Now.AddDays(-1), DateTimeOffset.Now.AddYears(5));
+        var pfx = cert.Export(X509ContentType.Pfx);
+        File.WriteAllBytes(path, pfx);
+        return X509CertificateLoader.LoadPkcs12(pfx, null);
     }
 
     private static bool IsPortAvailable(int port)
@@ -96,16 +73,24 @@ public static class ServerManager
         return port;
     }
 
-    public static void StartApp(bool export, Action<string>? onStart = null)
+    // serveSpa：在 loopback 上伺服 wwwroot 里的 Vue SPA（用于 Photino 桌面宿主），
+    // 但不开放 LAN 端口。放在 onStart 之后以保持现有位置参数调用的兼容性。
+    public static void StartApp(bool export, Action<string>? onStart = null, bool serveSpa = false)
     {
-        var builder = WebApplication.CreateBuilder();
-
+        // ContentRoot 必须显式指定为应用自身目录：WebApplication 默认用当前工作目录(cwd)，
+        // 而桌面宿主常从用户 HOME 启动，host 启动时会对 ContentRoot 做文件监视/扫描，
+        // HOME 下海量文件会让 CreateBuilder 卡上几十秒。指向 exeDir 即可（wwwroot 伺服
+        // 走独立 PhysicalFileProvider，不受 ContentRoot 影响）。
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            ContentRootPath = StaticSettings.exeDir,
+        });
         builder.WebHost.UseSentry((SentryAspNetCoreOptions o) =>
             {
-                // Tells which project in Sentry to send events to:
+                // 指定 Sentry 项目，将事件发送到对应的项目：
                 o.Dsn = "https://be7a9ae3a9a88f4660737b25894b3c20@sentry.c5y.moe/3";
-                // Set TracesSampleRate to 1.0 to capture 100% of transactions for tracing.
-                // We recommend adjusting this value in production.
+                // 将 TracesSampleRate 设为 1.0 可捕获 100% 的事务用于追踪。
+                // 建议在生产环境中适当调低该值。
                 o.TracesSampleRate = 0.5;
             })
             .ConfigureKestrel(serverOptions =>
@@ -144,6 +129,21 @@ public static class ServerManager
             .AddApplicationPart(typeof(ServerManager).Assembly)
             .AddJsonOptions(options =>
                 options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
+#if WINDOWS
+        builder.Services.AddSingleton<MaiChartManager.Platform.IDesktopDialogService, MaiChartManager.Platform.Windows.WinFormsDialogService>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.ITaskbarProgress, MaiChartManager.Platform.Windows.WindowsTaskbarProgress>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IShellService, MaiChartManager.Platform.Windows.WindowsShellService>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IAppShell, MaiChartManager.Platform.Windows.WindowsAppShell>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IProgressController, MaiChartManager.Platform.Windows.WindowsProgressController>();
+#else
+        // 使用 Photino 原生对话框（替换原 HeadlessDialogService 占位实现），让 OOBE 选目录可用。
+        builder.Services.AddSingleton<MaiChartManager.Platform.IDesktopDialogService, MaiChartManager.Platform.Linux.PhotinoDialogService>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.ITaskbarProgress, MaiChartManager.Platform.Linux.NoopTaskbarProgress>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IShellService, MaiChartManager.Platform.Linux.LinuxShellService>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IAppShell, MaiChartManager.Platform.Linux.PhotinoAppShell>();
+        builder.Services.AddSingleton<MaiChartManager.Platform.IProgressController, MaiChartManager.Platform.Linux.HeadlessProgressController>();
+#endif
 
         if (StaticSettings.Config.UseAuth)
         {
@@ -206,7 +206,8 @@ public static class ServerManager
             .UseSwagger()
             .UseSwaggerUI()
             .UseCors("qwq");
-        if (export)
+        // 当 export 或 serveSpa 时都伺服 SPA：export 是导出场景，serveSpa 是 Photino 桌面宿主场景
+        if (export || serveSpa)
             app.UseFileServer(new FileServerOptions
             {
                 FileProvider = new PhysicalFileProvider(StaticSettings.wwwroot),

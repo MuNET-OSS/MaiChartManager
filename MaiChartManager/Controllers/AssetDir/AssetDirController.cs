@@ -1,15 +1,15 @@
 ﻿using MaiChartManager.Attributes;
+using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Net.Http.Headers;
-using Microsoft.VisualBasic.FileIO;
 
 namespace MaiChartManager.Controllers.AssetDir;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api")]
-public class AssetDirController(StaticSettings settings, ILogger<AssetDirController> logger) : ControllerBase
+public class AssetDirController(StaticSettings settings, ILogger<AssetDirController> logger, IDesktopDialogService dialogService) : ControllerBase
 {
     [HttpPost]
     public void CreateAssetDir([FromBody] string dir)
@@ -20,7 +20,7 @@ public class AssetDirController(StaticSettings settings, ILogger<AssetDirControl
     [HttpDelete]
     public void DeleteAssetDir([FromBody] string dir)
     {
-        FileSystem.DeleteDirectory(Path.Combine(StaticSettings.StreamingAssets, dir), UIOption.AllDialogs, RecycleOption.SendToRecycleBin);
+        PlatformFile.DeleteDirectory(Path.Combine(StaticSettings.StreamingAssets, dir), showDialog: true);
     }
 
     public record GetAssetsDirsResult(string DirName, IEnumerable<string> SubFiles, string Version);
@@ -91,7 +91,7 @@ public class AssetDirController(StaticSettings settings, ILogger<AssetDirControl
     [HttpDelete]
     public void DeleteAssetDirTxt([FromBody] GetAssetDirTxtValueRequest req)
     {
-        FileSystem.DeleteFile(Path.Combine(StaticSettings.StreamingAssets, req.DirName, req.FileName), UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+        PlatformFile.DeleteFile(Path.Combine(StaticSettings.StreamingAssets, req.DirName, req.FileName));
     }
 
     public record PutAssetDirTxtValueRequest(string DirName, string FileName, string Content);
@@ -105,15 +105,9 @@ public class AssetDirController(StaticSettings settings, ILogger<AssetDirControl
     [HttpPost]
     public async Task RequestLocalImportDir()
     {
-        var dialog = new FolderBrowserDialog
-        {
-            Description = Locale.SelectAssetDirectory,
-            ShowNewFolderButton = false,
-        };
-        if (WinUtils.ShowDialog(dialog) != DialogResult.OK) return;
-        var src = dialog.SelectedPath;
-        logger.LogInformation("LocalImportDir: {src}", src);
+        var src = dialogService.PickFolder(Locale.SelectAssetDirectory);
         if (src is null) return;
+        logger.LogInformation("LocalImportDir: {src}", src);
         var destName = Path.GetFileName(src);
         if (!StaticSettings.ADirRegex().IsMatch(destName))
         {
@@ -132,7 +126,7 @@ public class AssetDirController(StaticSettings settings, ILogger<AssetDirControl
 
         var dest = Path.Combine(StaticSettings.StreamingAssets, destName);
         logger.LogInformation("Src: {src} Dest: {dest}", src, dest);
-        FileSystem.CopyDirectory(src, dest, UIOption.AllDialogs);
+        PlatformFile.CopyDirectory(src, dest);
         await settings.RescanAll();
     }
 

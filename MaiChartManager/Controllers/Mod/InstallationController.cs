@@ -1,9 +1,9 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
+using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.VisualBasic.FileIO;
 
 namespace MaiChartManager.Controllers.Mod;
 
@@ -100,7 +100,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
 
     #region ADX HID 冲突检测和删除
 
-    private static readonly string[] HidModPaths = [@"Mods\Mai2InputMod.dll", @"Mods\hid_input_lib.dll", "hid_input_lib.dll", "mai2io.dll"];
+    private static readonly string[] HidModPaths = [Path.Combine("Mods", "Mai2InputMod.dll"), Path.Combine("Mods", "hid_input_lib.dll"), "hid_input_lib.dll", "mai2io.dll"];
 
     [NonAction]
     private static bool GetIsHidConflictExist()
@@ -123,7 +123,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
         {
             if (System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, mod)))
             {
-                FileSystem.DeleteFile(Path.Combine(StaticSettings.GamePath, mod), UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                PlatformFile.DeleteFile(Path.Combine(StaticSettings.GamePath, mod));
             }
         }
     }
@@ -133,17 +133,17 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
     [NonAction]
     private static bool GetIsAdxHidIoModAbsent()
     {
-        return !System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Mods\ADXHIDIOMod.dll"));
+        return !System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Mods", "ADXHIDIOMod.dll"));
     }
 
     [NonAction]
     private static bool GetIsMmlLegacyLibsInstalled()
     {
-        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\hidapi.dll")))
+        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "hidapi.dll")))
         {
             return false;
         }
-        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\libadxhid.dll")))
+        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "libadxhid.dll")))
         {
             return false;
         }
@@ -165,18 +165,18 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
     public void InstallMmlLibs([FromBody] InstallMmlLibsDto req)
     {
         var isMaimollerLegacyModeEnabled = req.UseLegacy;
-        if (System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Mods\ADXHIDIOMod.dll")))
+        if (System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Mods", "ADXHIDIOMod.dll")))
         {
-            System.IO.File.Delete(Path.Combine(StaticSettings.GamePath, @"Mods\ADXHIDIOMod.dll"));
+            System.IO.File.Delete(Path.Combine(StaticSettings.GamePath, "Mods", "ADXHIDIOMod.dll"));
         }
         if (!isMaimollerLegacyModeEnabled || GetIsMmlLegacyLibsInstalled()) return;
-        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\hidapi.dll")))
+        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "hidapi.dll")))
         {
-            CopyFile(Path.Combine(StaticSettings.exeDir, @"hidapi.dll"), Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\hidapi.dll"));
+            CopyFile(Path.Combine(StaticSettings.exeDir, @"hidapi.dll"), Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "hidapi.dll"));
         }
-        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\libadxhid.dll")))
+        if (!System.IO.File.Exists(Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "libadxhid.dll")))
         {
-            CopyFile(Path.Combine(StaticSettings.exeDir, @"libadxhid.dll"), Path.Combine(StaticSettings.GamePath, @"Sinmai_Data\Plugins\libadxhid.dll"));
+            CopyFile(Path.Combine(StaticSettings.exeDir, @"libadxhid.dll"), Path.Combine(StaticSettings.GamePath, "Sinmai_Data", "Plugins", "libadxhid.dll"));
         }
     }
 
@@ -196,7 +196,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
     {
         if (IsMelonInstalled())
         {
-            logger.LogInformation("MelonLoader is already installed.");
+            logger.LogInformation("MelonLoader 已安装，跳过。");
             return;
         }
 
@@ -249,9 +249,9 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
             "ci" => CI_KEY,
             "slow" => CI_KEY,
             "release" => RELEASE_KEY,
-            _ => throw new ArgumentException("Invalid type", nameof(req.Type)),
+            _ => throw new ArgumentException("无效的类型", nameof(req.Type)),
         };
-        // Download from url
+        // 从 URL 下载
         using var client = new HttpClient();
         client.Timeout = TimeSpan.FromSeconds(15);
         Exception? lastException = null;
@@ -264,17 +264,17 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
 
                 if (!VerifyBinary(data, req.Sign, key))
                 {
-                    throw new InvalidOperationException("Invalid signature");
+                    throw new InvalidOperationException("签名无效");
                 }
             }
             catch (Exception e)
             {
-                logger.LogError(e, "Failed to download AquaMai from {Url}", url);
+                logger.LogError(e, "从 {Url} 下载 AquaMai 失败", url);
                 lastException = e;
                 continue;
             }
-            // Save to Mods folder
-            var dest = Path.Combine(StaticSettings.GamePath, @"Mods\AquaMai.dll");
+            // 保存到 Mods 目录
+            var dest = Path.Combine(StaticSettings.GamePath, "Mods", "AquaMai.dll");
             Directory.CreateDirectory(Path.GetDirectoryName(dest));
             await System.IO.File.WriteAllBytesAsync(dest, data);
             if (System.IO.File.Exists(ModPaths.MuModDllInstalledPath))
@@ -283,7 +283,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
             }
             return;
         }
-        throw new InvalidOperationException("Failed to download AquaMai from all urls", lastException);
+        throw new InvalidOperationException("从所有 URL 下载 AquaMai 均失败", lastException);
     }
 
     [HttpPost]
@@ -307,7 +307,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Failed to download MuMod cache during install, but DLL was installed successfully");
+            logger.LogError(e, "安装期间下载 MuMod 缓存失败，但 DLL 已成功安装");
         }
     }
 
@@ -316,7 +316,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
     {
         if (System.IO.File.Exists(ModPaths.AquaMaiDllInstalledPath))
         {
-            FileSystem.DeleteFile(ModPaths.AquaMaiDllInstalledPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+            PlatformFile.DeleteFile(ModPaths.AquaMaiDllInstalledPath);
         }
     }
 
@@ -325,7 +325,7 @@ public class InstallationController(StaticSettings settings, ILogger<Installatio
     {
         if (System.IO.File.Exists(ModPaths.MuModDllInstalledPath))
         {
-            FileSystem.DeleteFile(ModPaths.MuModDllInstalledPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+            PlatformFile.DeleteFile(ModPaths.MuModDllInstalledPath);
         }
     }
 

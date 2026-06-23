@@ -15,6 +15,7 @@ import Settings from './Settings';
 import Splash from '@/components/Splash';
 import { ensureBackendUrl } from '@/utils/ensureBackendUrl';
 import ChangelogModal from '@/components/ChangelogModal';
+import { isLocalHost } from '@/client/api';
 
 export default defineComponent({
   setup() {
@@ -30,7 +31,9 @@ export default defineComponent({
         });
       });
 
-      if (window.showDirectoryPicker === undefined) {
+      // 本地宿主（Windows WebView2 / Photino）下目录操作走后端原生对话框，不需要 File System Access API；
+      // 仅当是远程浏览器时才检测并提示浏览器不支持
+      if (!isLocalHost && window.showDirectoryPicker === undefined) {
         const showError = () => {
           showTransactionalDialog(
             t('error.browserUnsupported.title'),

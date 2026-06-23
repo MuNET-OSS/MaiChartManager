@@ -30,7 +30,7 @@ public class MovieConvertController(ILogger<MovieConvertController> logger) : Co
 
         if (Path.GetExtension(file.FileName).Equals(".dat", StringComparison.InvariantCultureIgnoreCase))
         {
-            var targetPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, $@"MovieData\{id:000000}.dat");
+            var targetPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, "MovieData", $"{id:000000}.dat");
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
             await using var stream = System.IO.File.Open(targetPath, FileMode.Create);
             await file.CopyToAsync(stream);
@@ -38,7 +38,9 @@ public class MovieConvertController(ILogger<MovieConvertController> logger) : Co
             return;
         }
 
+#if WINDOWS
         if (IapManager.License != IapManager.LicenseStatus.Active) return;
+#endif
         Response.Headers.Append("Content-Type", "text/event-stream");
         
         var tmpDir = Directory.CreateTempSubdirectory();
@@ -54,7 +56,7 @@ public class MovieConvertController(ILogger<MovieConvertController> logger) : Co
             }
 
             // 目标路径
-            var targetPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, $@"MovieData\{id:000000}.{(StaticSettings.Config.MovieCodec == MovieCodec.ForceH264 ? "mp4" : "dat")}");
+            var targetPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, "MovieData", $"{id:000000}.{(StaticSettings.Config.MovieCodec == MovieCodec.ForceH264 ? "mp4" : "dat")}");
 
             // 使用工具类转换视频
             await VideoConvert.ConvertVideo(new VideoConvert.VideoConvertOptions

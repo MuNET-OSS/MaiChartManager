@@ -1,9 +1,10 @@
 <Project>
-  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'MuConvert'">
+  <!-- 仅在 Windows 上构建时，让随 MaiChartManager 一起发布的 MuConvert 为自包含 win-x64，
+       使打包进 Windows 版的 MuConvert.exe 可独立运行（不依赖单独的 dotnet 运行时）。
+       Linux 原生构建则不强制，MuConvert 随主项目按 linux-x64 框架依赖构建。
+       （原先无条件强制 win-x64 是为了在 Linux 上用 Wine 测 Windows 版，已不需要。） -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'MuConvert' and $([MSBuild]::IsOSPlatform('Windows'))">
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
-  </PropertyGroup>
-  <PropertyGroup>
-    <EnableWindowsTargeting>true</EnableWindowsTargeting>
   </PropertyGroup>
 </Project>

@@ -638,42 +638,15 @@ internal static class UsmCreator
         return probeInfo;
     }
 
-    private static string ResolveFfprobePath()
-    {
-        var candidates = new[]
-        {
-            Path.Combine(AppContext.BaseDirectory, "ffprobe.exe"),
-            Path.Combine(AppContext.BaseDirectory, "FFMpeg", "ffprobe.exe"),
-            Path.Combine(StaticSettings.exeDir, "ffprobe.exe"),
-            Path.Combine(StaticSettings.exeDir, "FFMpeg", "ffprobe.exe")
-        };
-        foreach (var candidate in candidates)
-        {
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-        return "ffprobe";
-    }
-    private static string ResolveFfmpegPath()
-    {
-        var candidates = new[]
-        {
-            Path.Combine(AppContext.BaseDirectory, "ffmpeg.exe"),
-            Path.Combine(AppContext.BaseDirectory, "FFMpeg", "ffmpeg.exe"),
-            Path.Combine(StaticSettings.exeDir, "ffmpeg.exe"),
-            Path.Combine(StaticSettings.exeDir, "FFMpeg", "ffmpeg.exe")
-        };
-        foreach (var candidate in candidates)
-        {
-            if (File.Exists(candidate))
-            {
-                return candidate;
-            }
-        }
-        return "ffmpeg";
-    }
+    // 复用 FFMpegCore 的二进制解析（GlobalFFOptions 在启动时已配置好 BinaryFolder）。
+    // 原先这里自己拼 ".exe" 路径并用 File.Exists 命中，在 Linux 上会命中输出目录里随 Windows
+    // 构建一起拷进来的 ffprobe.exe（PE 文件，无执行权限）→ 启动报 EACCES。改为单一来源，
+    // FFMpegCore 会按 OS 自动补可执行名后缀、并尊重配置的 BinaryFolder。
+    private static string ResolveFfprobePath() =>
+        FFMpegCore.GlobalFFOptions.GetFFProbeBinaryPath(FFMpegCore.GlobalFFOptions.Current);
+
+    private static string ResolveFfmpegPath() =>
+        FFMpegCore.GlobalFFOptions.GetFFMpegBinaryPath(FFMpegCore.GlobalFFOptions.Current);
     private static void TryDeleteFile(string path)
     {
         try

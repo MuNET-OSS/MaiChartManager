@@ -6,6 +6,7 @@ import SelectFileTypeTip from "./SelectFileTypeTip";
 import { globalCapture, updateAddVersionList, updateGenreList } from "@/store/refs";
 import { EDIT_TYPE } from "./index";
 import { useI18n } from 'vue-i18n';
+import { pickFile } from "@/utils/pickFile";
 
 export default defineComponent({
   props: {
@@ -30,23 +31,11 @@ export default defineComponent({
     const startProcess = async () => {
       showTip.value = true;
       try {
-        const [fileHandle] = await window.showOpenFilePicker({
-          id: 'genreTitle',
-          startIn: 'downloads',
-          types: [
-            {
-              description: t('genre.imageDescription'),
-              accept: {
-                "application/jpeg": [".jpeg", ".jpg"],
-                "application/png": [".png"],
-              },
-            },
-          ],
-        });
+        // 分类/版本图片，使用通用单文件选择（兼容 WebKitGTK）
+        const file = await pickFile('image/jpeg,image/png');
         showTip.value = false;
 
-        if (!fileHandle) return;
-        const file = await fileHandle.getFile();
+        if (!file) return;
 
         await (props.type === EDIT_TYPE.Genre ? api.SetGenreTitleImage : api.SetVersionTitleImage)({id: props.genre.id!, image: file});
         await updateGenreList();

@@ -8,6 +8,7 @@ import api, { getUrl } from "@/client/api";
 import AudioPreviewEditorButton from "@/views/Charts/MusicEdit/AudioPreviewEditorButton";
 import SetMovieButton from "@/views/Charts/MusicEdit/SetMovieButton";
 import { t } from "@/locales";
+import { pickFile } from "@/utils/pickFile";
 
 
 export let uploadFlow = async (fileHandle?: FileSystemFileHandle) => {
@@ -34,44 +35,27 @@ export default defineComponent({
     uploadFlow = async (fileHandle?: FileSystemFileHandle) => {
       tipShow.value = true
       try {
+        let file: File;
         if (!fileHandle) {
-          [fileHandle] = await window.showOpenFilePicker({
-            id: 'acbawb',
-            startIn: 'downloads',
-            types: [
-              {
-                description: t('music.edit.supportedFileTypes'),
-                accept: {
-                  "application/x-supported": [".mp3", ".wav", ".ogg", ".acb"],
-                },
-              },
-            ],
-          });
+          // 音频文件，使用通用单文件选择（兼容 WebKitGTK）
+          const picked = await pickFile('.mp3,.wav,.ogg,.acb');
+          tipShow.value = false;
+          if (!picked) return;
+          file = picked;
+        } else {
+          tipShow.value = false;
+          file = await fileHandle.getFile() as File;
         }
-        tipShow.value = false;
-        if (!fileHandle) return;
-        const file = await fileHandle.getFile() as File;
 
         let res: HttpResponse<any>;
         if (file.name.endsWith('.acb')) {
           tipSelectAwbShow.value = true;
-          const [fileHandle] = await window.showOpenFilePicker({
-            id: 'acbawb',
-            startIn: 'downloads',
-            types: [
-              {
-                description: t('music.edit.supportedFileTypes'),
-                accept: {
-                  "application/x-supported": [".awb"],
-                },
-              },
-            ],
-          });
+          // 对应的 awb 文件，使用通用单文件选择（兼容 WebKitGTK）
+          const awb = await pickFile('.awb');
           tipSelectAwbShow.value = false;
-          if (!fileHandle) return;
+          if (!awb) return;
 
           load.value = true;
-          const awb = await fileHandle.getFile() as File;
           res = await api.SetAudio(props.song.id!, selectedADir.value, { file, awb, padding: 0 });
         } else {
           offset.value = 0;

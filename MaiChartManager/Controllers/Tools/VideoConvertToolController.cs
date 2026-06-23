@@ -1,14 +1,14 @@
 using System.Text.Json;
 using System.Threading.Channels;
+using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.VisualBasic.FileIO;
 
 namespace MaiChartManager.Controllers.Tools;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api")]
-public class VideoConvertToolController(ILogger<VideoConvertToolController> logger) : ControllerBase
+public class VideoConvertToolController(ILogger<VideoConvertToolController> logger, IDesktopDialogService dialogService) : ControllerBase
 {
     public enum VideoConvertEventType
     {
@@ -22,20 +22,15 @@ public class VideoConvertToolController(ILogger<VideoConvertToolController> logg
     {
         Response.Headers.Append("Content-Type", "text/event-stream");
 
-        var dialog = new OpenFileDialog()
-        {
-            Title = Locale.SelectVideoToConvert,
-            Filter = Locale.VideoFileFilter,
-        };
+        var inputFile = dialogService.PickFile(Locale.SelectVideoToConvert, Locale.VideoFileFilter);
 
-        if (WinUtils.ShowDialog(dialog) != DialogResult.OK)
+        if (inputFile is null)
         {
             await Response.WriteAsync($"event: {VideoConvertEventType.Error}\ndata: {Locale.FileNotSelected}\n\n");
             await Response.Body.FlushAsync();
             return;
         }
 
-        var inputFile = dialog.FileName;
         var directory = Path.GetDirectoryName(inputFile);
         var fileNameWithoutExt = Path.GetFileNameWithoutExtension(inputFile);
         var inputExt = Path.GetExtension(inputFile).ToLowerInvariant();
@@ -137,11 +132,13 @@ public class VideoConvertToolController(ILogger<VideoConvertToolController> logg
         Response.Headers.Append("Content-Type", "text/event-stream");
 
         // PV 转换属于赞助功能
+#if WINDOWS
         if (IapManager.License != IapManager.LicenseStatus.Active)
         {
             await WriteBatchError(BatchConvertPvErrorCode.NeedLicense, Locale.BatchConvertPvNeedLicense);
             return;
         }
+#endif
 
         if (string.IsNullOrWhiteSpace(folderPath) || !Directory.Exists(folderPath))
         {
@@ -356,7 +353,7 @@ public class VideoConvertToolController(ILogger<VideoConvertToolController> logg
         }
         catch (OperationCanceledException)
         {
-            // ignore
+            // 忽略取消异常
         }
     }
 }

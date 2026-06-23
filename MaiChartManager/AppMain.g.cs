@@ -3,5 +3,5 @@
 
     public partial class AppMain
     {
-        public const string Version = "26.2";
+        public const string Version = "26.3";
     }

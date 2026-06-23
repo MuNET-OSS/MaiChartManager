@@ -1,5 +1,6 @@
 ﻿using System.Xml;
-using Microsoft.VisualBasic.FileIO;
+using MaiChartManager.Platform;
+using MaiChartManager.Utils;
 
 namespace MaiChartManager.Models;
 
@@ -123,16 +124,16 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
 
     internal bool DeleteJacket()
     {
-        bool shouldDelete = HasJacket && RealJacketPath?.Contains(@"\A000\", StringComparison.InvariantCultureIgnoreCase) == false;
+        bool shouldDelete = HasJacket && PathUtils.ContainsSegment(RealJacketPath, "A000") == false;
         if (!shouldDelete) return false;
         var assetBundleJacket = this.AssetBundleJacket;
         
         Console.WriteLine("删除 jacket: " + RealJacketPath);
         try
         { 
-            FileSystem.DeleteFile(RealJacketPath);
+            PlatformFile.DeleteFile(RealJacketPath);
             if (RealJacketPath.EndsWith(".ab") && File.Exists(RealJacketPath + ".manifest")) // .ab的情况，要额外把manifest也干掉
-                FileSystem.DeleteFile(RealJacketPath + ".manifest");
+                PlatformFile.DeleteFile(RealJacketPath + ".manifest");
         }
         catch
         {
@@ -143,7 +144,7 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
         StaticSettings.AssetBundleJacketMap.Remove(NonDxId);
         StaticSettings.PseudoAssetBundleJacketMap.Remove(NonDxId);
 
-        // Issue #42: AB jackets come with a companion jacket_s/ui_jacket_xxx_s.ab, delete it too to avoid orphan
+        // Issue #42: AB 封面带有同级目录 jacket_s/ui_jacket_xxx_s.ab，一并删除以避免孤立文件
         if (assetBundleJacket is not null)
         {
             var abDir = Path.GetDirectoryName(assetBundleJacket);
@@ -152,14 +153,14 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
             {
                 var jacketSPath = Path.Combine(parentDir, "jacket_s",
                     Path.GetFileNameWithoutExtension(assetBundleJacket) + "_s" + Path.GetExtension(assetBundleJacket));
-                if (File.Exists(jacketSPath) && !jacketSPath.Contains(@"\A000\", StringComparison.InvariantCultureIgnoreCase))
+                if (File.Exists(jacketSPath) && !PathUtils.ContainsSegment(jacketSPath, "A000"))
                 {
                     Console.WriteLine("删除 jacket_s: " + jacketSPath);
                     try
                     {
-                        FileSystem.DeleteFile(jacketSPath);
+                        PlatformFile.DeleteFile(jacketSPath);
                         if (File.Exists(jacketSPath + ".manifest"))
-                            FileSystem.DeleteFile(jacketSPath + ".manifest");
+                            PlatformFile.DeleteFile(jacketSPath + ".manifest");
                     }
                     catch
                     {
@@ -175,12 +176,12 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
     {
         DeleteJacket();
 
-        if (StaticSettings.AcbAwb.TryGetValue($"music{NonDxId:000000}.acb", out var acb) && acb?.Contains(@"\A000\", StringComparison.InvariantCultureIgnoreCase) == false)
+        if (StaticSettings.AcbAwb.TryGetValue($"music{NonDxId:000000}.acb", out var acb) && PathUtils.ContainsSegment(acb, "A000") == false)
         {
             Console.WriteLine("删除 acb: " + acb);
             try
             {
-                FileSystem.DeleteFile(acb);
+                PlatformFile.DeleteFile(acb);
             }
             catch
             {
@@ -188,12 +189,12 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
             }
         }
 
-        if (StaticSettings.AcbAwb.TryGetValue($"music{NonDxId:000000}.awb", out var awb) && awb?.Contains(@"\A000\", StringComparison.InvariantCultureIgnoreCase) == false)
+        if (StaticSettings.AcbAwb.TryGetValue($"music{NonDxId:000000}.awb", out var awb) && PathUtils.ContainsSegment(awb, "A000") == false)
         {
             Console.WriteLine("删除 awb: " + awb);
             try
             {
-                FileSystem.DeleteFile(awb);
+                PlatformFile.DeleteFile(awb);
             }
             catch
             {
@@ -201,12 +202,12 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
             }
         }
 
-        if (StaticSettings.MovieDataMap.TryGetValue(NonDxId, out var movieData) && movieData?.Contains(@"\A000\", StringComparison.InvariantCultureIgnoreCase) == false)
+        if (StaticSettings.MovieDataMap.TryGetValue(NonDxId, out var movieData) && PathUtils.ContainsSegment(movieData, "A000") == false)
         {
             Console.WriteLine("删除 movieData: " + movieData);
             try
             {
-                FileSystem.DeleteFile(movieData);
+                PlatformFile.DeleteFile(movieData);
             }
             catch
             {
@@ -217,7 +218,7 @@ public class MusicXmlWithABJacket(string filePath, string gamePath, string asset
         try
         {
             Console.WriteLine("删除目录: " + Path.GetDirectoryName(FilePath));
-            FileSystem.DeleteDirectory(Path.GetDirectoryName(FilePath), DeleteDirectoryOption.DeleteAllContents);
+            PlatformFile.DeleteDirectoryPermanent(Path.GetDirectoryName(FilePath));
         }
         catch
         {
