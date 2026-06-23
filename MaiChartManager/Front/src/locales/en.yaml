@@ -21,6 +21,7 @@ common:
   dismiss: Dismiss
   longMusic: LongMusic
   error: Error
+  detail: Detail
 assetDir:
   title: Opt Management
   create: Create Directory

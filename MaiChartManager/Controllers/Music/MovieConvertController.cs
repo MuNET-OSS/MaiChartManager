@@ -1,4 +1,5 @@
-﻿using MaiChartManager.Utils;
+﻿using System.Text.Json;
+using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MaiChartManager.Controllers.Music;
@@ -7,6 +8,13 @@ namespace MaiChartManager.Controllers.Music;
 [Route("MaiChartManagerServlet/[action]Api/{assetDir}/{id:int}")]
 public class MovieConvertController(ILogger<MovieConvertController> logger) : ControllerBase
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
+    private record SseErrorPayload(string Message, string? Detail);
+
     public enum SetMovieEventType
     {
         Progress,
@@ -22,7 +30,7 @@ public class MovieConvertController(ILogger<MovieConvertController> logger) : Co
 
         if (Path.GetExtension(file.FileName).Equals(".dat", StringComparison.InvariantCultureIgnoreCase))
         {
-            var targetPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, $@"MovieData\{id:000000}.dat");
+            var targetPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, "MovieData", $"{id:000000}.dat");
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
             await using var stream = System.IO.File.Open(targetPath, FileMode.Create);
             await file.CopyToAsync(stream);
@@ -30,7 +38,9 @@ public class MovieConvertController(ILogger<MovieConvertController> logger) : Co
             return;
         }
 
+#if WINDOWS
         if (IapManager.License != IapManager.LicenseStatus.Active) return;
+#endif
         Response.Headers.Append("Content-Type", "text/event-stream");
         
         var tmpDir = Directory.CreateTempSubdirectory();
@@ -46,7 +56,7 @@ public class MovieConvertController(ILogger<MovieConvertController> logger) : Co
             }
 
             // 目标路径
-            var targetPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, $@"MovieData\{id:000000}.{(StaticSettings.Config.MovieCodec == MovieCodec.ForceH264 ? "mp4" : "dat")}");
+            var targetPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, "MovieData", $"{id:000000}.{(StaticSettings.Config.MovieCodec == MovieCodec.ForceH264 ? "mp4" : "dat")}");
 
             // 使用工具类转换视频
             await VideoConvert.ConvertVideo(new VideoConvert.VideoConvertOptions
@@ -73,7 +83,7 @@ public class MovieConvertController(ILogger<MovieConvertController> logger) : Co
         {
             logger.LogError(e, "Failed to convert video");
             SentrySdk.CaptureException(e);
-            await Response.WriteAsync($"event: {SetMovieEventType.Error}\ndata: 转换失败：{e.Message}\n\n");
+            await WriteError(e);
             await Response.Body.FlushAsync();
         }
         finally
@@ -88,5 +98,14 @@ public class MovieConvertController(ILogger<MovieConvertController> logger) : Co
                 // 忽略清理错误
             }
         }
+    }
+
+    private async Task WriteError(Exception exception)
+    {
+        var detail = exception is VideoConversionException videoConversionException
+            ? videoConversionException.Detail
+            : exception.ToString();
+        var payload = JsonSerializer.Serialize(new SseErrorPayload(exception.Message, detail), JsonOptions);
+        await Response.WriteAsync($"event: {SetMovieEventType.Error}\ndata: {payload}\n\n");
     }
 }

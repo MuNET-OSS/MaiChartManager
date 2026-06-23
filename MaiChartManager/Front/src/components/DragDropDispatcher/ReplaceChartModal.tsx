@@ -11,6 +11,7 @@ import { Chart, ImportChartCheckResult, ImportChartResult, ShiftMethod } from "@
 import ImportAlert from "@/views/Charts/ImportCreateChartButton/ImportChartButton/ImportAlert";
 import { defaultTempOptions, ImportChartMessageEx, TempOptions } from "@/views/Charts/ImportCreateChartButton/ImportChartButton/types";
 import ShiftModeSelector from "@/views/Charts/ImportCreateChartButton/ImportChartButton/ShiftModeSelector";
+import { pickFile } from "@/utils/pickFile";
 
 // noinspection JSUnusedLocalSymbols
 export let prepareReplaceChart = async (fileHandle?: FileSystemFileHandle) => {
@@ -20,7 +21,7 @@ export default defineComponent({
   setup() {
 
     const checking = ref(false);
-    const fileHandle = shallowRef<FileSystemFileHandle | null>(null);
+    const file = shallowRef<File | null>(null);
     const show = ref<"" | "ma2" | "maidata" | "failed">("");
 
     const apiResp = ref<ImportChartCheckResult | ImportChartResult | null>(null)
@@ -35,30 +36,24 @@ export default defineComponent({
 
     // 注：本功能的逻辑是，如果选择的是ma2文件，则只替换指定难度的谱面；如果选择的是maidata，则替换整首歌的所有难度。
     prepareReplaceChart = async (fHandle?: FileSystemFileHandle) => {
+      let selectedFile: File;
       if (!fHandle) {
-        [fHandle] = await window.showOpenFilePicker({
-          id: 'chart',
-          startIn: 'downloads',
-          types: [
-            {
-              description: t('music.edit.supportedFileTypes'),
-              accept: {
-                "application/x-supported": [".ma2", ".txt"], // 没办法限定只匹配maidata.txt，就只好先把一切txt都作为匹配
-              },
-            },
-          ],
-        });
+        // 换谱面文件（maidata.txt 或 ma2），使用通用单文件选择（兼容 WebKitGTK）
+        // 没办法限定只匹配maidata.txt，就只好先把一切txt都作为匹配
+        const picked = await pickFile('.ma2,.txt');
+        if (!picked) return; // 用户未选择文件
+        selectedFile = picked;
+      } else {
+        selectedFile = await fHandle.getFile();
       }
-      if (!fHandle) return; // 用户未选择文件
-      fileHandle.value = fHandle
+      file.value = selectedFile;
 
-      const name = fHandle.name;
+      const name = selectedFile.name;
       // 对maidata.txt和ma2分类讨论，前者执行ImportCheck
       if (name === "maidata.txt") {
         try {
           checking.value = true;
-          const file = await fHandle.getFile();
-          const r = (await api.ImportChartCheck({file, isReplacement: true})).data;
+          const r = (await api.ImportChartCheck({file: selectedFile, isReplacement: true})).data;
           if (!checking.value) return; // 说明检查期间用户点击了关闭按钮、取消了操作。则不再执行后续流程。
 
           apiResp.value = r;
@@ -77,13 +72,13 @@ export default defineComponent({
     }
 
     const replaceChart = async () => {
-      if (!fileHandle.value) return;
+      if (!file.value) return;
       try {
-        const file = await fileHandle.value.getFile();
-        fileHandle.value = null;
+        const uploadFile = file.value;
+        file.value = null;
         const level = show.value === "maidata" ? -1 : selectedLevel.value;
         show.value = "";
-        const result = (await api.ReplaceChart(selectMusicId.value, level, selectedADir.value, { file, shift: tempOption.value.shift })).data;
+        const result = (await api.ReplaceChart(selectMusicId.value, level, selectedADir.value, { file: uploadFile, shift: tempOption.value.shift })).data;
         if (!result.fatal) {
           addToast({ type:'success', message: t('music.edit.replaceChartSuccess') })
         } else {
@@ -116,7 +111,7 @@ export default defineComponent({
         default: () => <div class="flex flex-col gap-2">
           {show.value === "ma2" && <>
             {t('music.edit.replaceChartConfirm', { level: DIFFICULTY[selectedLevel.value!] })}
-            <div class="text-4.5 text-center">{fileHandle.value?.name}</div>
+            <div class="text-4.5 text-center">{file.value?.name}</div>
             <div class="text-6 text-center">↓</div>
           </>}
           {(show.value === "maidata" || show.value === "failed") && <ImportAlert errors={checkErrors.value} tempOptions={tempOption.value}></ImportAlert>}

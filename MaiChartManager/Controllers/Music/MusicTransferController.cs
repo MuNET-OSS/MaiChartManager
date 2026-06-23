@@ -4,21 +4,27 @@ using System.Text;
 using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using MaiChartManager.Models;
+using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.VisualBasic.FileIO;
 using MuConvert.mai;
 using NAudio.Lame;
-using Vanara.Windows.Forms;
-using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
 
 namespace MaiChartManager.Controllers.Music;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api/{assetDir}/{id:int}")]
-public partial class MusicTransferController(StaticSettings settings, ILogger<MusicTransferController> logger) : ControllerBase
+public partial class MusicTransferController(
+    StaticSettings settings,
+    ILogger<MusicTransferController> logger,
+    IDesktopDialogService dialogService,
+    ITaskbarProgress taskbarProgress,
+    IProgressController progressController) : ControllerBase
 {
     public record RequestCopyToRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool removeEvents, bool legacyFormat);
+
+    // 原生选目录导出 maidata 的请求体：music 为要导出的歌曲列表，ignoreVideo 控制是否跳过 PV 视频。
+    public record RequestExportMaidataRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool ignoreVideo = false);
 
     private static int[] GetAudioCandidateIds(MusicXmlWithABJacket music)
     {
@@ -40,10 +46,10 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
     }
 
     /// <summary>
-    /// Given an AssetBundle jacket path (e.g. ".../AssetBundleImages/jacket/ui_jacket_000123.ab"),
-    /// compute the companion small jacket path in the sibling "jacket_s" directory
-    /// (e.g. ".../AssetBundleImages/jacket_s/ui_jacket_000123_s.ab").
-    /// Returns null if the path shape is unexpected.
+    /// 根据 AssetBundle 封面路径（如 ".../AssetBundleImages/jacket/ui_jacket_000123.ab"），
+    /// 计算同级 "jacket_s" 目录下的小封面路径
+    /// （如 ".../AssetBundleImages/jacket_s/ui_jacket_000123_s.ab"）。
+    /// 若路径格式不符则返回 null。
     /// </summary>
     private static string? GetAssetBundleJacketSmallPath(string assetBundleJacketPath)
     {
@@ -173,7 +179,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             return;
         }
 
-        // copy music
+        // 复制音乐数据
         var musicDestDir = Path.Combine(musicRootDir, $"music{music.Id:000000}");
         CopyDirectoryIfChanged(musicDir, musicDestDir);
 
@@ -197,7 +203,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             }
         }
 
-        // copy jacket
+        // 复制封面
         if (music.JacketPath is not null)
         {
             var jacketDest = Path.Combine(jacketRootDir, $"ui_jacket_{music.NonDxId:000000}{Path.GetExtension(music.JacketPath)}");
@@ -212,7 +218,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
                 CopySharedFileIfNeeded(music.AssetBundleJacket + ".manifest", Path.Combine(jacketRootDir, jacketFileName + ".manifest"), copiedSharedDestinations);
             }
 
-            // Issue #42: jacket_s lives in a sibling directory, must be exported into AssetBundleImages/jacket_s/
+            // Issue #42: jacket_s 位于同级目录，导出时必须写入 AssetBundleImages/jacket_s/
             var jacketSPath = GetAssetBundleJacketSmallPath(music.AssetBundleJacket);
             if (jacketSPath is not null && System.IO.File.Exists(jacketSPath))
             {
@@ -231,7 +237,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             CopySharedFileIfNeeded(music.PseudoAssetBundleJacket, Path.Combine(jacketRootDir, jacketFileName), copiedSharedDestinations);
         }
 
-        // copy acbawb
+        // 复制 ACB/AWB 音频
         if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out var resolvedAudioId, out var acb, out var awb)
             && acb is not null
             && awb is not null)
@@ -244,7 +250,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             logger.LogWarning("{message}", BuildAudioResolveErrorMessage(music));
         }
 
-        // copy movie data
+        // 复制视频数据
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
         {
             CopySharedFileIfNeeded(movie, Path.Combine(movieRootDir, $"{music.NonDxId:000000}{Path.GetExtension(movie)}"), copiedSharedDestinations);
@@ -255,37 +261,23 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
     [Route("/MaiChartManagerServlet/[action]Api")]
     public void RequestCopyTo(RequestCopyToRequest request)
     {
-        var dialog = new FolderBrowserDialog
-        {
-            Description = Locale.SelectTargetLocation
-        };
-        if (WinUtils.ShowDialog(dialog) != DialogResult.OK) return;
-        var dest = dialog.SelectedPath;
+        var dest = dialogService.PickFolder(Locale.SelectTargetLocation);
+        if (dest is null) return;
         logger.LogInformation("CopyTo: {dest}", dest);
 
-        ShellProgressDialog? progress = null;
-        if (request.music.Length > 1)
-        {
-            progress = new ShellProgressDialog()
-            {
-                AutoTimeEstimation = false,
-                Title = Locale.Exporting,
-                Description = string.Format(Locale.ExportingMultipleMusic, request.music.Length),
-                CancelMessage = Locale.Cancelling,
-                HideTimeRemaining = true,
-            };
-            progress.Start(AppMain.BrowserWin!);
-            progress.UpdateProgress(0, (ulong)request.music.Length);
-        }
+        var showProgress = request.music.Length > 1;
+        using var progress = showProgress
+            ? progressController.Begin(Locale.Exporting, string.Format(Locale.ExportingMultipleMusic, request.music.Length), Locale.Cancelling)
+            : null;
+        progress?.Report(0, (ulong)request.music.Length);
 
         if (request.music.Length == 0)
         {
-            progress?.Stop();
             return;
         }
 
         var musicRootDir = Path.Combine(dest, "music");
-        var jacketRootDir = Path.Combine(dest, @"AssetBundleImages\jacket");
+        var jacketRootDir = Path.Combine(dest, "AssetBundleImages", "jacket");
         var soundRootDir = Path.Combine(dest, "SoundData");
         var movieRootDir = Path.Combine(dest, "MovieData");
         Directory.CreateDirectory(musicRootDir);
@@ -298,19 +290,19 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             musicIndex.TryAdd((music.Id, music.AssetDir), music);
         }
 
-        var cancellation = new CancellationTokenSource();
         var progressLock = new object();
         var completed = 0;
         var maxConcurrency = GetBatchExportMaxConcurrency();
         var progressStep = Math.Max(1, request.music.Length / 100);
         var copiedSharedDestinations = new ConcurrentDictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var cancellation = new CancellationTokenSource();
 
         try
         {
             Parallel.ForEach(request.music, new ParallelOptions
             {
                 MaxDegreeOfParallelism = maxConcurrency,
-                CancellationToken = cancellation.Token
+                CancellationToken = cancellation.Token,
             }, (musicId, state) =>
             {
                 if (progress is not null)
@@ -342,23 +334,14 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
                 {
                     lock (progressLock)
                     {
-                        if (currentMusicName is not null)
-                        {
-                            progress.Detail = currentMusicName;
-                        }
-
-                        progress.UpdateProgress((ulong)done, (ulong)request.music.Length);
+                        progress.Report((ulong)done, (ulong)request.music.Length, currentMusicName);
                     }
                 }
             });
         }
         catch (OperationCanceledException)
         {
-            logger.LogInformation("Batch export cancelled by user.");
-        }
-        finally
-        {
-            progress?.Stop();
+            logger.LogInformation("批量导出被用户取消。");
         }
     }
 
@@ -378,12 +361,12 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         var zipStream = HttpContext.Response.BodyWriter.AsStream();
         using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
 
-        // copy music
+        // 复制音乐数据
         foreach (var file in Directory.EnumerateFiles(musicDir))
         {
             if (Path.GetFileName(file).Equals("Music.xml", StringComparison.InvariantCultureIgnoreCase) && removeEvents)
             {
-                logger.LogInformation("Remove events and rights from Music.xml");
+                logger.LogInformation("从 Music.xml 中移除 Events 和版权信息");
                 var xmlDoc = music.GetXmlWithoutEventsAndRights();
                 var entry = zipArchive.CreateEntry($"music/music{music.Id:000000}/Music.xml");
                 using var stream = entry.Open();
@@ -412,7 +395,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             }
         }
 
-        // copy jacket
+        // 复制封面
         if (music.JacketPath is not null)
         {
             zipArchive.CreateEntryFromFile(music.JacketPath, $"AssetBundleImages/jacket/ui_jacket_{music.NonDxId:000000}{Path.GetExtension(music.JacketPath)}");
@@ -425,7 +408,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
                 zipArchive.CreateEntryFromFile(music.AssetBundleJacket + ".manifest", $"AssetBundleImages/jacket/{Path.GetFileName(music.AssetBundleJacket)}.manifest");
             }
 
-            // Issue #42: jacket_s lives in a sibling directory, must be exported into AssetBundleImages/jacket_s/
+            // Issue #42: jacket_s 位于同级目录，导出时必须写入 AssetBundleImages/jacket_s/
             var jacketSPath = GetAssetBundleJacketSmallPath(music.AssetBundleJacket);
             if (jacketSPath is not null && System.IO.File.Exists(jacketSPath))
             {
@@ -441,7 +424,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             zipArchive.CreateEntryFromFile(music.PseudoAssetBundleJacket, $"AssetBundleImages/jacket/{Path.GetFileName(music.PseudoAssetBundleJacket)}");
         }
 
-        // copy acbawb
+        // 复制 ACB/AWB 音频
         if (!AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out var resolvedAudioId, out var acb, out var awb) || acb is null || awb is null)
         {
             var message = BuildAudioResolveErrorMessage(music);
@@ -451,7 +434,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         zipArchive.CreateEntryFromFile(acb, $"SoundData/music{resolvedAudioId:000000}.acb");
         zipArchive.CreateEntryFromFile(awb, $"SoundData/music{resolvedAudioId:000000}.awb");
 
-        // copy movie data
+        // 复制视频数据
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
         {
             zipArchive.CreateEntryFromFile(movie, $"MovieData/{music.NonDxId:000000}{Path.GetExtension(movie)}");
@@ -465,22 +448,22 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             if (Directory.Exists(p))
             {
                 logger.LogInformation("Delete directory: {p}", p);
-                FileSystem.DeleteDirectory(p, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                PlatformFile.DeleteDirectory(p);
             }
 
             if (System.IO.File.Exists(p))
             {
                 logger.LogInformation("Delete file: {p}", p);
-                FileSystem.DeleteFile(p, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+                PlatformFile.DeleteFile(p);
             }
         }
     }
 
     private void DeleteAb(string abPath)
     {
-        FileSystem.DeleteFile(abPath, UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+        PlatformFile.DeleteFile(abPath);
         if (System.IO.File.Exists(abPath + ".manifest"))
-            FileSystem.DeleteFile(abPath + ".manifest", UIOption.OnlyErrorDialogs, RecycleOption.SendToRecycleBin);
+            PlatformFile.DeleteFile(abPath + ".manifest");
     }
 
     private void MoveJacketSoundVideo(MusicXmlWithABJacket music, int newId, string assetDir)
@@ -489,8 +472,8 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         // 当新ID和旧ID的 NonDx部分相同时（例如 5003 -> 15003），封面、音频、视频文件的目标路径与源路径完全一致，因此既不需要也不应该删除/移动它们。
         if (newNonDxId == music.NonDxId) return;
         
-        var abiDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, @"AssetBundleImages\jacket");
-        var abiSDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, @"AssetBundleImages\jacket_s");
+        var abiDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "AssetBundleImages", "jacket");
+        var abiSDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "AssetBundleImages", "jacket_s");
         Directory.CreateDirectory(abiDir);
         Directory.CreateDirectory(abiSDir);
         var abJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}.ab");
@@ -507,7 +490,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             var localJacketTarget = Path.Combine(abiDir, $"ui_jacket_{newNonDxId:000000}{Path.GetExtension(jacketSourcePath)}");
             DeleteIfExists(localJacketTarget);
             logger.LogInformation("Move jacket: {jacketSourcePng} -> {localJacketTarget}", jacketSourcePath, localJacketTarget);
-            FileSystem.MoveFile(jacketSourcePath, localJacketTarget, UIOption.OnlyErrorDialogs);
+            PlatformFile.MoveFile(jacketSourcePath, localJacketTarget);
         }
         else if (music.AssetBundleJacket is not null)
         {
@@ -561,20 +544,20 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         if (StaticSettings.AcbAwb.TryGetValue($"music{music.NonDxId:000000}.acb", out var acb))
         {
             logger.LogInformation("Move acb: {acb} -> {acbawbTarget}.acb", acb, acbawbTarget);
-            FileSystem.MoveFile(acb, acbawbTarget + ".acb", UIOption.OnlyErrorDialogs);
+            PlatformFile.MoveFile(acb, acbawbTarget + ".acb");
         }
 
         if (StaticSettings.AcbAwb.TryGetValue($"music{music.NonDxId:000000}.awb", out var awb))
         {
             logger.LogInformation("Move awb: {awb} -> {acbawbTarget}.awb", awb, acbawbTarget);
-            FileSystem.MoveFile(awb, acbawbTarget + ".awb", UIOption.OnlyErrorDialogs);
+            PlatformFile.MoveFile(awb, acbawbTarget + ".awb");
         }
 
-        // movie data
+        // 视频数据
         if (StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movie))
         {
             logger.LogInformation("Move movie: {movie} -> {movieTarget}", movie, movieTarget);
-            FileSystem.MoveFile(movie, movieTarget + Path.GetExtension(movie), UIOption.OnlyErrorDialogs);
+            PlatformFile.MoveFile(movie, movieTarget + Path.GetExtension(movie));
         }
         #endregion
     }
@@ -582,7 +565,9 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
     [HttpPost]
     public async Task ModifyId(int id, [FromBody] int newId, string assetDir)
     {
+#if WINDOWS
         if (IapManager.License != IapManager.LicenseStatus.Active) return;
+#endif
         var music = settings.GetMusic(id, assetDir);
         if (music is null) return;
         var musicDir = Path.GetDirectoryName(music.FilePath);
@@ -608,18 +593,18 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             if (!System.IO.File.Exists(Path.Combine(oldMusicDir, chart.Path))) continue;
             var newFileName = $"{newId:000000}_0{i}.ma2";
             logger.LogInformation("Move chart: {chart.Path} -> {newFileName}", chart.Path, newFileName);
-            FileSystem.MoveFile(Path.Combine(oldMusicDir, chart.Path), Path.Combine(oldMusicDir, newFileName));
+            PlatformFile.MoveFile(Path.Combine(oldMusicDir, chart.Path), Path.Combine(oldMusicDir, newFileName));
             chart.Path = newFileName;
         }
 
-        // xml
+        // 保存 XML
         music.Id = newId;
         music.Save();
         Directory.CreateDirectory(Path.Combine(StaticSettings.StreamingAssets, assetDir, "music"));
         logger.LogInformation("Move music dir: {oldMusicDir} -> {newMusicDir}", oldMusicDir, newMusicDir);
-        FileSystem.MoveDirectory(oldMusicDir, newMusicDir, UIOption.OnlyErrorDialogs);
+        PlatformFile.MoveDirectory(oldMusicDir, newMusicDir);
 
-        // rescan all
+        // 重新扫描全部
         await settings.RescanAll();
     }
 
@@ -649,7 +634,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         var version = StaticSettings.VersionList.FirstOrDefault(it => it.Id == music.AddVersionId);
         if (version is not null) simaiFile["version"] = version.GenreName;
 
-        // demo_seek
+        // demo_seek（预览起止时间）
         try
         {
             if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out _, out var previewAcb, out _) && previewAcb is not null)
@@ -663,7 +648,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         }
         catch (Exception e)
         {
-            logger.LogWarning(e, "ExportAsMaidata: Failed to get audio preview time, ignoring.");
+            logger.LogWarning(e, "ExportAsMaidata: 获取音频预览时间失败，已忽略。");
         }
         
         for (var i = 0; i < music.Charts.Length; i++)
@@ -696,7 +681,8 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             }
         }
         
-        simaiFile["chartconverter"] = $"MaiChartManager v{Application.ProductVersion}";
+        var appVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
+        simaiFile["chartconverter"] = $"MaiChartManager v{appVersion}";
 
         await using var zipStream = HttpContext.Response.BodyWriter.AsStream();
         using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
@@ -706,7 +692,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         await maidataStream.WriteAsync(Encoding.UTF8.GetBytes(simaiFile.ToString()));
         maidataStream.Close();
 
-        // copy jacket
+        // 复制封面
         var img = music.GetMusicJacketPngData();
         if (img is not null)
         {
@@ -741,6 +727,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
         AudioConvert.ConvertWavToMp3Stream(wav, soundStream, tag);
         soundStream.Close();
 
+
         if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
         {
             DirectoryInfo? tmpDir = null;
@@ -769,7 +756,7 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Failed to export pv.mp4 for music {musicId} ({name}), skipping video.", music.Id, music.Name);
+                logger.LogWarning(ex, "导出音乐 {musicId}（{name}）的 pv.mp4 失败，跳过视频。", music.Id, music.Name);
             }
             finally
             {
@@ -781,10 +768,272 @@ public partial class MusicTransferController(StaticSettings settings, ILogger<Mu
                     }
                     catch
                     {
-                        // ignore cleanup errors
+                        // 忽略清理错误
                     }
                 }
             }
+        }
+    }
+
+    // 把单首歌导出为 maidata 文件（maidata.txt + 封面 + 音频）写入 targetDir。
+    // 该方法供原生选目录导出复用；与 zip 版 ExportAsMaidata 产物保持一致（Linux 下不导出音频）。
+    private async Task WriteMaidataToDirectory(int id, string assetDir, string targetDir, bool ignoreVideo)
+    {
+        var music = settings.GetMusic(id, assetDir);
+        if (music is null) return;
+        var musicDir = Path.GetDirectoryName(music.FilePath);
+        if (string.IsNullOrWhiteSpace(musicDir) || !Directory.Exists(musicDir))
+        {
+            var message = $"Invalid source directory for music {music.Id}: {music.FilePath}";
+            logger.LogError("{message}", message);
+            throw new DirectoryNotFoundException(message);
+        }
+
+        Directory.CreateDirectory(targetDir);
+
+        var simaiFile = new Maidata();
+        simaiFile.Title = music.Name;
+        simaiFile.Artist = music.Artist;
+        simaiFile.WholeBpm = music.Bpm;
+        simaiFile.First = 0;
+        simaiFile["shortid"] = music.Id.ToString();
+        simaiFile["genreid"] = music.GenreId.ToString();
+        var genre = StaticSettings.GenreList.FirstOrDefault(it => it.Id == music.GenreId);
+        if (genre is not null) simaiFile["genre"] = genre.GenreName;
+        simaiFile["versionid"] = music.AddVersionId.ToString();
+        var version = StaticSettings.VersionList.FirstOrDefault(it => it.Id == music.AddVersionId);
+        if (version is not null) simaiFile["version"] = version.GenreName;
+
+        // demo_seek（预览起止时间），依赖 CriUtils
+        try
+        {
+            if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out _, out var previewAcb, out _) && previewAcb is not null)
+            {
+                var previewTime = CriUtils.GetAudioPreviewTime(previewAcb);
+                if (previewTime.StartTime >= 0 && previewTime.EndTime > previewTime.StartTime)
+                {
+                    simaiFile.Demo = ((float)previewTime.StartTime, (float)(previewTime.EndTime - previewTime.StartTime));
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "WriteMaidataToDirectory: 获取音频预览时间失败，已忽略。");
+        }
+
+        for (var i = 0; i < music.Charts.Length; i++)
+        {
+            var chart = music.Charts[i];
+            if (chart is null || !chart.Enable || string.IsNullOrWhiteSpace(chart.Path)) continue;
+
+            var chartPath = Path.Combine(musicDir, chart.Path);
+            if (!System.IO.File.Exists(chartPath))
+            {
+                var fallbackPath = Path.Combine(musicDir, chart.Path.Replace(".ma2", "_L.ma2", StringComparison.OrdinalIgnoreCase));
+                if (!System.IO.File.Exists(fallbackPath)) continue;
+                chartPath = fallbackPath;
+            }
+
+            try
+            {
+                if (StaticSettings.Config.UseLegacyMaiLib)
+                {
+                    simaiFile["ChartConvertTool"] = $"MaiLib";
+                    var parser = new MaiLib.Ma2Parser();
+                    var ma2Content = await System.IO.File.ReadAllLinesAsync(chartPath);
+                    var ma2 = parser.ChartOfToken(ma2Content);
+                    var simai = ma2.Compose(MaiLib.ChartEnum.ChartVersion.SimaiFes);
+
+                    var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
+                    simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer), false);
+                }
+                else
+                {
+                    var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
+                    var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
+                    var (simai, _) = new SimaiGenerator().Generate(cvtChart);
+
+                    var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
+                    simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer));
+                    simaiFile.ClockCount = cvtChart.ClockCount; // 通过多次写入，自然实现取最后一个有效难度的clockCount，作为写入maidata中的
+                }
+            }
+            catch (Exception e)
+            {
+                logger.LogError("WriteMaidataToDirectory FAILED! {title}, {filename}: {e}", music.Name, chartPath, e);
+                throw;
+            }
+        }
+
+        var appVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
+        simaiFile["chartconverter"] = $"MaiChartManager v{appVersion}";
+
+        // 写 maidata.txt
+        await System.IO.File.WriteAllTextAsync(Path.Combine(targetDir, "maidata.txt"), simaiFile.ToString(), Encoding.UTF8);
+
+        // 写封面 bg{ext}
+        var img = music.GetMusicJacketPngData();
+        if (img is not null)
+        {
+            var imgExt = (Path.GetExtension(music.RealJacketPath) ?? ".png").ToLowerInvariant();
+            if (imgExt == ".ab") imgExt = ".png";
+            await System.IO.File.WriteAllBytesAsync(Path.Combine(targetDir, $"bg{imgExt}"), img);
+        }
+
+        // 导出音频 track.mp3，依赖 AudioConvert/CriUtils
+        var tag = new ID3TagData
+        {
+            Title = music.Name,
+            Artist = music.Artist,
+            Album = genre?.GenreName,
+            Track = music.Id.ToString(),
+            Comment = version?.GenreName,
+            AlbumArt = img,
+        };
+
+        if (!AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out _, out var acbPath, out var awbPath) || acbPath is null || awbPath is null)
+        {
+            var message = BuildAudioResolveErrorMessage(music);
+            logger.LogError("{message}", message);
+            throw new FileNotFoundException(message);
+        }
+        var wav = Audio.AcbToWav(acbPath);
+        await using (var soundStream = System.IO.File.Create(Path.Combine(targetDir, "track.mp3")))
+        {
+            AudioConvert.ConvertWavToMp3Stream(wav, soundStream, tag);
+        }
+
+
+        // 导出 PV 视频 pv.mp4（与 zip 版保持一致，未加 #if WINDOWS 限制）
+        if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
+        {
+            DirectoryInfo? tmpDir = null;
+            try
+            {
+                string? pvMp4Path = null;
+                var ext = Path.GetExtension(movieUsmPath).ToLowerInvariant();
+
+                if (ext == ".dat" || ext == ".usm")
+                {
+                    tmpDir = Directory.CreateTempSubdirectory();
+                    logger.LogInformation("Temp dir: {tmpDir}", tmpDir.FullName);
+                    pvMp4Path = Path.Combine(tmpDir.FullName, "pv.mp4");
+
+                    await VideoConvert.ConvertUsmToMp4(movieUsmPath, pvMp4Path);
+                }
+                else if (ext == ".mp4")
+                {
+                    pvMp4Path = movieUsmPath;
+                }
+
+                if (pvMp4Path is not null && System.IO.File.Exists(pvMp4Path))
+                {
+                    System.IO.File.Copy(pvMp4Path, Path.Combine(targetDir, "pv.mp4"), true);
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "导出音乐 {musicId}（{name}）的 pv.mp4 失败，跳过视频。", music.Id, music.Name);
+            }
+            finally
+            {
+                if (tmpDir is not null)
+                {
+                    try
+                    {
+                        tmpDir.Delete(true);
+                    }
+                    catch
+                    {
+                        // 忽略清理错误
+                    }
+                }
+            }
+        }
+    }
+
+    // 把文件名中的非法字符替换为下划线，空结果回退到 fallback。
+    private static string SanitizeFileNameSegment(string name, string fallback)
+    {
+        var invalidChars = Path.GetInvalidFileNameChars();
+        var builder = new StringBuilder(name.Length);
+        foreach (var ch in name)
+        {
+            builder.Append(Array.IndexOf(invalidChars, ch) >= 0 ? '_' : ch);
+        }
+
+        var result = builder.ToString().Trim();
+        return string.IsNullOrEmpty(result) ? fallback : result;
+    }
+
+    // 原生选目录导出 maidata：弹出系统目录选择对话框，对每首歌在子目录中写入 maidata。
+    // 用于没有 File System Access API 的环境（Linux/Photino/WebKitGTK）。
+    [HttpPost]
+    [Route("/MaiChartManagerServlet/[action]Api")]
+    public async Task RequestExportMaidata([FromBody] RequestExportMaidataRequest request)
+    {
+        var dest = dialogService.PickFolder(Locale.SelectTargetLocation);
+        if (dest is null) return;
+        logger.LogInformation("ExportMaidata: {dest}", dest);
+
+        if (request.music.Length == 0) return;
+
+        var showProgress = request.music.Length > 1;
+        using var progress = showProgress
+            ? progressController.Begin(Locale.Exporting, string.Format(Locale.ExportingMultipleMusic, request.music.Length), Locale.Cancelling)
+            : null;
+        progress?.Report(0, (ulong)request.music.Length);
+
+        // 记录已使用的子目录名，避免不同歌曲互相覆盖
+        var usedDirNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var done = 0;
+        var total = request.music.Length;
+
+        foreach (var musicId in request.music)
+        {
+            if (progress?.IsCancelled == true)
+            {
+                logger.LogInformation("批量导出 maidata 被用户取消。");
+                break;
+            }
+
+            var music = settings.GetMusic(musicId.Id, musicId.AssetDir);
+            if (music is null)
+            {
+                logger.LogWarning("Skip export: music {id} in {assetDir} not found.", musicId.Id, musicId.AssetDir);
+                done++;
+                progress?.Report((ulong)done, (ulong)total);
+                continue;
+            }
+
+            try
+            {
+                // 子目录命名：安全化歌名 + DX 后缀（与前端 remoteExport 保持一致）；为空回退到 id。
+                var suffix = music.Id is > 10000 and < 20000 ? " [DX]" : "";
+                var baseName = SanitizeFileNameSegment(music.Name ?? "", music.Id.ToString()) + suffix;
+
+                // 处理重名：追加 id，再不行追加序号
+                var dirName = baseName;
+                if (!usedDirNames.Add(dirName))
+                {
+                    dirName = $"{baseName}_{music.Id}";
+                    var n = 1;
+                    while (!usedDirNames.Add(dirName))
+                    {
+                        dirName = $"{baseName}_{music.Id}_{n++}";
+                    }
+                }
+
+                var targetDir = Path.Combine(dest, dirName);
+                await WriteMaidataToDirectory(musicId.Id, musicId.AssetDir, targetDir, request.ignoreVideo);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "导出音乐 {id}（{name}）的 maidata 失败，已跳过。", music.Id, music.Name);
+            }
+
+            done++;
+            progress?.Report((ulong)done, (ulong)total, music.Name);
         }
     }
 

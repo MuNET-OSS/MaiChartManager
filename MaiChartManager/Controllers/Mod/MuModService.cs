@@ -9,7 +9,7 @@ public class MuModService(ILogger<MuModService> logger, IHttpClientFactory httpC
 {
     private const string CosVersionApiUrl = "https://munet-version-config-1251600285.cos.ap-shanghai.myqcloud.com/aquamai.json";
     private const string CfVersionApiUrl = "https://aquamai-version-config.mumur.net/api/config";
-    private const string DefaultCacheRelativePath = @"LocalAssets\MuMod.cache";
+    private const string DefaultCacheRelativePath = "LocalAssets/MuMod.cache";
 
     private enum VersionSource
     {
@@ -51,7 +51,7 @@ public class MuModService(ILogger<MuModService> logger, IHttpClientFactory httpC
     {
         if (channel != "slow" && channel != "fast")
         {
-            throw new ArgumentException("Channel must be slow or fast", nameof(channel));
+            throw new ArgumentException("Channel 只能为 slow 或 fast", nameof(channel));
         }
 
         var config = ReadConfig();
@@ -107,21 +107,21 @@ public class MuModService(ILogger<MuModService> logger, IHttpClientFactory httpC
 
             if (hasOldCache && string.Equals(NormalizeVersion(oldVersion), targetVersion, StringComparison.OrdinalIgnoreCase))
             {
-                logger.LogInformation("MuMod cache is up-to-date: {Version}", oldVersion);
+                logger.LogInformation("MuMod 缓存已是最新版本：{Version}", oldVersion);
                 return new EnsureCacheResult(true, oldVersion, null);
             }
 
             var downloadUrls = BuildDownloadUrls(versionInfo, source).ToArray();
             if (downloadUrls.Length == 0)
             {
-                throw new InvalidOperationException("No valid download urls found in version API response");
+                throw new InvalidOperationException("版本 API 响应中未找到有效的下载地址");
             }
 
             var data = await DownloadFromUrlsAsync(downloadUrls, ct);
             var verifyResult = AquaMaiSignatureV2.VerifySignature(data);
             if (verifyResult.Status != AquaMaiSignatureV2.VerifyStatus.Valid)
             {
-                throw new InvalidOperationException($"MuMod cache signature verification failed: {verifyResult.Status}");
+                throw new InvalidOperationException($"MuMod 缓存签名验证失败：{verifyResult.Status}");
             }
 
             var cacheDir = Path.GetDirectoryName(cachePath);
@@ -145,15 +145,15 @@ public class MuModService(ILogger<MuModService> logger, IHttpClientFactory httpC
             }
 
             var finalVersion = ReadProductVersion(cachePath) ?? targetVersion;
-            logger.LogInformation("MuMod cache updated successfully to version {Version}", finalVersion);
+            logger.LogInformation("MuMod 缓存已成功更新至版本 {Version}", finalVersion);
             return new EnsureCacheResult(true, finalVersion, null);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to ensure MuMod cache");
+            logger.LogError(ex, "更新 MuMod 缓存失败");
             if (hasOldCache)
             {
-                logger.LogWarning("Using existing MuMod cache due to update failure");
+                logger.LogWarning("因更新失败，继续使用现有 MuMod 缓存");
                 return new EnsureCacheResult(true, oldVersion, null);
             }
 
@@ -183,7 +183,7 @@ public class MuModService(ILogger<MuModService> logger, IHttpClientFactory httpC
         {
             "slow" => "slow",
             "fast" => "ci",
-            _ => throw new InvalidOperationException($"Unsupported MuMod channel: {channel}"),
+            _ => throw new InvalidOperationException($"不支持的 MuMod 频道：{channel}"),
         };
     }
 
@@ -217,26 +217,26 @@ public class MuModService(ILogger<MuModService> logger, IHttpClientFactory httpC
             var firstMatch = firstVersions.FirstOrDefault(v => string.Equals(v.Type, apiType, StringComparison.OrdinalIgnoreCase));
             if (firstMatch != null)
             {
-                logger.LogInformation("MuMod version metadata resolved from {Source}", firstSource);
+                logger.LogInformation("MuMod 版本元数据已从 {Source} 获取", firstSource);
                 return (firstMatch, firstSource);
             }
 
-            throw new InvalidOperationException($"Version metadata from {firstSource} has no '{apiType}' item");
+            throw new InvalidOperationException($"来自 {firstSource} 的版本元数据中没有 '{apiType}' 条目");
         }
         catch (Exception ex)
         {
             firstError = ex;
-            logger.LogWarning(ex, "Failed to use version metadata from {Source}", firstSource);
+            logger.LogWarning(ex, "使用来自 {Source} 的版本元数据失败", firstSource);
         }
 
         var secondVersions = await secondTask;
         var secondMatch = secondVersions.FirstOrDefault(v => string.Equals(v.Type, apiType, StringComparison.OrdinalIgnoreCase));
         if (secondMatch == null)
         {
-            throw new InvalidOperationException($"Version metadata from both sources has no '{apiType}' item", firstError);
+            throw new InvalidOperationException($"两个来源的版本元数据中均没有 '{apiType}' 条目", firstError);
         }
 
-        logger.LogInformation("MuMod version metadata resolved from fallback source {Source}", secondSource);
+        logger.LogInformation("MuMod 版本元数据已从备用来源 {Source} 获取", secondSource);
         return (secondMatch, secondSource);
     }
 
@@ -298,6 +298,6 @@ public class MuModService(ILogger<MuModService> logger, IHttpClientFactory httpC
             }
         }
 
-        throw new InvalidOperationException("Failed to download MuMod cache from all urls", lastError);
+        throw new InvalidOperationException("从所有 URL 下载 MuMod 缓存均失败", lastError);
     }
 }

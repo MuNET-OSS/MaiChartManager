@@ -34,7 +34,7 @@ export type ImportMeta = {
 }
 
 export type FirstPaddingMessage = { first: number, chartPaddings: ImportChartCheckResult['chartPaddings']}
-export type ImportChartMessageEx = (ImportChartMessage | FirstPaddingMessage) & { name: string, isPaid?: boolean }
+export type ImportChartMessageEx = (ImportChartMessage | FirstPaddingMessage) & { name: string, isPaid?: boolean, detail?: string }
 
 export const dummyMeta = {name: '', importStep: IMPORT_STEP.start} as ImportMeta
 

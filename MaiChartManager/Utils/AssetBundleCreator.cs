@@ -181,7 +181,9 @@ public static class AssetBundleCreator
             resizeWidth: 200,
             resizeHeight: 200);
 
-        return Path.Combine(abiDir, $"{key}.ab");
+        // 实际写出的文件名是小写（见上面 key.ToLowerInvariant()），返回路径也必须用小写，
+        // 否则在 Linux（大小写敏感）上这个路径匹配不到真实文件（Windows 不区分大小写所以遇不到）。
+        return Path.Combine(abiDir, $"{key.ToLowerInvariant()}.ab");
     }
     
     // 读取输入的ab包当中的图片，然后用指定的assetName等参数重新打包。

@@ -15,20 +15,15 @@ import { handleSseOpen } from "@/utils/sseOpen";
 import { defaultSavedOptions, defaultTempOptions, dummyMeta, IMPORT_STEP, ImportChartMessageEx, ImportMeta, STEP } from "./types";
 import getNextUnusedMusicId from "@/utils/getNextUnusedMusicId";
 import { useI18n } from 'vue-i18n';
+import { createImportFatal, createVideoConvertWarning, getCaptureTarget, isAbortError } from "./importErrors";
+import tryGetFile from "@/utils/tryGetFile";
+import { ImportDirectory } from "@/utils/importDirectory";
+import { pickDirectory } from "@/utils/pickDirectory";
 
-const tryGetFile = async (dir: FileSystemDirectoryHandle, file: string) => {
-  try {
-    const handle = await dir.getFileHandle(file);
-    return await handle.getFile();
-  } catch (e) {
-    return;
-  }
-}
-
-export let startProcess = (dir?: FileSystemDirectoryHandle | FileSystemDirectoryHandle[]) => { }
+export let startProcess = (_dir?: ImportDirectory | ImportDirectory[]) => { }
 
 export default defineComponent({
-  setup(props) {
+  setup() {
     const savedOptions = useStorage('importMusicOptions', defaultSavedOptions, undefined, { mergeDefaults: true });
     const tempOptions = ref({ ...defaultTempOptions });
     const step = ref(STEP.none);
@@ -46,7 +41,7 @@ export default defineComponent({
       modalReject.value && modalReject.value({ name: 'AbortError' });
     }
 
-    const prepareFolder = async (dir: FileSystemDirectoryHandle, id: number) => {
+    const prepareFolder = async (dir: ImportDirectory, id: number) => {
       let reject = false;
 
       const maidata = await tryGetFile(dir, 'maidata.txt');
@@ -186,8 +181,8 @@ export default defineComponent({
           music.importStep = IMPORT_STEP.movie;
           try {
             await uploadMovie(music.id, music.movie, audioPadding);
-          } catch (e: any) {
-            errors.value.push({ level: MessageLevel.Warning, message: t('chart.import.error.videoConvertFailed') + `: ${e.error?.message || e.error?.detail || e?.message || e?.toString() || t('error.unknown')}`, name: music.name });
+          } catch (e) {
+            errors.value.push(createVideoConvertWarning(e, music.name, t('chart.import.error.videoConvertFailed'), t('error.unknown')));
           }
         }
 
@@ -195,15 +190,15 @@ export default defineComponent({
         if (music.bg) await api.SetMusicJacket(music.id, selectedADir.value, { file: music.bg });
 
         music.importStep = IMPORT_STEP.finish;
-      } catch (e: any) {
+      } catch (e) {
         console.log(music, e)
-        captureException(e.error || e, {
+        captureException(getCaptureTarget(e), {
           tags: {
             context: t('chart.import.error.importError'),
             step: music.importStep,
           }
         })
-        errors.value.push({ level: MessageLevel.Fatal, message: e.error?.message || e.error?.detail || e.message || e.toString(), name: music.name });
+        errors.value.push(createImportFatal(e, music.name));
         if (music.importStep !== IMPORT_STEP.create) {
           // 如果是在创建乐曲这步就挂了，说明乐曲XML没有创建成功，则不需要删除乐曲。
           // 否则，在ID冲突的情况下，会把原本的乐曲给删除掉，见 https://github.com/MuNET-OSS/MaiChartManager/issues/34
@@ -215,7 +210,7 @@ export default defineComponent({
       }
     }
 
-    startProcess = async (dir?: FileSystemDirectoryHandle | FileSystemDirectoryHandle[]) => {
+    startProcess = async (dir?: ImportDirectory | ImportDirectory[]) => {
       let id = getNextUnusedMusicId();
       const usedIds = [] as number[];
       errors.value = [];
@@ -225,18 +220,32 @@ export default defineComponent({
       currentProcessing.value = dummyMeta;
       try {
         if (!dir) {
-          dir = await window.showDirectoryPicker({
+          // pickDirectory：支持 showDirectoryPicker 时返回真实 handle，否则用 webkitdirectory 适配器
+          dir = await pickDirectory({
             id: 'maidata-dir',
             startIn: 'downloads',
           });
         }
         step.value = STEP.checking;
 
-        if (dir instanceof FileSystemDirectoryHandle && await tryGetFile(dir, 'maidata.txt')) {
+        // 不再依赖 instanceof FileSystemDirectoryHandle（适配器不是它）。
+        // 统一逻辑：单个目录句柄时，先看根目录有没有 maidata.txt，有就当作单首谱面导入；
+        // 没有（或传入的是数组）就遍历子目录。真实 handle 与适配器都走得通。
+        if (!Array.isArray(dir) && await tryGetFile(dir, 'maidata.txt')) {
           await prepareFolder(dir, id);
         } else {
-          for await (const entry of dir.values()) {
-            if (entry.kind !== 'directory') continue;
+          // 数组（拖拽多个）时直接用这些句柄；单目录时遍历其子项。两种都只取目录项。
+          const entries: (ImportDirectory)[] = [];
+          if (Array.isArray(dir)) {
+            for (const entry of dir) {
+              if (entry.kind === 'directory') entries.push(entry);
+            }
+          } else {
+            for await (const entry of dir.values()) {
+              if (entry.kind === 'directory') entries.push(entry);
+            }
+          }
+          for (const entry of entries) {
             if (await prepareFolder(entry, id)) {
               usedIds.push(id);
               id = getNextUnusedMusicId(usedIds);
@@ -269,9 +278,11 @@ export default defineComponent({
         if (errors.value.length) {
           step.value = STEP.showResultError
         }
-      } catch (e: any) {
-        if (e.name === 'AbortError') return
-        console.log(e)
+      } catch (e) {
+        if (isAbortError(e)) return
+        // WebKit 的 console 直接 log 异常对象时无法正确转文本，这里显式打印字符串便于定位
+        const err = e as any;
+        console.log('[imp] FAILED step=' + step.value + ' message=' + String(err?.message ?? err) + ' stack=' + String(err?.stack ?? '(无栈)'));
         globalCapture(e, t('chart.import.error.importErrorGlobal'))
       } finally {
         if (step.value !== STEP.showResultError)

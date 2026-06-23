@@ -1,8 +1,9 @@
-import { computed, defineComponent, PropType } from "vue";
+import { computed, defineComponent, PropType, ref } from "vue";
 import { MessageLevel, ShiftMethod } from "@/client/apiGen";
 import { ImportChartMessageEx, TempOptions } from "./types";
 import { showNeedPurchaseDialog } from "@/store/refs";
 import { useI18n } from 'vue-i18n';
+import { Button, Modal } from "@munet/ui";
 
 export default defineComponent({
   props: {
@@ -11,6 +12,7 @@ export default defineComponent({
   },
   setup(props) {
     const {t} = useI18n();
+    const detail = ref<string>();
 
     const i18nPostfix = computed(() => {
       switch (props.tempOptions.shift) {
@@ -19,8 +21,9 @@ export default defineComponent({
       }
     })
 
-    return () => <div class="of-y-auto cst max-h-20vh">
-      <div class="flex flex-col gap-2">
+    return () => <>
+      <div class="of-y-auto cst max-h-20vh">
+        <div class="flex flex-col gap-2">
         {
           props.errors.map((error, i) => {
             if ('first' in error) {
@@ -65,17 +68,34 @@ export default defineComponent({
                 break;
             }
             return <div key={i} class={`p-3 rounded border ${borderColor} ${bgColor} ${error.isPaid && 'cursor-pointer'}`}
-              // @ts-ignore
-                         onClick={() => error.isPaid && (showNeedPurchaseDialog.value = true)}
+                         onClick={() => {
+                           if (error.isPaid) showNeedPurchaseDialog.value = true;
+                         }}
             >
-              <div class="font-bold mb-1">{error.name}</div>
+              <div class="flex items-center gap-2 mb-1">
+                <div class="font-bold w-0 grow">{error.name}</div>
+                {error.detail && <span onClick={(event: MouseEvent) => event.stopPropagation()}>
+                  <Button size="small" onClick={() => {
+                    detail.value = error.detail;
+                  }}>{t('common.detail')}</Button>
+                </span>}
+              </div>
               <div class="whitespace-pre-wrap">
                 {error.message}
               </div>
             </div>
           })
         }
+        </div>
       </div>
-    </div>
+      <Modal
+        width="min(70vw,70em)"
+        title={t('common.detail')}
+        show={!!detail.value}
+        onUpdateShow={() => detail.value = undefined}
+      >
+        <pre class="max-h-60vh of-auto cst whitespace-pre-wrap break-words text-xs font-mono">{detail.value}</pre>
+      </Modal>
+    </>
   }
 })

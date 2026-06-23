@@ -1,9 +1,7 @@
 using System.Diagnostics;
-using AssetStudio;
 using MaiChartManager.Models;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.VisualBasic.FileIO;
 using MusicXml = MaiChartManager.Models.MusicXml;
 
 namespace MaiChartManager.Controllers.Music;
@@ -167,7 +165,7 @@ public class MusicController(StaticSettings settings, ILogger<MusicController> l
         if (music is null) return "Music not found!";
         music.DeleteJacket(); // 删除老的jacket
 
-        var abiDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, @"AssetBundleImages\jacket");
+        var abiDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "AssetBundleImages", "jacket");
         Directory.CreateDirectory(abiDir);
         
         if (StaticSettings.Config.ConvertJacketToAssetBundle)

@@ -21,6 +21,7 @@ common:
   dismiss: 放弃
   longMusic: 长乐曲
   error: 错误
+  detail: 详情
 assetDir:
   title: Opt 管理
   create: 创建目录

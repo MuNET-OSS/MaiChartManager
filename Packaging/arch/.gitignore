@@ -1,0 +1,4 @@
+# makepkg 构建产物，不纳入版本控制
+pkg/
+src/
+*.pkg.tar.*

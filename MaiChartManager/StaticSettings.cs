@@ -10,7 +10,7 @@ public partial class StaticSettings
 {
     public static readonly string tempPath = Path.Combine(Path.GetTempPath(), "MaiChartManager");
     public static readonly string appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MaiChartManager");
-    public static readonly string exeDir = Path.GetDirectoryName(Application.ExecutablePath);
+    public static readonly string exeDir = Path.GetDirectoryName(Environment.ProcessPath) ?? AppContext.BaseDirectory;
 #if DEBUG
     public static readonly string wwwroot = Path.Combine(ProjectDir, "wwwroot");
     private static string ProjectDir => Path.GetDirectoryName(GetThisFilePath())!;
@@ -47,8 +47,7 @@ public partial class StaticSettings
         {
             _logger.LogError(e, "初始化数据目录时出错");
             SentrySdk.CaptureException(e);
-            MessageBox.Show(e.Message, Locale.InitDataDirError, MessageBoxButtons.OK, MessageBoxIcon.Error);
-            Application.Exit();
+            throw new InvalidOperationException(Locale.InitDataDirError, e);
         }
     }
 
@@ -63,19 +62,35 @@ public partial class StaticSettings
         {
             _logger.LogError(e, "初始化数据目录时出错");
             SentrySdk.CaptureException(e);
-            MessageBox.Show(e.Message, Locale.InitDataDirError, MessageBoxButtons.OK, MessageBoxIcon.Error);
-            Application.Exit();
+            throw new InvalidOperationException(Locale.InitDataDirError, e);
         }
     }
 
     [GeneratedRegex(@"^[A-Z](\d{3})$")]
     public static partial Regex ADirRegex();
 
-    public static string GamePath { get; set; }
+    // 默认空字符串而非 null：未配置游戏目录（OOBE 阶段）时，下游 Path.Combine(GamePath, ...)
+    // 不会因 null 抛 ArgumentNullException（空字符串得到相对路径，后续 Directory/File.Exists 返回 false，优雅降级）。
+    public static string GamePath { get; set; } = "";
     public static string StreamingAssets => Path.Combine(GamePath, "Sinmai_Data", "StreamingAssets");
 
-    public static IEnumerable<string> AssetsDirs => Directory.EnumerateDirectories(StreamingAssets)
-        .Select(Path.GetFileName).Where(it => ADirRegex().IsMatch(it));
+    public static IEnumerable<string> AssetsDirs => Directory.Exists(StreamingAssets)
+        ? Directory.EnumerateDirectories(StreamingAssets).Select(Path.GetFileName).Where(it => ADirRegex().IsMatch(it))
+        : [];
+
+    /// <summary>
+    /// 在父目录下按名称大小写不敏感地解析子目录的真实路径，找不到返回 null。
+    /// 用于兼容 Linux 大小写敏感文件系统：游戏目录在 Windows 下大小写随意（如 musicVersion / MusicVersion），
+    /// 直接 Path.Combine 固定大小写会在 Linux 上匹配不到。优先尝试精确路径以避免多数情况下的额外枚举。
+    /// </summary>
+    public static string? ResolveSubDir(string parent, string name)
+    {
+        var exact = Path.Combine(parent, name);
+        if (Directory.Exists(exact)) return exact;
+        if (!Directory.Exists(parent)) return null;
+        return Directory.EnumerateDirectories(parent)
+            .FirstOrDefault(d => string.Equals(Path.GetFileName(d), name, StringComparison.OrdinalIgnoreCase));
+    }
 
     public int gameVersion;
     private List<MusicXmlWithABJacket> _musicList = [];
@@ -122,8 +137,8 @@ public partial class StaticSettings
         _musicList.Clear();
         foreach (var a in AssetsDirs)
         {
-            var musicDir = Path.Combine(StreamingAssets, a, "music");
-            if (!Directory.Exists(musicDir)) continue;
+            var musicDir = ResolveSubDir(Path.Combine(StreamingAssets, a), "music");
+            if (musicDir is null) continue;
 
             foreach (var subDir in Directory.EnumerateDirectories(musicDir))
             {
@@ -142,7 +157,7 @@ public partial class StaticSettings
             }
         }
 
-        _logger.LogInformation("Scan music list, found {0} music.", _musicList.Count);
+        _logger.LogInformation("扫描音乐列表，共找到 {0} 首音乐。", _musicList.Count);
     }
 
     public void ScanGenre()
@@ -151,14 +166,17 @@ public partial class StaticSettings
 
         foreach (var a in AssetsDirs)
         {
-            if (!Directory.Exists(Path.Combine(StreamingAssets, a, "musicGenre"))) continue;
-            foreach (var genreDir in Directory.EnumerateDirectories(Path.Combine(StreamingAssets, a, "musicGenre"), "musicgenre*"))
+            // 大小写不敏感解析 musicGenre 目录；枚举全部子目录后用大小写不敏感的前缀过滤（不用 glob，避免 Linux 区分大小写匹配不到）。
+            var genreParent = ResolveSubDir(Path.Combine(StreamingAssets, a), "musicGenre");
+            if (genreParent is null) continue;
+            foreach (var genreDir in Directory.EnumerateDirectories(genreParent))
             {
+                var dirName = Path.GetFileName(genreDir);
+                if (!dirName.StartsWith("musicgenre", StringComparison.InvariantCultureIgnoreCase)) continue;
                 if (!File.Exists(Path.Combine(genreDir, "MusicGenre.xml"))) continue;
-                if (!Path.GetFileName(genreDir).StartsWith("musicgenre", StringComparison.InvariantCultureIgnoreCase)) continue;
                 try
                 {
-                    var id = int.Parse(Path.GetFileName(genreDir).Substring("musicgenre".Length));
+                    var id = int.Parse(dirName.Substring("musicgenre".Length));
                     var genreXml = new GenreXml(id, a, GamePath);
 
                     var existed = GenreList.Find(it => it.Id == id);
@@ -178,7 +196,7 @@ public partial class StaticSettings
             }
         }
 
-        _logger.LogInformation("Scan genre list, found {0} genre.", GenreList.Count);
+        _logger.LogInformation("扫描流派列表，共找到 {0} 个流派。", GenreList.Count);
     }
 
     public void ScanVersionList()
@@ -186,14 +204,17 @@ public partial class StaticSettings
         VersionList.Clear();
         foreach (var a in AssetsDirs)
         {
-            if (!Directory.Exists(Path.Combine(StreamingAssets, a, "musicVersion"))) continue;
-            foreach (var versionDir in Directory.EnumerateDirectories(Path.Combine(StreamingAssets, a, "musicVersion"), "musicversion*"))
+            // 大小写不敏感解析 musicVersion 目录；枚举全部子目录后用大小写不敏感前缀过滤（不用 glob）。
+            var versionParent = ResolveSubDir(Path.Combine(StreamingAssets, a), "musicVersion");
+            if (versionParent is null) continue;
+            foreach (var versionDir in Directory.EnumerateDirectories(versionParent))
             {
+                var dirName = Path.GetFileName(versionDir);
+                if (!dirName.StartsWith("musicversion", StringComparison.InvariantCultureIgnoreCase)) continue;
                 if (!File.Exists(Path.Combine(versionDir, "MusicVersion.xml"))) continue;
-                if (!Path.GetFileName(versionDir).StartsWith("musicversion", StringComparison.InvariantCultureIgnoreCase)) continue;
                 try
                 {
-                    var id = int.Parse(Path.GetFileName(versionDir).Substring("musicversion".Length));
+                    var id = int.Parse(dirName.Substring("musicversion".Length));
                     var versionXml = new VersionXml(id, a, GamePath);
 
                     var existed = VersionList.Find(it => it.Id == id);
@@ -213,7 +234,7 @@ public partial class StaticSettings
             }
         }
 
-        _logger.LogInformation("Scan version list, found {VersionListCount} version.", VersionList.Count);
+        _logger.LogInformation("扫描版本列表，共找到 {VersionListCount} 个版本。", VersionList.Count);
     }
 
     public void ScanAssetBundles()
@@ -222,8 +243,11 @@ public partial class StaticSettings
         PseudoAssetBundleJacketMap.Clear();
         foreach (var a in AssetsDirs)
         {
-            if (!Directory.Exists(Path.Combine(StreamingAssets, a, @"AssetBundleImages\jacket"))) continue;
-            foreach (var jacketFile in Directory.EnumerateFiles(Path.Combine(StreamingAssets, a, @"AssetBundleImages\jacket")))
+            // 大小写不敏感解析 AssetBundleImages/jacket 两级目录（兼容 Linux）。
+            var abImagesDir = ResolveSubDir(Path.Combine(StreamingAssets, a), "AssetBundleImages");
+            var jacketDir = abImagesDir is null ? null : ResolveSubDir(abImagesDir, "jacket");
+            if (jacketDir is null) continue;
+            foreach (var jacketFile in Directory.EnumerateFiles(jacketDir))
             {
                 if (!Path.GetFileName(jacketFile).StartsWith("ui_jacket_", StringComparison.InvariantCultureIgnoreCase)) continue;
                 var idStr = Path.GetFileName(jacketFile).Substring("ui_jacket_".Length, 6);
@@ -235,7 +259,7 @@ public partial class StaticSettings
             }
         }
 
-        _logger.LogInformation($"Scan AssetBundles, found {AssetBundleJacketMap.Count} AssetBundles.");
+        _logger.LogInformation($"扫描 AssetBundle，共找到 {AssetBundleJacketMap.Count} 个 AssetBundle。");
     }
 
     public void ScanSoundData()
@@ -243,14 +267,15 @@ public partial class StaticSettings
         AcbAwb.Clear();
         foreach (var a in AssetsDirs)
         {
-            if (!Directory.Exists(Path.Combine(StreamingAssets, a, "SoundData"))) continue;
-            foreach (var sound in Directory.EnumerateFiles(Path.Combine(StreamingAssets, a, @"SoundData")))
+            var soundDir = ResolveSubDir(Path.Combine(StreamingAssets, a), "SoundData");
+            if (soundDir is null) continue;
+            foreach (var sound in Directory.EnumerateFiles(soundDir))
             {
                 AcbAwb[Path.GetFileName(sound).ToLower()] = sound;
             }
         }
 
-        _logger.LogInformation($"Scan SoundData, found {AcbAwb.Count} SoundData.");
+        _logger.LogInformation($"扫描 SoundData，共找到 {AcbAwb.Count} 个音频文件。");
     }
 
     public void ScanMovieData()
@@ -258,15 +283,16 @@ public partial class StaticSettings
         MovieDataMap.Clear();
         foreach (var a in AssetsDirs)
         {
-            if (!Directory.Exists(Path.Combine(StreamingAssets, a, "MovieData"))) continue;
-            foreach (var dat in Directory.EnumerateFiles(Path.Combine(StreamingAssets, a, @"MovieData")))
+            var movieDir = ResolveSubDir(Path.Combine(StreamingAssets, a), "MovieData");
+            if (movieDir is null) continue;
+            foreach (var dat in Directory.EnumerateFiles(movieDir))
             {
                 if (!int.TryParse(Path.GetFileNameWithoutExtension(dat), out var id)) continue;
                 MovieDataMap[id] = dat;
             }
         }
 
-        _logger.LogInformation($"Scan MovieData, found {MovieDataMap.Count} MovieData.");
+        _logger.LogInformation($"扫描 MovieData，共找到 {MovieDataMap.Count} 个视频文件。");
     }
 
     public void GetGameVersion()
@@ -277,14 +303,14 @@ public partial class StaticSettings
             xmlDoc.Load(Path.Combine(StreamingAssets, @"A000/DataConfig.xml"));
             if (!int.TryParse(xmlDoc.SelectSingleNode("/DataConfig/version/minor")?.InnerText, out gameVersion))
             {
-                MessageBox.Show(Locale.GameVersionNotFound, Locale.GameVersionNotFoundTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                _logger.LogWarning("{message}", Locale.GameVersionNotFound);
             }
         }
         catch (Exception e)
         {
             _logger.LogError(e, @"无法获取游戏版本号，可能是因为 A000\DataConfig.xml 找不到或者有错误");
             SentrySdk.CaptureException(e);
-            MessageBox.Show(Locale.GameVersionError, Locale.GameVersionNotFoundTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            _logger.LogWarning(e, "{message}", Locale.GameVersionError);
         }
     }
 
