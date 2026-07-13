@@ -107,16 +107,24 @@ public class CheckConflictController(StaticSettings settings, ILogger<CheckConfl
     {
         foreach (var req in requests)
         {
-            var path = Path.Combine(StaticSettings.StreamingAssets, req.AssetDir);
-            path = req.Type switch
+            try
             {
-                AssetType.Music => Path.Combine(path, "SoundData"),
-                AssetType.Movie => Path.Combine(path, "MovieData"),
-                _ => throw new InvalidEnumArgumentException()
-            };
+                var path = Path.Combine(StaticSettings.StreamingAssets, req.AssetDir);
+                path = req.Type switch
+                {
+                    AssetType.Music => Path.Combine(path, "SoundData"),
+                    AssetType.Movie => Path.Combine(path, "MovieData"),
+                    _ => throw new InvalidEnumArgumentException()
+                };
 
-            logger.LogInformation("Delete file {path}", Path.Combine(path, req.FileName));
-            PlatformFile.DeleteFile(Path.Combine(path, req.FileName));
+                logger.LogInformation("Delete file {path}", Path.Combine(path, req.FileName));
+                PlatformFile.DeleteFile(Path.Combine(path, req.FileName));
+
+            }
+            catch (FileNotFoundException ex)
+            {
+                logger.LogWarning(ex, "File not found {path}", Path.Combine(req.AssetDir, req.FileName));
+            }
         }
     }
 }

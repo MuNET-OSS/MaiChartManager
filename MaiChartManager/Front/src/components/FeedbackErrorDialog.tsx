@@ -41,7 +41,7 @@ export default defineComponent({
 
     return () => <Modal
       width="min(50vw,60em)"
-      title={t('error.title') + '！'}
+      title={t('error.title')}
       show={!!error.value}
       onUpdateShow={() => error.value = null}
     >
