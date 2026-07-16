@@ -34,6 +34,8 @@ public record ImportChartMessage(string Message, MessageLevel Level)
 
 public record ImportChartResult(IEnumerable<ImportChartMessage> Errors, bool Fatal);
 
+public record UtageImportOptions(bool IsDoublePlayer, int? BasicLevel, int? LeftLevel, int? RightLevel);
+
 // v1.1.2 新增
 public enum ShiftMethod
 {
@@ -173,10 +175,11 @@ public class MaidataImportService : IMaidataImportService
         ShiftMethod shift,
         bool ignoreLevelNum,
         bool debug,
-        bool isReplacement = false)
+        bool isReplacement = false,
+        UtageImportOptions? utageOptions = null)
     {
         var id = music.Id;
-        var isUtage = id > 100000;
+        var isUtage = id >= 100000 || music.GenreId == 107 || utageOptions is not null;
         var errors = new List<ImportChartMessage>();
         
         using var stream = file.OpenReadStream();
@@ -185,16 +188,24 @@ public class MaidataImportService : IMaidataImportService
         var lineNoDict = GetLevelLineNo(maiDataText);
         
         var targetLevelMap = MapMaidataLevelToGame(maiData);
+        var utageLevelMap = isUtage
+            ? ResolveUtageLevelMap(maiData.Levels.Keys.ToList(), music.UtagePlayStyle, isReplacement, utageOptions)
+            : null;
+        if (utageLevelMap is { Count: 0 })
+        {
+            errors.Add(new ImportChartMessage("宴会场谱面映射无效，请重新选择要导入的谱面", MessageLevel.Fatal));
+            return new ImportChartResult(errors, true);
+        }
         
         // 先执行第一步：Parser，因为可能涉及对Chart做出调整
-        List<(int lv, int targetLevel, MaidataLevel data, MaiChart? chart, List<Alert> alerts)> parserOutput = [];
+        List<(int lv, int targetLevel, string? side, MaidataLevel data, MaiChart? chart, List<Alert> alerts)> parserOutput = [];
         foreach (var (lv, data) in maiData.Levels)
         {
-            if (!targetLevelMap.ContainsKey(lv)) continue;
-            if (isUtage && parserOutput.Count > 0) break; // 宴会场只导入第一个谱面
+            string? side = null;
+            if (isUtage && (utageLevelMap is null || !utageLevelMap.TryGetValue(lv, out side))) continue;
+            if (!isUtage && !targetLevelMap.ContainsKey(lv)) continue;
             
-            var targetLevel = targetLevelMap[lv]; // 在MA2中的目标等级
-            if (isUtage) targetLevel = 0;
+            var targetLevel = isUtage ? 0 : targetLevelMap[lv];
             try
             {
                 var parser = new SimaiParser(!isUtage && lv is 2 or 3, maiData.ClockCount);
@@ -204,15 +215,17 @@ public class MaidataImportService : IMaidataImportService
                     errors.Add(new ImportChartMessage(string.Format(Locale.ChartNoNotes, lv), MessageLevel.Warning));
                     chart = null;
                 }
-                parserOutput.Add((lv, targetLevel, data, chart, alerts));
+                parserOutput.Add((lv, targetLevel, isUtage ? side : null, data, chart, alerts));
             }
             catch (ConversionException e)
             {
-                parserOutput.Add((lv, targetLevel, data, null, e.Alerts));
+                parserOutput.Add((lv, targetLevel, isUtage ? side : null, data, null, e.Alerts));
                 MergeAlertsIntoImportChartMessages();
                 return new ImportChartResult(errors, true);
             }
         }
+        if (isUtage && utageLevelMap?.Values.Any(side => side is not null) == true)
+            parserOutput = parserOutput.OrderBy(output => output.side == "L" ? 0 : 1).ToList();
         
         var validCharts = parserOutput.Where(x=> x.chart != null).Select(x => x.chart!).ToList();
         if (validCharts.Count == 0)
@@ -224,10 +237,15 @@ public class MaidataImportService : IMaidataImportService
         var chartPadding = chartPaddingDict[shift]; // 当前所选择的模式所具体对应的chartPadding
 
         foreach (var c in music.Charts) { c.Enable = false; } // 先把所有难度标记为关闭（马上后面"第二步"的逻辑，会对存在的难度打开）
+        if (isUtage)
+        {
+            music.UtagePlayStyle = utageLevelMap?.Values.Any(side => side is not null) == true ? 1 : 0;
+            music.Charts[0].MaxNotes = 0;
+        }
         
         float lastChartBpm = 0; // 最后一个谱面的bpm，当没有指定wholebpm时用作fallback
         // 再执行第二步
-        foreach (var (lv, targetLevel, data, chart, alerts) in parserOutput)
+        foreach (var (lv, targetLevel, side, data, chart, alerts) in parserOutput)
         {
             if (chart == null) continue;
             var targetChart = music.Charts[targetLevel];
@@ -235,13 +253,17 @@ public class MaidataImportService : IMaidataImportService
             
             #region 计算等级（定数）相关
             MaiUtils.ParseLevelStr(data.Level, out var levelNum, out var utageKanji);
-            if (isUtage) music.UtageKanji = utageKanji;
-            targetChart.LevelId = MaiUtils.GetLevelId((int)(levelNum * 10));
-            // 忽略定数
-            if (!ignoreLevelNum)
+            if (!targetChart.Enable)
             {
-                targetChart.Level = (int)Math.Floor(levelNum);
-                targetChart.LevelDecimal = (int)Math.Floor(levelNum * 10 % 10);
+                if (isUtage) music.UtageKanji = utageKanji;
+                targetChart.LevelId = MaiUtils.GetLevelId((int)(levelNum * 10));
+                // 双人谱面共用 XML 元数据，以左侧谱面作为显示基准。
+                if (!ignoreLevelNum)
+                {
+                    targetChart.Level = (int)Math.Floor(levelNum);
+                    targetChart.LevelDecimal = (int)Math.Floor(levelNum * 10 % 10);
+                }
+                targetChart.Designer = data.NoteDesigner ?? maiData.GetValueOrDefault("des") ?? "";
             }
             #endregion
 
@@ -265,10 +287,25 @@ public class MaidataImportService : IMaidataImportService
                 return new ImportChartResult(errors, true);
             }
 
-            targetChart.Designer = data.NoteDesigner ?? maiData.GetValueOrDefault("des") ?? "";
-            targetChart.MaxNotes = chart.Statistics.Total;
-            File.WriteAllText(Path.Combine(Path.GetDirectoryName(music.FilePath)!, targetChart.Path), resultMA2);
+            targetChart.MaxNotes = isUtage ? targetChart.MaxNotes + chart.Statistics.Total : chart.Statistics.Total;
+            var outputPath = side is null ? targetChart.Path : targetChart.Path.Replace(".ma2", $"_{side}.ma2");
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(music.FilePath)!, outputPath), resultMA2);
             targetChart.Enable = true;
+        }
+
+        if (isUtage)
+        {
+            var musicDir = Path.GetDirectoryName(music.FilePath)!;
+            var basePath = Path.Combine(musicDir, music.Charts[0].Path);
+            if (music.UtagePlayStyle == 1)
+            {
+                File.Delete(basePath);
+            }
+            else
+            {
+                File.Delete(basePath.Replace(".ma2", "_L.ma2"));
+                File.Delete(basePath.Replace(".ma2", "_R.ma2"));
+            }
         }
 
         if (!isReplacement)
@@ -294,6 +331,39 @@ public class MaidataImportService : IMaidataImportService
                 }
             }
         }
+    }
+
+    private static Dictionary<int, string?> ResolveUtageLevelMap(
+        List<int> levels,
+        int currentPlayStyle,
+        bool isReplacement,
+        UtageImportOptions? options)
+    {
+        if (levels.Count == 0) return [];
+        if (levels.Count == 1) return new Dictionary<int, string?> { [levels[0]] = null };
+
+        if (options is null)
+        {
+            if (!isReplacement) return [];
+            return currentPlayStyle == 1
+                ? new Dictionary<int, string?> { [levels[0]] = "L", [levels[1]] = "R" }
+                : new Dictionary<int, string?> { [levels[0]] = null };
+        }
+
+        if (!options.IsDoublePlayer)
+        {
+            return options.BasicLevel is int basicLevel && levels.Contains(basicLevel)
+                ? new Dictionary<int, string?> { [basicLevel] = null }
+                : [];
+        }
+
+        if (options.LeftLevel is not int leftLevel || options.RightLevel is not int rightLevel ||
+            leftLevel == rightLevel || !levels.Contains(leftLevel) || !levels.Contains(rightLevel))
+        {
+            return [];
+        }
+
+        return new Dictionary<int, string?> { [leftLevel] = "L", [rightLevel] = "R" };
     }
     
     // 正常Simai导入为MA2的逻辑已经不用这个了，但ReplaceChartApi中有一种情况是上传一个MA2文件、直接替换MA2文件，就还需要这个，所以得留着

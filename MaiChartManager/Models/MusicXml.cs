@@ -197,6 +197,9 @@ public partial class MusicXml
                     <isEnable>false</isEnable>
                         </Notes>
                      </notesData>
+                      <utageKanjiName />
+                      <comment />
+                      <utagePlayStyle>0</utagePlayStyle>
                       <jacketFile />
                       <thumbnailName />
                       <rightFile />
@@ -403,6 +406,18 @@ public partial class MusicXml
         }
     }
 
+    private const string utagePlayStyleNode = "utagePlayStyle";
+
+    public int UtagePlayStyle
+    {
+        get => int.TryParse(RootNode.SelectSingleNode(utagePlayStyleNode)?.InnerText ?? "0", out var result) ? result : 0;
+        set
+        {
+            Modified = true;
+            SelectSingleNodeOrCreate(RootNode, utagePlayStyleNode).InnerText = value.ToString();
+        }
+    }
+
     public int Version
     {
         get => int.TryParse(RootNode.SelectSingleNode("version")?.InnerText ?? "0", out var result) ? result : 0;
@@ -481,8 +496,11 @@ public partial class MusicXml
             _node = node;
             _parent = parent;
 
-            if (!File.Exists(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(_parent.FilePath), Path)) &&
-                !File.Exists(System.IO.Path.Combine(System.IO.Path.GetDirectoryName(_parent.FilePath), Path.Replace(".ma2", "_L.ma2"))))
+            var musicDir = System.IO.Path.GetDirectoryName(_parent.FilePath);
+            var baseFileExists = File.Exists(System.IO.Path.Combine(musicDir, Path));
+            var leftFileExists = File.Exists(System.IO.Path.Combine(musicDir, Path.Replace(".ma2", "_L.ma2")));
+            var rightFileExists = File.Exists(System.IO.Path.Combine(musicDir, Path.Replace(".ma2", "_R.ma2")));
+            if (_parent.UtagePlayStyle == 1 ? !leftFileExists || !rightFileExists : !baseFileExists)
             {
                 Problems.Add(Locale.ChartFileNotFound);
             }

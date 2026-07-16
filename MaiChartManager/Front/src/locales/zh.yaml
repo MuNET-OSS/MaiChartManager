@@ -132,6 +132,10 @@ music:
     idConflictWarning: 以下目录中存在冲突的 ID
     confirmSetMovie: 确认要使用 {filename} 替换当前的 PV 吗
     replaceChart: 替换谱面
+    doublePlayerChart: 双人谱面
+    leftChart: 左侧（L）
+    rightChart: 右侧（R）
+    sharedChartSettings: 共用谱面信息
     replaceChartConfirm: 确认要替换 {level} 谱面吗？
     replaceChartFailed: 替换谱面失败
     replaceChartSuccess: 替换谱面成功
@@ -244,6 +248,13 @@ chart:
       codecForceH264: H264
       codecForceVP9: VP9 USM
     assignId: 为新导入的歌曲指定 ID
+    utage:
+      singlePlayer: 单人谱面
+      doublePlayer: 双人谱面
+      basicChart: 映射为 Basic 的谱面
+      leftChart: 左侧（L）谱面
+      rightChart: 右侧（R）谱面
+      sameChartError: 左右两侧必须选择不同的谱面
     currentProcessing: 当前正在处理的项目
     folderHint: 包含以下文件的文件夹，或者，一个包含一些这样的文件夹的文件夹
     addPadding: 将在音频前面加上 {padding} 秒空白以保证第一押在第二小节

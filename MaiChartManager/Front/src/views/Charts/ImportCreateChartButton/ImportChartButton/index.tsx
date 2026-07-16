@@ -65,6 +65,7 @@ export default defineComponent({
       }
 
       let first = 0, chartPaddings, name = dir.name, isDx = false, previewTime = undefined;
+      let maidataLevels: number[] = [];
       if (maidata) {
         const checkRet = (await api.ImportChartCheck({ file: maidata })).data;
         reject = reject || !checkRet.accept;
@@ -77,11 +78,19 @@ export default defineComponent({
         if (checkRet.isDx) id += 1e4;
         isDx = checkRet.isDx!;
         if (checkRet.previewTime) previewTime = checkRet.previewTime
+        maidataLevels = checkRet.maidataLevels ?? [];
       }
 
       if (!reject) {
+        const utageMapping = maidataLevels.length >= 2 ? {
+          isDoublePlayer: false,
+          basicLevel: maidataLevels[0],
+          leftLevel: maidataLevels[0],
+          rightLevel: maidataLevels[1],
+        } : undefined;
         meta.value.push({
           id, maidata, bg, track, chartPaddings, name, first, movie, isDx, previewTime,
+          maidataLevels, utageMapping,
           importStep: IMPORT_STEP.start,
         })
       }
@@ -147,6 +156,10 @@ export default defineComponent({
           addVersionId: savedOptions.value.addVersionId,
           version: savedOptions.value.version,
           shift: tempOptions.value.shift,
+          utageDoublePlayer: music.utageMapping?.isDoublePlayer,
+          utageBasicLevel: music.utageMapping?.basicLevel,
+          utageLeftLevel: music.utageMapping?.leftLevel,
+          utageRightLevel: music.utageMapping?.rightLevel,
           debug: import.meta.env.DEV,
           assetDir: selectedADir.value,
         })).data;

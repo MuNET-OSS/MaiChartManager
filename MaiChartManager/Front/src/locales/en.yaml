@@ -141,6 +141,10 @@ music:
     idConflictWarning: ID conflicts in following directories
     confirmSetMovie: Confirm to replace current PV with {filename}?
     replaceChart: Replace Chart
+    doublePlayerChart: Two-player chart
+    leftChart: Left (L)
+    rightChart: Right (R)
+    sharedChartSettings: Shared chart settings
     replaceChartConfirm: Confirm to replace {level}?
     replaceChartFailed: Failed to replace chart
     replaceChartSuccess: Chart replaced successfully
@@ -271,6 +275,13 @@ chart:
       codecForceH264: H264
       codecForceVP9: VP9 USM
     assignId: Assign ID for new imported songs
+    utage:
+      singlePlayer: Single-player chart
+      doublePlayer: Two-player chart
+      basicChart: Chart mapped to Basic
+      leftChart: Left (L) chart
+      rightChart: Right (R) chart
+      sameChartError: Left and right must use different charts
     currentProcessing: Currently processing
     folderHint: >-
       Folder containing the following files, or a folder containing multiple

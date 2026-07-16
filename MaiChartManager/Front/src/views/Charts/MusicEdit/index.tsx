@@ -1,6 +1,6 @@
 import { computed, defineComponent, onMounted, PropType, provide, ref, watch } from "vue";
 import { addVersionList, genreList, globalCapture, selectedADir, selectedMusic as info, selectMusicId, updateAddVersionList, updateGenreList, updateMusicList, selectedLevel, disableSync, gameVersion, b15ver } from "@/store/refs";
-import { Chart, MusicXmlWithABJacket } from "@/client/apiGen";
+import type { Chart, MusicXmlWithABJacket } from "@/client/apiGen";
 import api from "@/client/api";
 
 import JacketBox from "../../../components/JacketBox";
@@ -25,9 +25,12 @@ const Component = defineComponent({
     provide('disabled', computed(() => selectedADir.value === 'A000'));
 
     const firstEnabledChart = info.value?.charts?.findIndex(chart => chart.enable);
-    if (firstEnabledChart && firstEnabledChart >= 0) {
+    if (firstEnabledChart !== undefined && firstEnabledChart >= 0) {
       selectedLevel.value = firstEnabledChart;
     }
+    const isUtage = computed(() => info.value !== undefined &&
+      (info.value.genreId === UTAGE_GENRE || (info.value.id ?? 0) >= 1e5));
+    const chartIndexes = computed(() => isUtage.value ? [0] : [0, 1, 2, 3, 4]);
 
     const sync = (key: keyof MusicXmlWithABJacket, method: Function) => async () => {
       if (disableSync.value || !info.value) return;
@@ -128,7 +131,7 @@ const Component = defineComponent({
             <VersionInput v-model:value={info.value.version}/>
           </div>
         </div>
-        {info.value.genreId === UTAGE_GENRE && // 宴会场
+        {isUtage.value &&
           <div class="flex gap-4">
             <div class="flex flex-col gap-2 w-0 grow">
               <div class="ml-1 text-sm">{t('music.edit.utageType')}</div>
@@ -142,11 +145,12 @@ const Component = defineComponent({
         <AcbAwb song={info.value}/>
         <NTabs type="line" animated barWidth={0} v-model:value={selectedLevel.value} class="levelTabs"
                style={{ '--n-tab-padding': 0, '--n-pane-padding-top': 0, '--n-tab-text-color-hover': '' }}>
-          {new Array(5).fill(0).map((_, index) =>
+          {chartIndexes.value.map(index =>
             <NTabPane key={index} name={index} tab={DIFFICULTY[index]}>
               {{
                 tab: () => <Tab index={index} chart={info.value?.charts![index]!} selected={selectedLevel.value === index}/>,
-                default: () => <ChartPanel chart={info.value?.charts![index]!} songId={info.value?.id!} chartIndex={index}
+              default: () => <ChartPanel chart={info.value?.charts![index]!} songId={info.value?.id!} chartIndex={index}
+                                           doublePlayer={info.value?.utagePlayStyle === 1}
                                            class="pxy pt-2 rounded-[0_0_.5em_.5em]" style={{ backgroundColor: `color-mix(in srgb, ${LEVEL_COLOR[index]}, transparent 90%)`, '--hue': LEVEL_HUE[index] }}/>
               }}
             </NTabPane>

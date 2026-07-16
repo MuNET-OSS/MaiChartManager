@@ -1,20 +1,23 @@
 import { t } from '@/locales';
 import { globalCapture, selectedADir, selectedLevel, selectedMusic, selectMusicId, updateMusicList } from '@/store/refs';
-import { Button, Modal, showTransactionalDialog, addToast } from '@munet/ui';
+import { Button, Modal, Radio, showTransactionalDialog, addToast } from '@munet/ui';
 import { computed, defineComponent, ref, shallowRef } from 'vue';
 import JacketBox from '../JacketBox';
 import { DIFFICULTY } from '@/consts';
 import api from '@/client/api';
 import CheckingModal from "@/views/Charts/ImportCreateChartButton/ImportChartButton/CheckingModal";
 import LevelTagsDisplay from "@/components/LevelTagsDisplay";
-import { Chart, ImportChartCheckResult, ImportChartResult, ShiftMethod } from "@/client/apiGen";
+import { ShiftMethod } from "@/client/apiGen";
+import type { Chart, ImportChartCheckResult, ImportChartResult } from "@/client/apiGen";
 import ImportAlert from "@/views/Charts/ImportCreateChartButton/ImportChartButton/ImportAlert";
-import { defaultTempOptions, ImportChartMessageEx, TempOptions } from "@/views/Charts/ImportCreateChartButton/ImportChartButton/types";
+import { defaultTempOptions } from "@/views/Charts/ImportCreateChartButton/ImportChartButton/types";
+import type { ImportChartMessageEx, TempOptions } from "@/views/Charts/ImportCreateChartButton/ImportChartButton/types";
 import ShiftModeSelector from "@/views/Charts/ImportCreateChartButton/ImportChartButton/ShiftModeSelector";
 import { pickFile } from "@/utils/pickFile";
+import type { ChartSide } from "@/views/Charts/MusicEdit/PreviewChartButton";
 
 // noinspection JSUnusedLocalSymbols
-export let prepareReplaceChart = async (fileHandle?: FileSystemFileHandle) => {
+export let prepareReplaceChart = async (fileHandle?: FileSystemFileHandle, side?: ChartSide) => {
 }
 
 export default defineComponent({
@@ -23,6 +26,7 @@ export default defineComponent({
     const checking = ref(false);
     const file = shallowRef<File | null>(null);
     const show = ref<"" | "ma2" | "maidata" | "failed">("");
+    const targetSide = ref<ChartSide>();
 
     const apiResp = ref<ImportChartCheckResult | ImportChartResult | null>(null)
     const checkErrors = computed<ImportChartMessageEx[]>(()=>{
@@ -35,7 +39,8 @@ export default defineComponent({
     })
 
     // 注：本功能的逻辑是，如果选择的是ma2文件，则只替换指定难度的谱面；如果选择的是maidata，则替换整首歌的所有难度。
-    prepareReplaceChart = async (fHandle?: FileSystemFileHandle) => {
+    prepareReplaceChart = async (fHandle?: FileSystemFileHandle, side?: ChartSide) => {
+      targetSide.value = side;
       let selectedFile: File;
       if (!fHandle) {
         // 换谱面文件（maidata.txt 或 ma2），使用通用单文件选择（兼容 WebKitGTK）
@@ -65,6 +70,7 @@ export default defineComponent({
           checking.value = false;
         }
       } else if (name.endsWith(".ma2")) {
+        if (selectedMusic.value?.utagePlayStyle === 1 && !targetSide.value) targetSide.value = 'L';
         show.value = "ma2"
       } else {
         await showTransactionalDialog(t('error.unsupportedFileType'), t('music.edit.notValidChartFile'), undefined, true);
@@ -76,9 +82,15 @@ export default defineComponent({
       try {
         const uploadFile = file.value;
         file.value = null;
-        const level = show.value === "maidata" ? -1 : selectedLevel.value;
+        const replacingMaidata = show.value === "maidata";
+        const level = replacingMaidata ? -1 : selectedLevel.value;
+        const side = replacingMaidata ? undefined : targetSide.value;
         show.value = "";
-        const result = (await api.ReplaceChart(selectMusicId.value, level, selectedADir.value, { file: uploadFile, shift: tempOption.value.shift })).data;
+        const result = (await api.ReplaceChart(selectMusicId.value, level, selectedADir.value, {
+          file: uploadFile,
+          shift: tempOption.value.shift,
+          side,
+        })).data;
         if (!result.fatal) {
           addToast({ type:'success', message: t('music.edit.replaceChartSuccess') })
         } else {
@@ -110,7 +122,15 @@ export default defineComponent({
       >{{
         default: () => <div class="flex flex-col gap-2">
           {show.value === "ma2" && <>
-            {t('music.edit.replaceChartConfirm', { level: DIFFICULTY[selectedLevel.value!] })}
+            {t('music.edit.replaceChartConfirm', {
+              level: targetSide.value
+                ? `${DIFFICULTY[selectedLevel.value!]} ${targetSide.value}`
+                : DIFFICULTY[selectedLevel.value!],
+            })}
+            {selectedMusic.value?.utagePlayStyle === 1 && <div class="flex gap-5 justify-center">
+              <Radio v-model:value={targetSide.value} k="L">{t('music.edit.leftChart')}</Radio>
+              <Radio v-model:value={targetSide.value} k="R">{t('music.edit.rightChart')}</Radio>
+            </div>}
             <div class="text-4.5 text-center">{file.value?.name}</div>
             <div class="text-6 text-center">↓</div>
           </>}

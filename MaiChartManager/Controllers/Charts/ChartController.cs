@@ -101,7 +101,8 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
         int level,
         IFormFile file,
         string assetDir,
-        [FromForm] ShiftMethod shift)
+        [FromForm] ShiftMethod shift,
+        [FromForm] string? side = null)
     {
         var music = settings.GetMusic(id, assetDir);
         if (music == null || file == null) return new ImportChartResult([new ImportChartMessage(Locale.FileUploadFailed, MessageLevel.Fatal)], true);
@@ -109,7 +110,10 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
         {
             var targetChart = music.Charts[level];
             targetChart.Path = $"{id:000000}_0{level}.ma2";
-            using var stream = System.IO.File.Open(Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{id:000000}", targetChart.Path), FileMode.Create);
+            if (music.UtagePlayStyle == 1 && side is not ("L" or "R"))
+                return new ImportChartResult([new ImportChartMessage("双人宴谱必须指定要替换的左侧或右侧谱面", MessageLevel.Fatal)], true);
+            var outputPath = side is "L" or "R" ? targetChart.Path.Replace(".ma2", $"_{side}.ma2") : targetChart.Path;
+            using var stream = System.IO.File.Open(Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{id:000000}", outputPath), FileMode.Create);
             file.CopyTo(stream);
             targetChart.Problems.Clear();
 
@@ -120,6 +124,14 @@ public class ChartController(StaticSettings settings, ILogger<StaticSettings> lo
                 fileContent = reader.ReadToEnd();
             }
             var newMaxNotes = MaidataImportService.ParseTNumAllFromMa2(fileContent);
+            if (music.UtagePlayStyle == 1)
+            {
+                var otherSide = side == "L" ? "R" : "L";
+                var otherPath = Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{id:000000}",
+                    targetChart.Path.Replace(".ma2", $"_{otherSide}.ma2"));
+                if (System.IO.File.Exists(otherPath))
+                    newMaxNotes += MaidataImportService.ParseTNumAllFromMa2(System.IO.File.ReadAllText(otherPath));
+            }
             if (newMaxNotes != 0 && targetChart.MaxNotes != newMaxNotes)
             {
                 targetChart.MaxNotes = newMaxNotes;

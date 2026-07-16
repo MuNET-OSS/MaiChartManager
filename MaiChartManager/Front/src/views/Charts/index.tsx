@@ -59,20 +59,22 @@ export default defineComponent({
           <MemoBox />
         ) : (
           <div class="flex flex-col gap-4 p-y h-full">
-            <div class="flex items-center gap-2 shrink-0 px">
+            <div class="flex flex-wrap items-center gap-2 shrink-0 px">
               <button onClick={() => (mobileShowMenu.value = true)} class="min-[1440px]:hidden">
                 <span class="i-ic-baseline-menu text-lg" />
               </button>
               <div class="grow-1" />
-              {!!selectedMusic.value && <CopyToButton />}
-              {selectedADir.value === 'A000' ? (
-                t('assetDir.selectNonA000')
-              ) : (
-                <>
-                  <MusicSelectedTopRightToolbar />
-                  <ImportCreateChartButton />
-                </>
-              )}
+              <div class="flex flex-wrap items-center justify-end gap-2 max-[639px]:w-full">
+                {!!selectedMusic.value && <div class="shrink-0"><CopyToButton /></div>}
+                {selectedADir.value === 'A000' ? (
+                  t('assetDir.selectNonA000')
+                ) : (
+                  <>
+                    <div class="flex gap-2 shrink-0"><MusicSelectedTopRightToolbar /></div>
+                    <div class="shrink-0"><ImportCreateChartButton /></div>
+                  </>
+                )}
+              </div>
             </div>
             <div class="of-y-auto cst grow-1 px">
               <MusicEdit />

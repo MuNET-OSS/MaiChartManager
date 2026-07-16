@@ -1,4 +1,5 @@
-import { ImportChartCheckResult, ImportChartMessage, SetAudioPreviewRequest, ShiftMethod } from "@/client/apiGen";
+import { ShiftMethod } from "@/client/apiGen";
+import type { ImportChartCheckResult, ImportChartMessage, SetAudioPreviewRequest } from "@/client/apiGen";
 
 export enum STEP {
   none,
@@ -30,7 +31,16 @@ export type ImportMeta = {
   chartPaddings: ImportChartCheckResult['chartPaddings'],
   first: number,
   isDx: boolean,
-  previewTime?: SetAudioPreviewRequest
+  previewTime?: SetAudioPreviewRequest,
+  maidataLevels: number[],
+  utageMapping?: UtageMapping,
+}
+
+export type UtageMapping = {
+  isDoublePlayer: boolean,
+  basicLevel: number,
+  leftLevel: number,
+  rightLevel: number,
 }
 
 export type FirstPaddingMessage = { first: number, chartPaddings: ImportChartCheckResult['chartPaddings']}

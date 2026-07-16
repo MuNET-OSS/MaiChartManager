@@ -1,7 +1,6 @@
-import { computed, defineComponent, effect, PropType, watch } from "vue";
-import { Button, CheckBox, Modal, NumberInput, Popover, Section } from "@munet/ui";
-import { ImportChartMessage, MessageLevel, ShiftMethod } from "@/client/apiGen";
-import { ImportChartMessageEx, ImportMeta, SavedOptions, TempOptions } from "./types";
+import { computed, defineComponent, PropType, useId, watch } from "vue";
+import { Button, CheckBox, Modal, NumberInput, Popover, Section, Select } from "@munet/ui";
+import type { ImportChartMessageEx, ImportMeta, SavedOptions, TempOptions } from "./types";
 import noJacket from '@/assets/noJacket.webp';
 import { addVersionList, genreList, showNeedPurchaseDialog } from "@/store/refs";
 import GenreInput from "@/components/GenreInput";
@@ -36,16 +35,24 @@ export default defineComponent({
       }
     })
 
+    const hasInvalidUtageMapping = computed(() => props.meta.some(item => {
+      const isUtage = props.savedOptions.genreId === UTAGE_GENRE || item.id >= 1e5;
+      if (!isUtage || item.maidataLevels.length < 2) return false;
+      const mapping = item.utageMapping;
+      return !mapping || mapping.isDoublePlayer && mapping.leftLevel === mapping.rightLevel;
+    }));
+
     return () => <Modal
-      width="min(50vw,50em)"
+      width="min(90vw,50em)"
+      innerClass="max-h-[90dvh] of-hidden"
       title={t('chart.import.importPrompt')}
       v-model:show={show.value}
     >{{
-      default: () => <div class="flex flex-col gap-3">
+      default: () => <div class="max-h-[calc(90dvh-10rem)] of-y-auto cst pr-1 space-y-3">
         <ImportAlert errors={props.errors} tempOptions={props.tempOptions}></ImportAlert>
         {!!props.meta.length && <>
-            {t('chart.import.assignId')}
-            <div class="of-y-auto cst max-h-20vh">
+            <div>{t('chart.import.assignId')}</div>
+            <div class="of-y-auto cst max-h-[50dvh]">
                 <div class="flex flex-col gap-3">
                   {props.meta.map((meta, i) => <MusicIdInput key={i} meta={meta} utage={props.savedOptions.genreId === UTAGE_GENRE}/>)}
                 </div>
@@ -84,7 +91,7 @@ export default defineComponent({
       </div>,
         actions: () => <>
           <Button class="w-0 grow" onClick={() => show.value = false}>{props.meta.length ? t('common.cancel') : t('common.close')}</Button>
-          {!!props.meta.length && <Button class="w-0 grow" onClick={props.proceed}>{t('purchase.continue')}</Button>}
+          {!!props.meta.length && <Button class="w-0 grow" disabled={hasInvalidUtageMapping.value} onClick={props.proceed}>{t('purchase.continue')}</Button>}
         </>
     }}</Modal>;
   }
@@ -96,18 +103,59 @@ const MusicIdInput = defineComponent({
     utage: {type: Boolean, required: true},
   },
   setup(props) {
+    const { t } = useI18n();
     const dxBase = computed(() => {
       const dx = props.meta.isDx ? 1e4 : 0
       const utage = props.utage ? 1e5 : 0
       return dx + utage;
     });
     const img = computed(() => props.meta.bg ? URL.createObjectURL(props.meta.bg) : noJacket);
+    const isUtage = computed(() => props.utage || props.meta.id >= 1e5);
+    const levelOptions = computed(() => props.meta.maidataLevels.map(level => ({
+      label: `inote_${level}`,
+      value: level,
+    })));
+    const playStyleInputName = useId();
 
-    return () => <div class="flex gap-3 items-center px of-hidden">
-      <img src={img.value} class="h-16 w-16 object-fill shrink-0"/>
-      <div class="w-0 grow">{props.meta.name}</div>
-      <MusicIdConflictNotifier id={props.meta.id}/>
-      <NumberInput v-model:value={props.meta.id} min={dxBase.value + 1} max={dxBase.value + 1e4 - 1} step={1} class="shrink-0"/>
+    return () => <div class="flex flex-col gap-3 px of-hidden">
+      <div class="flex flex-wrap gap-3 items-center">
+        <img src={img.value} class="h-16 w-16 object-fill shrink-0"/>
+        <div class="min-w-28 grow">{props.meta.name}</div>
+        <MusicIdConflictNotifier id={props.meta.id}/>
+        <NumberInput v-model:value={props.meta.id} min={dxBase.value + 1} max={119999} step={1} class="w-full sm:w-auto shrink-0"/>
+      </div>
+      {isUtage.value && props.meta.maidataLevels.length >= 2 && props.meta.utageMapping &&
+        <div class="flex flex-col gap-3 border-t border-t-solid border-gray/20 pt-3 sm:ml-19">
+          <div class="flex flex-wrap gap-x-5 gap-y-2">
+            <label class="flex gap-2 items-center">
+              <input type="radio" name={playStyleInputName} checked={!props.meta.utageMapping.isDoublePlayer}
+                     onChange={() => props.meta.utageMapping!.isDoublePlayer = false}/>
+              <span>{t('chart.import.utage.singlePlayer')}</span>
+            </label>
+            <label class="flex gap-2 items-center">
+              <input type="radio" name={playStyleInputName} checked={props.meta.utageMapping.isDoublePlayer}
+                     onChange={() => props.meta.utageMapping!.isDoublePlayer = true}/>
+              <span>{t('chart.import.utage.doublePlayer')}</span>
+            </label>
+          </div>
+          {props.meta.utageMapping.isDoublePlayer
+            ? <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="flex flex-col gap-1">
+                  <div class="text-sm">{t('chart.import.utage.leftChart')}</div>
+                  <Select options={levelOptions.value} v-model:value={props.meta.utageMapping.leftLevel}/>
+                </div>
+                <div class="flex flex-col gap-1">
+                  <div class="text-sm">{t('chart.import.utage.rightChart')}</div>
+                  <Select options={levelOptions.value} v-model:value={props.meta.utageMapping.rightLevel}/>
+                </div>
+                {props.meta.utageMapping.leftLevel === props.meta.utageMapping.rightLevel &&
+                  <div class="sm:col-span-2 text-sm text-red">{t('chart.import.utage.sameChartError')}</div>}
+              </div>
+            : <div class="flex flex-col gap-1">
+                <div class="text-sm">{t('chart.import.utage.basicChart')}</div>
+                <Select options={levelOptions.value} v-model:value={props.meta.utageMapping.basicLevel}/>
+              </div>}
+        </div>}
     </div>
   }
 })

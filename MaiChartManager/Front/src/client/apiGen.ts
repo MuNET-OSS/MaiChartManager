@@ -17,14 +17,6 @@ export enum VerifyStatus {
   Valid = "Valid",
 }
 
-export enum StorePurchaseStatus {
-  Succeeded = "Succeeded",
-  AlreadyPurchased = "AlreadyPurchased",
-  NotPurchased = "NotPurchased",
-  NetworkError = "NetworkError",
-  ServerError = "ServerError",
-}
-
 export enum ShiftMethod {
   Legacy = "Legacy",
   Bar = "Bar",
@@ -281,6 +273,7 @@ export interface ImportChartCheckResult {
   /** @format float */
   first?: number;
   previewTime?: SetAudioPreviewRequest;
+  maidataLevels?: number[] | null;
 }
 
 export interface ImportChartMessage {
@@ -291,6 +284,12 @@ export interface ImportChartMessage {
 export interface ImportChartResult {
   errors?: ImportChartMessage[] | null;
   fatal?: boolean;
+}
+
+export interface ImportDirEntry {
+  name?: string | null;
+  path?: string | null;
+  isDirectory?: boolean;
 }
 
 export interface InstallAquaMaiOnlineDto {
@@ -331,6 +330,8 @@ export interface MusicXmlWithABJacket {
   utageKanji?: string | null;
   comment?: string | null;
   /** @format int32 */
+  utagePlayStyle?: number;
+  /** @format int32 */
   version?: number;
   /** @format float */
   bpm?: number;
@@ -353,6 +354,10 @@ export interface MusicXmlWithABJacket {
   problems?: string[] | null;
 }
 
+export interface OpenExternalUrlRequest {
+  url?: string | null;
+}
+
 export interface PdxDriverStatusDto {
   isUsingWinusb?: boolean;
   /** @format int32 */
@@ -373,9 +378,15 @@ export interface RequestCopyToRequest {
   legacyFormat?: boolean;
 }
 
+export interface RequestExportMaidataRequest {
+  music?: MusicIdAndAssetDirPair[] | null;
+  ignoreVideo?: boolean;
+}
+
 export interface RequestPurchaseResult {
   errorMessage?: string | null;
-  status?: StorePurchaseStatus;
+  /** @format int32 */
+  status?: number;
 }
 
 export interface Section {
@@ -407,7 +418,6 @@ export interface SettingsDto {
   noScale?: boolean;
   ignoreLevel?: boolean;
   disableBga?: boolean;
-  useLegacyMaiLib?: boolean;
   convertJacketToAssetBundle?: boolean;
   /** @format int32 */
   uiZoom?: number;
@@ -1152,6 +1162,7 @@ export class Api<
         /** @format binary */
         file?: File;
         shift?: ShiftMethod;
+        side?: string;
       },
       params: RequestParams = {},
     ) =>
@@ -1175,11 +1186,15 @@ export class Api<
       id: number,
       level: number,
       assetDir: string,
+      query?: {
+        side?: string;
+      },
       params: RequestParams = {},
     ) =>
       this.request<string, any>({
         path: `/MaiChartManagerServlet/ChartPreviewApi/${assetDir}/${id}/${level}`,
         method: "GET",
+        query: query,
         format: "json",
         ...params,
       }),
@@ -1450,6 +1465,63 @@ export class Api<
     /**
      * No description
      *
+     * @tags ImportBrowse
+     * @name PickImportFolder
+     * @request GET:/MaiChartManagerServlet/PickImportFolderApi
+     */
+    PickImportFolder: (params: RequestParams = {}) =>
+      this.request<string, any>({
+        path: `/MaiChartManagerServlet/PickImportFolderApi`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags ImportBrowse
+     * @name ListImportDir
+     * @request GET:/MaiChartManagerServlet/ListImportDirApi
+     */
+    ListImportDir: (
+      query?: {
+        path?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<ImportDirEntry[], any>({
+        path: `/MaiChartManagerServlet/ListImportDirApi`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags ImportBrowse
+     * @name ReadImportFile
+     * @request GET:/MaiChartManagerServlet/ReadImportFileApi
+     */
+    ReadImportFile: (
+      query?: {
+        path?: string;
+        name?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<void, any>({
+        path: `/MaiChartManagerServlet/ReadImportFileApi`,
+        method: "GET",
+        query: query,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags ImportChart
      * @name ImportChartCheck
      * @request POST:/MaiChartManagerServlet/ImportChartCheckApi
@@ -1494,6 +1566,14 @@ export class Api<
         version?: number;
         assetDir?: string;
         shift?: ShiftMethod;
+        /** @default false */
+        utageDoublePlayer?: boolean;
+        /** @format int32 */
+        utageBasicLevel?: number;
+        /** @format int32 */
+        utageLeftLevel?: number;
+        /** @format int32 */
+        utageRightLevel?: number;
         /** @default false */
         debug?: boolean;
       },
@@ -2366,6 +2446,25 @@ export class Api<
     /**
      * No description
      *
+     * @tags MusicTransfer
+     * @name RequestExportMaidata
+     * @request POST:/MaiChartManagerServlet/RequestExportMaidataApi
+     */
+    RequestExportMaidata: (
+      data: RequestExportMaidataRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, any>({
+        path: `/MaiChartManagerServlet/RequestExportMaidataApi`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
      * @tags Oobe
      * @name GetGamePath
      * @request GET:/MaiChartManagerServlet/GetGamePathApi
@@ -2597,6 +2696,25 @@ export class Api<
       this.request<void, any>({
         path: `/MaiChartManagerServlet/SetSettingsApi`,
         method: "PUT",
+        body: data,
+        type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Shell
+     * @name OpenExternalUrl
+     * @request POST:/MaiChartManagerServlet/OpenExternalUrlApi
+     */
+    OpenExternalUrl: (
+      data: OpenExternalUrlRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<void, any>({
+        path: `/MaiChartManagerServlet/OpenExternalUrlApi`,
+        method: "POST",
         body: data,
         type: ContentType.Json,
         ...params,

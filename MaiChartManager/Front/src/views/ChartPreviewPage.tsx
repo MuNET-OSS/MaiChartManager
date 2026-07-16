@@ -17,6 +17,7 @@ export default defineComponent({
     const assetDir = route.query.assetDir as string ?? '';
     const songId = route.query.songId as string ?? '';
     const level = route.query.level as string ?? '';
+    const side = route.query.side === 'L' || route.query.side === 'R' ? route.query.side : undefined;
 
     const unityContext = new UnityWebgl({
       dataUrl,
@@ -27,8 +28,10 @@ export default defineComponent({
 
     unityContext.on("mounted", () => {
       setTimeout(() => {
+        const chartUrl = new URL(getUrl(`ChartPreviewApi/${assetDir}/${songId}/${level}`));
+        if (side) chartUrl.searchParams.set('side', side);
         unityContext.send("HandleJSMessages", "ReceiveMessage", [
-          getUrl(`ChartPreviewApi/${assetDir}/${songId}/${level}`),
+          chartUrl.toString(),
           getUrl(`GetMusicWavApi/${assetDir}/${songId}`),
           getUrl(`GetJacketApi/${assetDir}/${songId}`),
           '',

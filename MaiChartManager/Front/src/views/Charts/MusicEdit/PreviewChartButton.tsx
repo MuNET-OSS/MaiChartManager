@@ -2,11 +2,15 @@ import { defineComponent } from "vue";
 import { selectedADir } from "@/store/refs";
 import { t } from "@/locales";
 import { isPhotino } from "@/client/api";
+import { Button } from "@munet/ui";
+
+export type ChartSide = "L" | "R";
 
 export default defineComponent({
   props: {
     songId: {type: Number, required: true},
     level: {type: Number, required: true},
+    side: {type: String as () => ChartSide | undefined},
   },
   setup(props) {
     const openPreview = () => {
@@ -15,6 +19,7 @@ export default defineComponent({
         songId: String(props.songId),
         level: String(props.level),
       });
+      if (props.side) params.set('side', props.side);
       const width = 960;
       const height = 640;
       const left = (screen.width - width) / 2;
@@ -38,9 +43,10 @@ export default defineComponent({
     };
 
     return () => (
-      <button onClick={openPreview}>
+      <Button onClick={openPreview}>
+        <span class="i-material-symbols:play-arrow-rounded"/>
         {t('music.edit.previewChart')}
-      </button>
+      </Button>
     );
   },
 });

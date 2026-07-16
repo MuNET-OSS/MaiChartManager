@@ -11,7 +11,9 @@ namespace MaiChartManager.Controllers.Charts;
 public class ImportChartController(StaticSettings settings, ILogger<StaticSettings> logger, 
     MaidataImportService importService) : ControllerBase
 {
-    public record ImportChartCheckResult(bool Accept, IEnumerable<ImportChartMessage> Errors, Dictionary<ShiftMethod, float> chartPaddings, bool IsDx, string? Title, float first, CueConvertController.SetAudioPreviewRequest? previewTime);
+    public record ImportChartCheckResult(bool Accept, IEnumerable<ImportChartMessage> Errors,
+        Dictionary<ShiftMethod, float> chartPaddings, bool IsDx, string? Title, float first,
+        CueConvertController.SetAudioPreviewRequest? previewTime, IEnumerable<int> MaidataLevels);
 
     [HttpPost]
     public ImportChartCheckResult ImportChartCheck(IFormFile file, [FromForm] bool isReplacement = false)
@@ -81,8 +83,6 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
             List<MaiChart> resultCharts = [];
             foreach (var (lv, data) in maiData.Levels)
             {
-                if (!targetLevelMap.ContainsKey(lv)) continue;
-                
                 // 转谱，并记录期间的警告等返回信息
                 List<Alert> alerts = [];
                 try
@@ -134,14 +134,15 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
                 previewTime = new CueConvertController.SetAudioPreviewRequest(start, start + (len??10000f));
             }
             
-            return new ImportChartCheckResult(!fatal, errors, chartPaddingsSec, isDx, title, first, previewTime);
+            return new ImportChartCheckResult(!fatal, errors, chartPaddingsSec, isDx, title, first, previewTime,
+                maiData.Levels.Keys);
         }
         catch (Exception e)
         {
             logger.LogError(e, "解析谱面失败（大）");
             errors.Add(new ImportChartMessage(Locale.ChartParseFailedGlobal, MessageLevel.Fatal));
             fatal = true;
-            return new ImportChartCheckResult(!fatal, errors, new Dictionary<ShiftMethod, float>(), false, "", 0, null);
+            return new ImportChartCheckResult(!fatal, errors, new Dictionary<ShiftMethod, float>(), false, "", 0, null, []);
         }
     }
     
@@ -156,10 +157,19 @@ public class ImportChartController(StaticSettings settings, ILogger<StaticSettin
         [FromForm] int version,
         [FromForm] string assetDir,
         [FromForm] ShiftMethod shift,
+        [FromForm] bool utageDoublePlayer = false,
+        [FromForm] int? utageBasicLevel = null,
+        [FromForm] int? utageLeftLevel = null,
+        [FromForm] int? utageRightLevel = null,
         [FromForm] bool debug = false)
     {
         var music = settings.GetMusic(id, assetDir);
-        var importMaidataResult = importService.ImportMaidata(music!, file, shift, ignoreLevelNum, debug);
+        var isUtage = genreId == 107 || id >= 100000;
+        var utageOptions = isUtage
+            ? new UtageImportOptions(utageDoublePlayer, utageBasicLevel, utageLeftLevel, utageRightLevel)
+            : null;
+        var importMaidataResult = importService.ImportMaidata(music!, file, shift, ignoreLevelNum, debug,
+            utageOptions: utageOptions);
         if (!importMaidataResult.Fatal)
         {
             music!.AddVersionId = addVersionId;

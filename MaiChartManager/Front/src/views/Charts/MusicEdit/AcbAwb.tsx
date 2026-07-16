@@ -86,29 +86,29 @@ export default defineComponent({
       }
     }
 
-    return () => <div class="flex items-center gap-2 mt-2">
-      {props.song.isAcbAwbExist && <audio controls src={url.value} class="w-0 grow"/>}
-      {selectedADir.value !== 'A000' && (cueIdNotMatch.value
+    return () => <div class="flex flex-wrap items-center gap-2 mt-2">
+      {props.song.isAcbAwbExist && <audio controls src={url.value} class="w-full min-[640px]:w-0 min-[640px]:grow"/>}
+      {selectedADir.value !== 'A000' && <div class="shrink-0">{cueIdNotMatch.value
         ? <Popover trigger="hover">{{
-          trigger: () => <Button variant="secondary" class={`${!props.song.isAcbAwbExist && "w-full"}`} onClick={() => uploadFlow()} ing={load.value} disabled>{props.song.isAcbAwbExist ? t('music.edit.replaceAudio') : t('music.edit.setAudio')}</Button>,
-          default: () => t('music.edit.cueIdNotMatch')
-        }}</Popover>
+            trigger: () => <Button variant="secondary" class={`${!props.song.isAcbAwbExist && "w-full"}`} onClick={() => uploadFlow()} ing={load.value} disabled>{props.song.isAcbAwbExist ? t('music.edit.replaceAudio') : t('music.edit.setAudio')}</Button>,
+            default: () => t('music.edit.cueIdNotMatch')
+          }}</Popover>
         : <Button variant="secondary" class={`${!props.song.isAcbAwbExist && "w-full"}`} onClick={() => uploadFlow()} ing={load.value}>{props.song.isAcbAwbExist ? t('music.edit.replaceAudio') : t('music.edit.setAudio')}</Button>
-      )}
-      {selectedADir.value !== 'A000' && props.song.isAcbAwbExist && (cueIdNotMatch.value
+      }</div>}
+      {selectedADir.value !== 'A000' && props.song.isAcbAwbExist && <div class="shrink-0">{cueIdNotMatch.value
         ? <Popover trigger="hover">{{
-          trigger: () => <AudioPreviewEditorButton disabled/>,
-          default: () => t('music.edit.cueIdNotMatchPreview')
-        }}</Popover>
+            trigger: () => <AudioPreviewEditorButton disabled/>,
+            default: () => t('music.edit.cueIdNotMatchPreview')
+          }}</Popover>
         : <AudioPreviewEditorButton/>
-      )}
-      {selectedADir.value !== 'A000' && props.song.isAcbAwbExist && (movieIdNotMatch.value
+      }</div>}
+      {selectedADir.value !== 'A000' && props.song.isAcbAwbExist && <div class="shrink-0">{movieIdNotMatch.value
         ? <Popover trigger="hover">{{
-          trigger: () => <SetMovieButton song={props.song} disabled/>,
-          default: () => t('music.edit.movieIdNotMatch')
-        }}</Popover>
+            trigger: () => <SetMovieButton song={props.song} disabled/>,
+            default: () => t('music.edit.movieIdNotMatch')
+          }}</Popover>
         : <SetMovieButton song={props.song}/>
-      )}
+      }</div>}
 
       {/* 打开文件对话框一般在左上角，所以在下边显示一个 Drawer */}
       <BottomOverlay title={t('music.edit.selectFileTypes')} show={tipShow.value}>

@@ -8,7 +8,7 @@ namespace MaiChartManager.Controllers.Charts;
 public class ChartPreviewController(StaticSettings settings) : ControllerBase
 {
     [HttpGet]
-    public string Maidata(int id, int level, string assetDir)
+    public string Maidata(int id, int level, string assetDir, [FromQuery] string? side = null)
     {
         var music = settings.GetMusic(id, assetDir);
         var chart = music?.Charts[level];
@@ -17,7 +17,8 @@ public class ChartPreviewController(StaticSettings settings) : ControllerBase
             return "No chart found";
         }
 
-        var path = Path.Combine(Path.GetDirectoryName(music!.FilePath)!, chart.Path);
+        var chartPath = side is "L" or "R" ? chart.Path.Replace(".ma2", $"_{side}.ma2") : chart.Path;
+        var path = Path.Combine(Path.GetDirectoryName(music!.FilePath)!, chartPath);
         if (!System.IO.File.Exists(path))
         {
             return "No chart found";
