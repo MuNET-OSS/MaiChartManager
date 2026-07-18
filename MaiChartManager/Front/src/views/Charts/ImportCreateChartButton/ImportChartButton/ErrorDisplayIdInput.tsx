@@ -44,11 +44,10 @@ export default defineComponent({
 
     return () => <Modal
       width="min(90vw,50em)"
-      innerClass="max-h-[90dvh] of-hidden"
       title={t('chart.import.importPrompt')}
       v-model:show={show.value}
     >{{
-      default: () => <div class="max-h-[calc(90dvh-10rem)] of-y-auto cst pr-1 space-y-3">
+      default: () => <div class="flex flex-col gap-3">
         <ImportAlert errors={props.errors} tempOptions={props.tempOptions}></ImportAlert>
         {!!props.meta.length && <>
             <div>{t('chart.import.assignId')}</div>
@@ -125,7 +124,7 @@ const MusicIdInput = defineComponent({
         <NumberInput v-model:value={props.meta.id} min={dxBase.value + 1} max={119999} step={1} class="w-full sm:w-auto shrink-0"/>
       </div>
       {isUtage.value && props.meta.maidataLevels.length >= 2 && props.meta.utageMapping &&
-        <div class="flex flex-col gap-3 border-t border-t-solid border-gray/20 pt-3 sm:ml-19">
+        <div class="flex flex-col gap-3 sm:ml-19">
           <div class="flex flex-wrap gap-x-5 gap-y-2">
             <label class="flex gap-2 items-center">
               <input type="radio" name={playStyleInputName} checked={!props.meta.utageMapping.isDoublePlayer}
