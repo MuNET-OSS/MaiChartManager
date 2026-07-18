@@ -1,4 +1,4 @@
-import { defineComponent, onMounted, ref } from 'vue';
+import { computed, defineComponent, onMounted, ref, Transition, watch, type Component } from 'vue';
 import { showTransactionalDialog } from '@munet/ui';
 import GenreVersionManager from './GenreVersionManager';
 import { globalCapture, updateAll, updateVersion, version, assetDirs, selectedADir, sidebarActive } from '@/store/refs';
@@ -16,11 +16,31 @@ import Splash from '@/components/Splash';
 import { ensureBackendUrl } from '@/utils/ensureBackendUrl';
 import ChangelogModal from '@/components/ChangelogModal';
 import { isLocalHost } from '@/client/api';
+import styles from './Index.module.sass';
+
+const tabOrder = ['charts', 'mods', 'batch', 'genres', 'tools', 'settings'] as const satisfies readonly SidebarItem[];
+
+const tabViews = {
+  charts: Charts,
+  mods: ModManager,
+  batch: BatchActionButton,
+  genres: GenreVersionManager,
+  tools: Tools,
+  settings: Settings,
+} satisfies Record<SidebarItem, Component>;
 
 export default defineComponent({
   setup() {
     const { t } = useI18n();
     const loaded = ref(false);
+    const transitionName = ref('tab-forward');
+    const activeView = computed(() => tabViews[sidebarActive.value]);
+
+    watch(sidebarActive, (current, previous) => {
+      transitionName.value = tabOrder.indexOf(current) < tabOrder.indexOf(previous)
+        ? 'tab-reverse'
+        : 'tab-forward';
+    });
 
     onMounted(async () => {
       document.title = `MaiChartManager (${location.host})`;
@@ -77,12 +97,13 @@ export default defineComponent({
         <ChangelogModal ready={loaded.value} />
         <div class={['grid cols-1 pb-14 md:pb-0 md:cols-[auto_1fr]']}>
           <Sidebar v-model:active={sidebarActive.value} />
-          {sidebarActive.value === 'charts' && <Charts />}
-          {sidebarActive.value === 'mods' && <ModManager />}
-          {sidebarActive.value === 'genres' && <GenreVersionManager />}
-          {sidebarActive.value === 'batch' && <BatchActionButton />}
-          {sidebarActive.value === 'tools' && <Tools />}
-          {sidebarActive.value === 'settings' && <Settings />}
+          <div class="h-100dvh min-w-0 of-hidden">
+            <Transition name={transitionName.value} mode="out-in">
+              <div key={sidebarActive.value} class={styles.page}>
+                <activeView.value />
+              </div>
+            </Transition>
+          </div>
         </div>
       </div>
     );
