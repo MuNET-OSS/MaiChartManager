@@ -5,7 +5,7 @@
             "label": "Backend",
             "command": "dotnet",
             "type": "process",
-            "args": ["run", "--project", "${workspaceFolder}/MaiChartManager"],
+            "args": ["run", "--project", "${workspaceFolder}/MaiChartManager", "--configuration", "LinuxDebugBackend"],
             "isBackground": true,
             "problemMatcher": {
                 "base": "$msCompile",

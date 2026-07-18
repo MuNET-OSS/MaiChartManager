@@ -8,7 +8,7 @@ namespace MaiChartManager;
 
 public static class LinuxProgram
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         Directory.CreateDirectory(StaticSettings.appData);
         Directory.CreateDirectory(StaticSettings.tempPath);
@@ -19,7 +19,7 @@ public static class LinuxProgram
         // Kestrel 在后台线程运行（StartApp 内部 Task.Run），主线程留给 Photino 开窗。
         var serverReady = new ManualResetEventSlim(false);
         string? backendUrl = null;
-        ServerManager.StartApp(export: false, serveSpa: true, onStart: url =>
+        var serverTask = ServerManager.StartApp(export: false, serveSpa: true, onStart: url =>
         {
             backendUrl = url;
             serverReady.Set();
@@ -42,6 +42,9 @@ public static class LinuxProgram
             ? $"{backendUrl.TrimEnd('/')}/#/oobe"
             : backendUrl;
 
+#if BACKENDONLY
+        await serverTask;
+#else
         // Photino 必须在主线程创建并显示窗口。Linux 下底层走系统 WebKitGTK。
         // 加载 Kestrel 的 loopback 地址：SPA 与 API 同源，前端无需注入 backendUrl。
         var window = new PhotinoWindow()
@@ -59,6 +62,7 @@ public static class LinuxProgram
         window.RegisterWebMessageReceivedHandler((sender, message) => HandleWebMessage(window, message));
 
         window.WaitForClose();
+#endif
     }
 
     /// <summary>

@@ -16,7 +16,7 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <NoWarn>NU1605</NoWarn>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Configurations>Debug;Release;Crack;LinuxDebug;LinuxRelease</Configurations>
+    <Configurations>Debug;Release;Crack;LinuxDebug;LinuxRelease;LinuxDebugBackend</Configurations>
     <PublishDir>..\Packaging\Pack</PublishDir>
     <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
     <CETCompat>false</CETCompat>
@@ -61,7 +61,11 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='LinuxDebug'">
     <IsPublishable>False</IsPublishable>
-    <DefineConstants>TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='LinuxDebugBackend'">
+    <IsPublishable>False</IsPublishable>
+    <DefineConstants>TRACE;BACKENDONLY;DEBUG</DefineConstants>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)'=='LinuxRelease'">
     <IsPublishable>True</IsPublishable>

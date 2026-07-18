@@ -4,7 +4,7 @@
 # 直接用当前工作树构建。请在仓库内 `Packaging/arch/` 目录执行 `makepkg -si`。
 
 pkgname=maichartmanager
-pkgver=26.3.r49.g16f9f82
+pkgver=26.3.r53.g328bdc8
 pkgrel=1
 pkgdesc="maimai 谱面管理工具（Linux 原生，Photino + WebKitGTK）"
 arch=('x86_64')
