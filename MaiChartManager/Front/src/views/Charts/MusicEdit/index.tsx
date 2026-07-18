@@ -18,6 +18,7 @@ import { getUrl } from "@/client/api";
 import { t } from "@/locales";
 import { CheckBox, NumberInput, TextInput, Tabs, TabPane, Popover } from "@munet/ui";
 import { NTabPane, NTabs } from "naive-ui";
+import styles from './index.module.sass';
 
 const Component = defineComponent({
   setup() {
@@ -143,7 +144,7 @@ const Component = defineComponent({
             </div>
           </div>}
         <AcbAwb song={info.value}/>
-        <NTabs type="line" animated barWidth={0} v-model:value={selectedLevel.value} class="levelTabs"
+        <NTabs type="line" animated barWidth={0} v-model:value={selectedLevel.value} class={["levelTabs", isUtage.value && styles.utageTabs]}
                style={{ '--n-tab-padding': 0, '--n-pane-padding-top': 0, '--n-tab-text-color-hover': '' }}>
           {chartIndexes.value.map(index =>
             <NTabPane key={index} name={index} tab={DIFFICULTY[index]}>
@@ -151,7 +152,8 @@ const Component = defineComponent({
                 tab: () => <Tab index={index} chart={info.value?.charts![index]!} selected={selectedLevel.value === index}/>,
               default: () => <ChartPanel chart={info.value?.charts![index]!} songId={info.value?.id!} chartIndex={index}
                                            doublePlayer={info.value?.utagePlayStyle === 1}
-                                           class="pxy pt-2 rounded-[0_0_.5em_.5em]" style={{ backgroundColor: `color-mix(in srgb, ${LEVEL_COLOR[index]}, transparent 90%)`, '--hue': LEVEL_HUE[index] }}/>
+                                           class={["pxy pt-2", isUtage.value ? 'rounded-[.5em]' : 'rounded-[0_0_.5em_.5em]']}
+                                           style={{ backgroundColor: `color-mix(in srgb, ${isUtage.value ? '#E434B4' : LEVEL_COLOR[index]}, transparent 90%)`, '--hue': isUtage.value ? '342' : LEVEL_HUE[index] }}/>
               }}
             </NTabPane>
           )}

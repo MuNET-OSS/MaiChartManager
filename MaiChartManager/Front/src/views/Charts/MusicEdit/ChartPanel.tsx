@@ -9,6 +9,7 @@ import { useI18n } from 'vue-i18n';
 import { Button, CheckBox, NumberInput, Select, TextInput } from "@munet/ui";
 import { prepareReplaceChart } from "@/components/DragDropDispatcher/ReplaceChartModal";
 import type { ChartSide } from "@/views/Charts/MusicEdit/PreviewChartButton";
+import styles from './index.module.sass';
 
 const LEVELS_OPTIONS = LEVELS.map((level, index) => ({label: level, value: index}));
 
@@ -43,14 +44,9 @@ export default defineComponent({
     watch(() => props.chart.levelId, sync('levelId', api.EditChartLevelDisplay));
 
     const sideRow = (side: ChartSide, label: string) => <div class="flex flex-wrap items-center gap-2">
-      <span class="w-7 h-7 flex items-center justify-center rounded bg-[var(--link-color)]/12 text-[var(--link-color)] font-600 shrink-0">
-        {side}
-      </span>
       <span class="text-sm font-500">{label}</span>
-      <code class="text-xs op-60 w-0 grow min-w-32 truncate">{props.chart.path?.replace('.ma2', `_${side}.ma2`)}</code>
       <PreviewChartButton songId={props.songId} level={props.chartIndex} side={side}/>
       <Button onClick={() => prepareReplaceChart(undefined, side)}>
-        <span class="i-material-symbols:drive-file-rename-outline-rounded"/>
         {t('music.edit.replaceChart')}
       </Button>
     </div>;
@@ -59,16 +55,13 @@ export default defineComponent({
         {!props.doublePlayer && <div class="absolute right-0 top-0 m-xy mt-2 z-2 flex gap-2">
           <PreviewChartButton songId={props.songId} level={props.chartIndex}/>
           <Button onClick={() => prepareReplaceChart()}>
-            <span class="i-material-symbols:drive-file-rename-outline-rounded"/>
             {t('music.edit.replaceChart')}
           </Button>
         </div>}
-        {props.doublePlayer && <div class="flex flex-col gap-2 pb-3 mb-1 border-b border-b-solid border-gray/20">
-          <div class="text-sm font-600 text-[var(--link-color)]">{t('music.edit.doublePlayerChart')}</div>
+        {props.doublePlayer && <div class={["right-0 top-0 m-x mt-2 z-2 flex justify-end gap-8", styles.doublePlayerChartPanel]}>
           {sideRow('L', t('music.edit.leftChart'))}
           {sideRow('R', t('music.edit.rightChart'))}
         </div>}
-        {props.doublePlayer && <div class="text-sm font-600 text-[var(--link-color)]">{t('music.edit.sharedChartSettings')}</div>}
         <div class="flex items-center gap-2">
           <CheckBox v-model:value={props.chart.enable} class="m-1">{t('music.edit.chartEnable')}</CheckBox>
           <ProblemsDisplay problems={props.chart.problems!}/>

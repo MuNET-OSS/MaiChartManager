@@ -44,7 +44,6 @@ export default defineComponent({
 
     return () => (
       <Button onClick={openPreview}>
-        <span class="i-material-symbols:play-arrow-rounded"/>
         {t('music.edit.previewChart')}
       </Button>
     );
