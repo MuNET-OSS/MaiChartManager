@@ -112,18 +112,10 @@ public static class Audio
         // ext 形如 ".mp3"/".wav"/".aac" 等；去掉前导点用作临时输入文件后缀
         var inputExt = string.IsNullOrEmpty(ext) ? "" : (ext.StartsWith('.') ? ext : "." + ext);
 
-        // 输入已是 wav 时无需 ffmpeg 转码，直接拷贝流内容
-        if (inputExt.Equals(".wav", StringComparison.OrdinalIgnoreCase))
-        {
-            var ms = new MemoryStream();
-            src.CopyTo(ms);
-            ms.Position = 0;
-            return ms;
-        }
-
         var tempFileGuid = Guid.NewGuid();
+        // 输入/输出须用不同文件名，以防输入也是 .wav时，输入输出相同文件名导致报错。
         var inputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToWav_{tempFileGuid:N}{inputExt}");
-        var outputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToWav_{tempFileGuid:N}.wav");
+        var outputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToWav_{tempFileGuid:N}_out.wav");
         try
         {
             Directory.CreateDirectory(StaticSettings.tempPath);
