@@ -191,7 +191,7 @@
     <value>有一個難度為 {0} 的譜面將被忽略</value>
   </data>
     <data name="MusicNoCharts" xml:space="preserve">
-    <value>樂曲沒有譜面</value>
+    <value>樂曲中沒有有效的譜面</value>
   </data>
     <data name="ChartInvalidMeasure" xml:space="preserve">
     <value>譜面難度 {0} 存在 {1} 分音符，這個數值不能大於 384。絕大多數這樣的情況都是可以修改譜面解決的</value>
