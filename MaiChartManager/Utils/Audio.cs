@@ -67,9 +67,11 @@ public static class Audio
         using WaveStream reader = extension switch
         {
             ".ogg" => new NAudio.Vorbis.VorbisWaveReader(src, true),
-            ".mp3" when !forceUseNAudio => new WaveFileReader(ConvertToWavViaFfmpeg(src, ".mp3")), // 默认情况下，优先使用ffmpeg
-            // WAV / WMA / AAC（以及 MP3+forceUseNAudio 的兼容模式）原本走 Windows-only 的 MediaFoundation，
-            // 跨平台改为用 ffmpeg 把任意输入解码成 16bit PCM wav，再用 NAudio WaveFileReader 读取。
+            // MP3 兼容模式（ignoreGapless）：仅在 Windows 上用 MediaFoundation 解码，
+            // 这会忽略 MP3 Gapless 元数据，从而表现与 Visual Maimai 等软件一致的行为。
+            // Linux 上无 MediaFoundation，因此兼容模式不可用（不管开不开启兼容模式，都一定会落到下面的ffmpeg逻辑中）
+            ".mp3" when forceUseNAudio && SupportsMp3CompatibilityMode => new StreamMediaFoundationReader(src),
+            // 一般情况（MP3 默认、WAV、WMA、AAC 等）：走 ffmpeg 解码为 16bit PCM wav。
             _ => new WaveFileReader(ConvertToWavViaFfmpeg(src, extension)),
         };
         // 关于上述MP3 Gapless问题的影响等具体讨论，详见 https://github.com/MuNET-OSS/MaiChartManager/issues/40
@@ -99,14 +101,27 @@ public static class Audio
         stream.Position = 0;
         return stream;
     }
+    
+    /// <summary>MP3 兼容模式（ignoreGapless）依赖 Windows MediaFoundation，Linux 上不可用。</summary>
+    public static bool SupportsMp3CompatibilityMode => OperatingSystem.IsWindows();
 
     // 用 ffmpeg 把任意输入流（按 ext 写到临时文件）解码成 16bit PCM wav，返回 wav 的内存流。
     // 替代 Windows-only 的 MediaFoundation，跨平台可用（系统 ffmpeg 已配好）。
     private static MemoryStream ConvertToWavViaFfmpeg(Stream src, string ext)
     {
-        var tempFileGuid = Guid.NewGuid();
         // ext 形如 ".mp3"/".wav"/".aac" 等；去掉前导点用作临时输入文件后缀
         var inputExt = string.IsNullOrEmpty(ext) ? "" : (ext.StartsWith('.') ? ext : "." + ext);
+
+        // 输入已是 wav 时无需 ffmpeg 转码，直接拷贝流内容
+        if (inputExt.Equals(".wav", StringComparison.OrdinalIgnoreCase))
+        {
+            var ms = new MemoryStream();
+            src.CopyTo(ms);
+            ms.Position = 0;
+            return ms;
+        }
+
+        var tempFileGuid = Guid.NewGuid();
         var inputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToWav_{tempFileGuid:N}{inputExt}");
         var outputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToWav_{tempFileGuid:N}.wav");
         try

@@ -8,16 +8,24 @@ namespace MaiChartManager.Controllers.App;
 public class AppVersionController(StaticSettings settings, ILogger<AppVersionController> logger) : ControllerBase
 {
 #if WINDOWS
-    public record AppVersionResult(string Version, int GameVersion, IapManager.LicenseStatus License, VideoConvert.HardwareAccelerationStatus HardwareAcceleration, string H264Encoder, string Locale);
+    public record AppVersionResult(string Version, int GameVersion, IapManager.LicenseStatus License, VideoConvert.HardwareAccelerationStatus HardwareAcceleration, string H264Encoder, string Locale, string Platform, bool Export);
 
     [HttpGet]
     public AppVersionResult GetAppVersion()
     {
-        return new AppVersionResult(Application.ProductVersion, settings.gameVersion, IapManager.License, VideoConvert.HardwareAcceleration, VideoConvert.H264Encoder, StaticSettings.CurrentLocale);
+        return new AppVersionResult(
+            Application.ProductVersion,
+            settings.gameVersion,
+            IapManager.License,
+            VideoConvert.HardwareAcceleration,
+            VideoConvert.H264Encoder,
+            StaticSettings.CurrentLocale,
+            OperatingSystem.IsWindows() ? "Windows" : "Linux",
+            StaticSettings.Config.Export);
     }
 #else
     public enum LicenseStatus { Pending, Active, Inactive }
-    public record AppVersionResult(string Version, int GameVersion, LicenseStatus License, VideoConvert.HardwareAccelerationStatus HardwareAcceleration, string H264Encoder, string Locale);
+    public record AppVersionResult(string Version, int GameVersion, LicenseStatus License, VideoConvert.HardwareAccelerationStatus HardwareAcceleration, string H264Encoder, string Locale, string Platform, bool Export);
 
     [HttpGet]
     public AppVersionResult GetAppVersion()
@@ -29,7 +37,15 @@ public class AppVersionController(StaticSettings settings, ILogger<AppVersionCon
         var info = (System.Reflection.AssemblyInformationalVersionAttribute?)System.Attribute
             .GetCustomAttribute(asm, typeof(System.Reflection.AssemblyInformationalVersionAttribute));
         var version = info?.InformationalVersion?.Split('+')[0] ?? "linux";
-        return new AppVersionResult(version, settings.gameVersion, LicenseStatus.Active, VideoConvert.HardwareAcceleration, VideoConvert.H264Encoder, StaticSettings.CurrentLocale);
+        return new AppVersionResult(
+            version,
+            settings.gameVersion,
+            LicenseStatus.Active,
+            VideoConvert.HardwareAcceleration,
+            VideoConvert.H264Encoder,
+            StaticSettings.CurrentLocale,
+            OperatingSystem.IsWindows() ? "Windows" : "Linux",
+            StaticSettings.Config.Export);
     }
 #endif
 }
