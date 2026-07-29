@@ -33,6 +33,4 @@ export const getCaptureTarget = (errorValue: unknown): unknown => {
   return errorValue.error;
 };
 
-export const isAbortError = (errorValue: unknown): boolean =>
-  errorValue instanceof DOMException && errorValue.name === "AbortError" ||
-  errorValue instanceof Error && errorValue.name === "AbortError";
+export const isAbortError = (errorValue: any): boolean => errorValue?.name === "AbortError"
