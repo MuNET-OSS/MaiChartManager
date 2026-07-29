@@ -23,7 +23,7 @@ public class ImportBrowseController(IDesktopDialogService dialogService, ILogger
     public ActionResult<string?> PickImportFolder()
     {
         // 仅本地桌面场景，export / 远程模式下禁止
-        if (StaticSettings.Config.Export) return Forbid();
+        if (StaticSettings.Config.Export) return StatusCode(StatusCodes.Status403Forbidden); // 如果直接 return Forbid(); 的话，会由于框架内部的某些authentication scheme机制造成抛异常，导致500
         var path = dialogService.PickFolder();
         logger.LogInformation("PickImportFolder: {path}", path);
         // 取消时 PickFolder 返回 null，这里原样返回（前端按取消处理）
@@ -35,7 +35,7 @@ public class ImportBrowseController(IDesktopDialogService dialogService, ILogger
     public ActionResult<IEnumerable<ImportDirEntry>> ListImportDir([FromQuery] string path)
     {
         // 仅本地桌面场景，export / 远程模式下禁止
-        if (StaticSettings.Config.Export) return Forbid();
+        if (StaticSettings.Config.Export) return StatusCode(StatusCodes.Status403Forbidden);
         if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
         {
             return Ok(Array.Empty<ImportDirEntry>());
@@ -64,7 +64,7 @@ public class ImportBrowseController(IDesktopDialogService dialogService, ILogger
     public IActionResult ReadImportFile([FromQuery] string path, [FromQuery] string? name = null)
     {
         // 仅本地桌面场景，export / 远程模式下禁止
-        if (StaticSettings.Config.Export) return Forbid();
+        if (StaticSettings.Config.Export) return StatusCode(StatusCodes.Status403Forbidden);
         var fullPath = string.IsNullOrEmpty(name) ? path : Path.Combine(path, name);
         if (string.IsNullOrEmpty(fullPath) || !System.IO.File.Exists(fullPath))
         {
