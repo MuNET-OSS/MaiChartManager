@@ -46,7 +46,8 @@ public record ResourceJunctionOverview(
 
 public class ResourceJunctionService
 {
-    public static readonly string[] ResourceNames = ["AssetBundleImages", "MovieData", "SoundData"];
+    public static IReadOnlyList<string> ResourceNames { get; } =
+        Array.AsReadOnly(["AssetBundleImages", "MovieData", "SoundData"]);
 
     private const uint IoReparseTagMountPoint = 0xA0000003;
     private readonly Func<string> targetPathProvider;
@@ -267,7 +268,9 @@ public class ResourceJunctionService
         {
             var fullPath = NormalizePath(currentPath);
             gameRoot = Directory.Exists(Path.Combine(fullPath, "Sinmai_Data", "StreamingAssets", "A000"))
-                ? Directory.GetParent(fullPath)?.FullName
+                ? string.Equals(Path.GetFileName(fullPath), "Package", StringComparison.OrdinalIgnoreCase)
+                    ? Directory.GetParent(fullPath)?.FullName
+                    : fullPath
                 : Directory.Exists(Path.Combine(fullPath, "Package", "Sinmai_Data", "StreamingAssets", "A000"))
                     ? fullPath
                     : null;
@@ -314,8 +317,27 @@ public class ResourceJunctionService
             var directory = new DirectoryInfo(Path.Combine(root, name));
             if (!directory.Exists || (directory.Attributes & FileAttributes.ReparsePoint) != 0)
                 throw new IOException($"{name} is missing or is a reparse point.");
-            return new ResourceDirectoryFileCount(name, directory.EnumerateFiles("*", SearchOption.AllDirectories).LongCount());
+            return new ResourceDirectoryFileCount(name, CountFilesWithoutReparsePoints(directory));
         }).ToArray();
+    }
+
+    private static long CountFilesWithoutReparsePoints(DirectoryInfo root)
+    {
+        var count = 0L;
+        var pending = new Stack<DirectoryInfo>();
+        pending.Push(root);
+        while (pending.TryPop(out var directory))
+        {
+            foreach (var entry in directory.EnumerateFileSystemInfos())
+            {
+                if ((entry.Attributes & FileAttributes.ReparsePoint) != 0) continue;
+                if (entry is DirectoryInfo child)
+                    pending.Push(child);
+                else
+                    count++;
+            }
+        }
+        return count;
     }
 
     private IReadOnlyList<ResourceJunctionItem> BuildUnavailableItems(string? targetRoot)

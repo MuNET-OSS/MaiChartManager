@@ -17,14 +17,6 @@ export enum VerifyStatus {
   Valid = "Valid",
 }
 
-export enum StorePurchaseStatus {
-  Succeeded = "Succeeded",
-  AlreadyPurchased = "AlreadyPurchased",
-  NotPurchased = "NotPurchased",
-  NetworkError = "NetworkError",
-  ServerError = "ServerError",
-}
-
 export enum ShiftMethod {
   Legacy = "Legacy",
   Bar = "Bar",
@@ -413,7 +405,8 @@ export interface RequestExportMaidataRequest {
 
 export interface RequestPurchaseResult {
   errorMessage?: string | null;
-  status?: StorePurchaseStatus;
+  /** @format int32 */
+  status?: number;
 }
 
 export interface ResourceDirectoryFileCount {
@@ -2742,12 +2735,12 @@ export class Api<
      *
      * @tags ResourceJunction
      * @name AutoSelectResourceJunctionSource
-     * @request GET:/MaiChartManagerServlet/AutoSelectResourceJunctionSourceApi
+     * @request POST:/MaiChartManagerServlet/AutoSelectResourceJunctionSourceApi
      */
     AutoSelectResourceJunctionSource: (params: RequestParams = {}) =>
       this.request<ResourceJunctionOverview, any>({
         path: `/MaiChartManagerServlet/AutoSelectResourceJunctionSourceApi`,
-        method: "GET",
+        method: "POST",
         format: "json",
         ...params,
       }),

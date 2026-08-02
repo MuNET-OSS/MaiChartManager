@@ -2,9 +2,13 @@ using MaiChartManager.Services;
 
 namespace MaiChartManager.Tests.Services;
 
+[CollectionDefinition("Static settings", DisableParallelization = true)]
+public sealed class StaticSettingsCollection;
+
+[Collection("Static settings")]
 public sealed class ResourceJunctionServiceTests : IDisposable
 {
-    private readonly string root = Path.Combine(Path.GetTempPath(), $"mcm-resource-links-{Guid.NewGuid():N}");
+    private readonly string root = Path.Combine(Path.GetTempPath(), $"mcm resource links & {Guid.NewGuid():N}");
     private readonly string sourceRoot;
     private readonly string targetRoot;
 
@@ -22,6 +26,7 @@ public sealed class ResourceJunctionServiceTests : IDisposable
     public void FixedScopeContainsOnlyThreeResourceDirectories()
     {
         Assert.Equal(["AssetBundleImages", "MovieData", "SoundData"], ResourceJunctionService.ResourceNames);
+        Assert.Throws<NotSupportedException>(() => ((IList<string>)ResourceJunctionService.ResourceNames)[0] = "OtherDirectory");
     }
 
     [Fact]
@@ -77,6 +82,31 @@ public sealed class ResourceJunctionServiceTests : IDisposable
     }
 
     [Fact]
+    public void AutoSelectionFindsSiblingForDirectSinmaiDataLayout()
+    {
+        var targetGame = CreateDirectGame("target-direct", [0, 0, 0]);
+        var sourceGame = CreateDirectGame("source-direct", [2, 2, 2]);
+        var previousGamePath = StaticSettings.GamePath;
+        var previousConfig = StaticSettings.Config;
+        try
+        {
+            StaticSettings.GamePath = targetGame;
+            StaticSettings.Config = new Config();
+
+            var overview = new ResourceJunctionService().AutoSelectSource();
+
+            Assert.Equal(ResourceSourceSelectionMode.Automatic, overview.SelectionMode);
+            Assert.Equal(Path.Combine(sourceGame, "Sinmai_Data", "StreamingAssets", "A000"), overview.SourceRoot);
+            Assert.Equal(6, overview.TotalFileCount);
+        }
+        finally
+        {
+            StaticSettings.GamePath = previousGamePath;
+            StaticSettings.Config = previousConfig;
+        }
+    }
+
+    [Fact]
     public void AutoSelectionRejectsResourceDirectoryJunctions()
     {
         if (!OperatingSystem.IsWindows()) return;
@@ -99,6 +129,38 @@ public sealed class ResourceJunctionServiceTests : IDisposable
         finally
         {
             Directory.Delete(resourcePath, false);
+        }
+    }
+
+    [Fact]
+    public void AutoSelectionDoesNotTraverseNestedReparsePoints()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var targetGame = CreateGame("target-game-nested-reparse", [0, 0, 0]);
+        var sourceGame = CreateGame("source-game-nested-reparse", [1, 1, 1]);
+        var externalDirectory = Path.Combine(root, "external-resource-files");
+        Directory.CreateDirectory(externalDirectory);
+        File.WriteAllText(Path.Combine(externalDirectory, "outside.dat"), "outside");
+        var nestedJunction = Path.Combine(
+            sourceGame,
+            "Package",
+            "Sinmai_Data",
+            "StreamingAssets",
+            "A000",
+            "AssetBundleImages",
+            "external-link");
+        CreateJunction(externalDirectory, nestedJunction);
+        try
+        {
+            var service = new ResourceJunctionService(() => targetGame, () => [sourceGame]);
+
+            var overview = service.AutoSelectSource();
+
+            Assert.Equal(3, overview.TotalFileCount);
+        }
+        finally
+        {
+            Directory.Delete(nestedJunction, false);
         }
     }
 
@@ -249,13 +311,27 @@ public sealed class ResourceJunctionServiceTests : IDisposable
     {
         var gameRoot = Path.Combine(root, name);
         var a000 = Path.Combine(gameRoot, "Package", "Sinmai_Data", "StreamingAssets", "A000");
-        for (var resourceIndex = 0; resourceIndex < ResourceJunctionService.ResourceNames.Length; resourceIndex++)
+        for (var resourceIndex = 0; resourceIndex < ResourceJunctionService.ResourceNames.Count; resourceIndex++)
         {
             var resourceRoot = Path.Combine(a000, ResourceJunctionService.ResourceNames[resourceIndex]);
             var nestedRoot = Path.Combine(resourceRoot, "nested");
             Directory.CreateDirectory(nestedRoot);
             for (var fileIndex = 0; fileIndex < fileCounts[resourceIndex]; fileIndex++)
                 File.WriteAllText(Path.Combine(nestedRoot, $"{fileIndex}.dat"), "test");
+        }
+        return gameRoot;
+    }
+
+    private string CreateDirectGame(string name, int[] fileCounts)
+    {
+        var gameRoot = Path.Combine(root, name);
+        var a000 = Path.Combine(gameRoot, "Sinmai_Data", "StreamingAssets", "A000");
+        for (var resourceIndex = 0; resourceIndex < ResourceJunctionService.ResourceNames.Count; resourceIndex++)
+        {
+            var resourceRoot = Path.Combine(a000, ResourceJunctionService.ResourceNames[resourceIndex]);
+            Directory.CreateDirectory(resourceRoot);
+            for (var fileIndex = 0; fileIndex < fileCounts[resourceIndex]; fileIndex++)
+                File.WriteAllText(Path.Combine(resourceRoot, $"{fileIndex}.dat"), "test");
         }
         return gameRoot;
     }

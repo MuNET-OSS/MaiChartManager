@@ -18,10 +18,11 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
         return Ok(service.GetOverview());
     }
 
-    [HttpGet]
+    [HttpPost]
     public ActionResult<ResourceJunctionOverview> AutoSelectResourceJunctionSource()
     {
         if (StaticSettings.Config.Export) return Forbid();
+        if (Request.Headers[LocalActionHeader] != LocalActionValue) return BadRequest();
         return Ok(service.AutoSelectSource());
     }
 

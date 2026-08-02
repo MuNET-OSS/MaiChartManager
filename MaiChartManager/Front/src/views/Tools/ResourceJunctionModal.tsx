@@ -12,15 +12,19 @@ export default defineComponent({
     const overview = ref<ResourceJunctionOverview>();
     const items = computed(() => overview.value?.items ?? []);
 
-    const canCreate = computed(() => items.value.some(item => item.status === 'Ready'));
-    const canRemove = computed(() => items.value.some(item => item.status === 'AlreadyLinked'));
+    const canCreate = computed(() => items.value.some(item => (
+      item.status === ResourceJunctionStatus.Ready || item.status === ResourceJunctionStatus.Removed
+    )));
+    const canRemove = computed(() => items.value.some(item => (
+      item.status === ResourceJunctionStatus.AlreadyLinked || item.status === ResourceJunctionStatus.Created
+    )));
 
     const request = async (action: 'auto' | 'status' | 'manual' | 'manualTarget' | 'create' | 'remove') => {
       loading.value = true;
       try {
         const writeParams = { headers: { 'X-MCM-Local-Action': 'resource-junction' } };
         const response = action === 'auto'
-          ? await api.AutoSelectResourceJunctionSource()
+          ? await api.AutoSelectResourceJunctionSource(writeParams)
           : action === 'status'
             ? await api.GetResourceJunctionStatus()
             : action === 'manual'
@@ -61,8 +65,12 @@ export default defineComponent({
     expose({ trigger });
 
     const statusClass = (status?: ResourceJunctionStatus) => {
-      if (['Created', 'AlreadyLinked', 'Removed'].includes(status)) return 'text-green-700';
-      if (status === 'Ready') return 'text-blue-700';
+      if (
+        status === ResourceJunctionStatus.Created
+        || status === ResourceJunctionStatus.AlreadyLinked
+        || status === ResourceJunctionStatus.Removed
+      ) return 'text-green-700';
+      if (status === ResourceJunctionStatus.Ready) return 'text-blue-700';
       return 'text-red-700';
     };
 
