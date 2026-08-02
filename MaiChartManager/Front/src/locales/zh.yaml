@@ -471,6 +471,39 @@ tools:
   videoConvertError: 视频转换出错
   imageToAb: 图片转 AssetBundle
   imageToAbError: 图片转 AB 出错
+  resourceJunction:
+    label: 游戏资源链接
+    title: 游戏资源链接
+    source: 只读源目录
+    target: 目标目录
+    noSource: 未自动选出源目录，请手动选择
+    selectSource: 手动选择源目录
+    selectTarget: 选择目标目录
+    fileCounts: 源目录资源文件数
+    total: 合计
+    refresh: 刷新状态
+    create: 建立链接
+    remove: 移除链接
+    loading: 正在读取状态…
+    requestFailed: 游戏资源链接操作失败
+    createConfirm: 只会在目标位置不存在时建立三个资源 Junction，确认继续？
+    removeConfirm: 只会移除正确指向当前源目录的 Junction，不会删除源文件，确认继续？
+    selection:
+      None: 未选择
+      Automatic: 自动选择
+      Manual: 手动选择
+      Tie: 文件数并列，请手动选择
+    status:
+      Ready: 可建立
+      Created: 已建立
+      AlreadyLinked: 已正确链接
+      Removed: 已移除
+      SourceMissing: 源目录缺失
+      TargetRootMissing: 目标根目录缺失
+      Conflict: 目标存在且不是 Junction
+      WrongTarget: Junction 指向错误
+      Failed: 操作失败
+      Unsupported: 当前系统不支持
   pvConvert:
     label: 转换 PV
     single: 单个转换

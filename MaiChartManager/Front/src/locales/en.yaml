@@ -532,6 +532,39 @@ tools:
   videoConvertError: Video conversion error
   imageToAb: Image to AssetBundle
   imageToAbError: Image to AB conversion error
+  resourceJunction:
+    label: Game Resource Links
+    title: Game Resource Links
+    source: Read-only source
+    target: Target directory
+    noSource: No source was selected automatically. Select one manually
+    selectSource: Select source manually
+    selectTarget: Select target directory
+    fileCounts: Source resource file counts
+    total: Total
+    refresh: Refresh status
+    create: Create links
+    remove: Remove links
+    loading: Reading status...
+    requestFailed: Game resource link operation failed
+    createConfirm: Create the three resource Junctions only where the target is missing?
+    removeConfirm: Remove only Junctions that point to the current source? Source files will not be deleted.
+    selection:
+      None: Not selected
+      Automatic: Automatically selected
+      Manual: Manually selected
+      Tie: File count tie; select manually
+    status:
+      Ready: Ready
+      Created: Created
+      AlreadyLinked: Linked correctly
+      Removed: Removed
+      SourceMissing: Source missing
+      TargetRootMissing: Target root missing
+      Conflict: Target is not a Junction
+      WrongTarget: Wrong Junction target
+      Failed: Failed
+      Unsupported: Unsupported system
   pvConvert:
     label: Convert PV
     single: Single convert

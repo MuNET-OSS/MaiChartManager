@@ -17,10 +17,38 @@ export enum VerifyStatus {
   Valid = "Valid",
 }
 
+export enum StorePurchaseStatus {
+  Succeeded = "Succeeded",
+  AlreadyPurchased = "AlreadyPurchased",
+  NotPurchased = "NotPurchased",
+  NetworkError = "NetworkError",
+  ServerError = "ServerError",
+}
+
 export enum ShiftMethod {
   Legacy = "Legacy",
   Bar = "Bar",
   NoShift = "NoShift",
+}
+
+export enum ResourceSourceSelectionMode {
+  None = "None",
+  Automatic = "Automatic",
+  Manual = "Manual",
+  Tie = "Tie",
+}
+
+export enum ResourceJunctionStatus {
+  Ready = "Ready",
+  Created = "Created",
+  AlreadyLinked = "AlreadyLinked",
+  Removed = "Removed",
+  SourceMissing = "SourceMissing",
+  TargetRootMissing = "TargetRootMissing",
+  Conflict = "Conflict",
+  WrongTarget = "WrongTarget",
+  Failed = "Failed",
+  Unsupported = "Unsupported",
 }
 
 export enum PubKeyId {
@@ -385,8 +413,32 @@ export interface RequestExportMaidataRequest {
 
 export interface RequestPurchaseResult {
   errorMessage?: string | null;
-  /** @format int32 */
-  status?: number;
+  status?: StorePurchaseStatus;
+}
+
+export interface ResourceDirectoryFileCount {
+  name?: string | null;
+  /** @format int64 */
+  fileCount?: number;
+}
+
+export interface ResourceJunctionItem {
+  name?: string | null;
+  source?: string | null;
+  target?: string | null;
+  status?: ResourceJunctionStatus;
+  detail?: string | null;
+}
+
+export interface ResourceJunctionOverview {
+  sourceRoot?: string | null;
+  targetRoot?: string | null;
+  selectionMode?: ResourceSourceSelectionMode;
+  fileCounts?: ResourceDirectoryFileCount[] | null;
+  /** @format int64 */
+  totalFileCount?: number;
+  detail?: string | null;
+  items?: ResourceJunctionItem[] | null;
 }
 
 export interface Section {
@@ -2667,6 +2719,96 @@ export class Api<
         path: `/MaiChartManagerServlet/SwitchPdxDriverApi`,
         method: "POST",
         query: query,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags ResourceJunction
+     * @name GetResourceJunctionStatus
+     * @request GET:/MaiChartManagerServlet/GetResourceJunctionStatusApi
+     */
+    GetResourceJunctionStatus: (params: RequestParams = {}) =>
+      this.request<ResourceJunctionOverview, any>({
+        path: `/MaiChartManagerServlet/GetResourceJunctionStatusApi`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags ResourceJunction
+     * @name AutoSelectResourceJunctionSource
+     * @request GET:/MaiChartManagerServlet/AutoSelectResourceJunctionSourceApi
+     */
+    AutoSelectResourceJunctionSource: (params: RequestParams = {}) =>
+      this.request<ResourceJunctionOverview, any>({
+        path: `/MaiChartManagerServlet/AutoSelectResourceJunctionSourceApi`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags ResourceJunction
+     * @name SelectResourceJunctionSource
+     * @request POST:/MaiChartManagerServlet/SelectResourceJunctionSourceApi
+     */
+    SelectResourceJunctionSource: (params: RequestParams = {}) =>
+      this.request<ResourceJunctionOverview, any>({
+        path: `/MaiChartManagerServlet/SelectResourceJunctionSourceApi`,
+        method: "POST",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags ResourceJunction
+     * @name SelectResourceJunctionTarget
+     * @request POST:/MaiChartManagerServlet/SelectResourceJunctionTargetApi
+     */
+    SelectResourceJunctionTarget: (params: RequestParams = {}) =>
+      this.request<ResourceJunctionOverview, any>({
+        path: `/MaiChartManagerServlet/SelectResourceJunctionTargetApi`,
+        method: "POST",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags ResourceJunction
+     * @name CreateResourceJunctions
+     * @request POST:/MaiChartManagerServlet/CreateResourceJunctionsApi
+     */
+    CreateResourceJunctions: (params: RequestParams = {}) =>
+      this.request<ResourceJunctionOverview, any>({
+        path: `/MaiChartManagerServlet/CreateResourceJunctionsApi`,
+        method: "POST",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags ResourceJunction
+     * @name RemoveResourceJunctions
+     * @request POST:/MaiChartManagerServlet/RemoveResourceJunctionsApi
+     */
+    RemoveResourceJunctions: (params: RequestParams = {}) =>
+      this.request<ResourceJunctionOverview, any>({
+        path: `/MaiChartManagerServlet/RemoveResourceJunctionsApi`,
+        method: "POST",
+        format: "json",
         ...params,
       }),
 
