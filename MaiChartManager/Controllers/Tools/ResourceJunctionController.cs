@@ -21,18 +21,17 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     [HttpPost]
     public ActionResult<ResourceJunctionOverview> AutoSelectResourceJunctionSource()
     {
-        if (StaticSettings.Config.Export) return Forbid();
-        if (Request.Headers[LocalActionHeader] != LocalActionValue) return BadRequest();
+        if (RejectUnavailableLocalAction() is { } rejection) return rejection;
         return Ok(service.AutoSelectSource());
     }
 
     [HttpPost]
     public ActionResult<ResourceJunctionOverview> SelectResourceJunctionSource()
     {
-        if (StaticSettings.Config.Export) return Forbid();
-        if (Request.Headers[LocalActionHeader] != LocalActionValue) return BadRequest();
+        if (RejectUnavailableLocalAction() is { } rejection) return rejection;
 
-        var path = dialogService.PickFolder("Select a source game directory or Package directory");
+        var path = dialogService.PickFolder(
+            Locale.ResourceManager.GetString("SelectResourceJunctionSourceFolder", Locale.Culture));
         if (path is null) return Ok(service.GetOverview());
         try
         {
@@ -51,10 +50,10 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     [HttpPost]
     public ActionResult<ResourceJunctionOverview> SelectResourceJunctionTarget()
     {
-        if (StaticSettings.Config.Export) return Forbid();
-        if (Request.Headers[LocalActionHeader] != LocalActionValue) return BadRequest();
+        if (RejectUnavailableLocalAction() is { } rejection) return rejection;
 
-        var path = dialogService.PickFolder("Select a target game directory or Package directory");
+        var path = dialogService.PickFolder(
+            Locale.ResourceManager.GetString("SelectResourceJunctionTargetFolder", Locale.Culture));
         if (path is null) return Ok(service.GetOverview());
         try
         {
@@ -69,8 +68,7 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     [HttpPost]
     public ActionResult<ResourceJunctionOverview> CreateResourceJunctions()
     {
-        if (StaticSettings.Config.Export) return Forbid();
-        if (Request.Headers[LocalActionHeader] != LocalActionValue) return BadRequest();
+        if (RejectUnavailableLocalAction() is { } rejection) return rejection;
         var items = service.CreateLinks();
         return Ok(service.GetOverview() with { Items = items });
     }
@@ -78,9 +76,14 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     [HttpPost]
     public ActionResult<ResourceJunctionOverview> RemoveResourceJunctions()
     {
-        if (StaticSettings.Config.Export) return Forbid();
-        if (Request.Headers[LocalActionHeader] != LocalActionValue) return BadRequest();
+        if (RejectUnavailableLocalAction() is { } rejection) return rejection;
         var items = service.RemoveLinks();
         return Ok(service.GetOverview() with { Items = items });
+    }
+
+    private ActionResult? RejectUnavailableLocalAction()
+    {
+        if (StaticSettings.Config.Export) return Forbid();
+        return Request.Headers[LocalActionHeader] != LocalActionValue ? BadRequest() : null;
     }
 }

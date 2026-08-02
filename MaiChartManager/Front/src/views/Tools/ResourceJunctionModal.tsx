@@ -19,6 +19,16 @@ export default defineComponent({
       item.status === ResourceJunctionStatus.AlreadyLinked || item.status === ResourceJunctionStatus.Created
     )));
 
+    const errorDetail = (error: unknown) => {
+      if (!error || typeof error !== 'object') return typeof error === 'string' ? error : undefined;
+      const payload = 'error' in error ? error.error : error;
+      if (typeof payload === 'string') return payload;
+      if (!payload || typeof payload !== 'object') return error instanceof Error ? error.message : undefined;
+      const detail = payload as { message?: unknown; error?: unknown };
+      if (typeof detail.message === 'string') return detail.message;
+      return typeof detail.error === 'string' ? detail.error : undefined;
+    };
+
     const request = async (action: 'auto' | 'status' | 'manual' | 'manualTarget' | 'create' | 'remove') => {
       loading.value = true;
       try {
@@ -37,7 +47,11 @@ export default defineComponent({
         overview.value = response.data;
       } catch (error) {
         console.error(error);
-        addToast({ message: t('tools.resourceJunction.requestFailed'), type: 'error' });
+        const detail = errorDetail(error);
+        addToast({
+          message: detail ? `${t('tools.resourceJunction.requestFailed')}: ${detail}` : t('tools.resourceJunction.requestFailed'),
+          type: 'error',
+        });
       } finally {
         loading.value = false;
       }
