@@ -21,3 +21,8 @@
 
 - 只验证前端动效且后端未启动时，初始化错误弹窗会遮住真实页面；可以仅在 QA 浏览器会话中关闭弹窗和根节点的 modal 状态，再采集页面证据，不要修改产品错误处理。
 - 动效证据矩阵送审前要逐项检查文件存在且非空，尤其是反向切换的 settled 帧；运行时 transform 数据不能替代缺失的视觉帧。
+
+## Linux 下验证 Windows 私有逻辑
+
+- 临时测试程序直接项目引用主项目时，默认配置会把主项目解析成 Windows TFM；先构建 `LinuxDebugBackend`，再引用其输出 DLL。
+- 引用主 Web 程序集的临时测试项目还需声明 `Microsoft.AspNetCore.App` FrameworkReference，否则运行时无法加载 MVC 程序集。
