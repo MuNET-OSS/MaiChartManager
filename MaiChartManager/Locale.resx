@@ -199,7 +199,7 @@ If you notice any issues with the conversion result, you can try testing it in A
     <value>A chart with difficulty {0} will be ignored</value>
   </data>
     <data name="MusicNoCharts" xml:space="preserve">
-    <value>Music has no charts</value>
+    <value>Music has no valid charts</value>
   </data>
     <data name="ChartInvalidMeasure" xml:space="preserve">
     <value>Chart difficulty {0} contains {1}-note division, this value cannot exceed 384. Most cases can be fixed by modifying the chart</value>
