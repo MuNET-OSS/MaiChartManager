@@ -16,6 +16,9 @@ public class OobeController(
     IAppShell appShell,
     IDesktopDialogService dialogService) : ControllerBase
 {
+    private bool IsLoopbackRequest()
+        => HttpContext.Connection.RemoteIpAddress is { } remoteIp && IPAddress.IsLoopback(remoteIp);
+
     [HttpGet]
     public string? GetGamePath()
     {
@@ -92,6 +95,7 @@ public class OobeController(
     [HttpPost]
     public async Task<IActionResult> CompleteSetup([FromBody] CompleteSetupRequest request)
     {
+        if (!IsLoopbackRequest()) return StatusCode(StatusCodes.Status403Forbidden);
         var exportChanged = request.Export != StaticSettings.Config.Export;
         StaticSettings.Config.Export = request.Export;
         StaticSettings.Config.UseAuth = request.UseAuth;
