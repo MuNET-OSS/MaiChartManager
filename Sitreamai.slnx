@@ -19,10 +19,7 @@
   <Project Path="SonicAudioTools/Source/SonicAudioLib/SonicAudioLib.csproj">
     <BuildType Solution="Crack|*" Project="Release" />
   </Project>
-  <Project Path="XV2-Tools/LB_Common/LB_Common.csproj">
-    <BuildType Solution="Crack|*" Project="Release" />
-  </Project>
-  <Project Path="XV2-Tools/Xv2CoreLib/Xv2CoreLib.csproj">
+  <Project Path="XV2-Tools/AcbCore/AcbCore.csproj">
     <BuildType Solution="Crack|*" Project="Release" />
   </Project>
 </Solution>

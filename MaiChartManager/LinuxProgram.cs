@@ -15,11 +15,10 @@ public static class LinuxProgram
         InitConfiguration();
         ConfigureFfmpeg();
 
-        // 启动进程内 Kestrel：loopback + 伺服 SPA（wwwroot）+ API 同源，但不开 LAN 端口。
-        // Kestrel 在后台线程运行（StartApp 内部 Task.Run），主线程留给 Photino 开窗。
+        var exportMode = StaticSettings.Config.Export;
         var serverReady = new ManualResetEventSlim(false);
         string? backendUrl = null;
-        var serverTask = ServerManager.StartApp(export: false, serveSpa: true, onStart: url =>
+        var serverTask = ServerManager.StartApp(export: exportMode, serveSpa: true, onStart: url =>
         {
             backendUrl = url;
             serverReady.Set();
@@ -38,7 +37,9 @@ public static class LinuxProgram
         // 决定初始路由（对齐 Windows AppMain 的逻辑）：
         // 未配置有效游戏目录时加载 OOBE 引导页（#/oobe），否则加载主界面（根路由）。
         // 直接加载主界面会让 SPA 立刻调用依赖 GamePath 的接口，导致一连串异常。
-        var startUrl = string.IsNullOrEmpty(StaticSettings.GamePath)
+        var startUrl = exportMode
+            ? $"{backendUrl.TrimEnd('/')}/#/server"
+            : string.IsNullOrEmpty(StaticSettings.GamePath)
             ? $"{backendUrl.TrimEnd('/')}/#/oobe"
             : backendUrl;
 

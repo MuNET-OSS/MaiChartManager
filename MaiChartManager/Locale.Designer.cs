@@ -141,6 +141,33 @@ namespace MaiChartManager {
         }
         
         /// <summary>
+        ///   Looks up a localized string similar to Selected folder does not exist.
+        /// </summary>
+        internal static string BatchConvertPvFolderNotFound {
+            get {
+                return ResourceManager.GetString("BatchConvertPvFolderNotFound", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to Batch PV conversion requires sponsor activation.
+        /// </summary>
+        internal static string BatchConvertPvNeedLicense {
+            get {
+                return ResourceManager.GetString("BatchConvertPvNeedLicense", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   Looks up a localized string similar to No PV files found in the matching format.
+        /// </summary>
+        internal static string BatchConvertPvNoFiles {
+            get {
+                return ResourceManager.GetString("BatchConvertPvNoFiles", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   Looks up a localized string similar to Browser window not initialized.
         /// </summary>
         internal static string BrowserNotInitialized {
@@ -667,7 +694,7 @@ namespace MaiChartManager {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to Music has no charts.
+        ///   Looks up a localized string similar to Music has no valid charts.
         /// </summary>
         internal static string MusicNoCharts {
             get {
@@ -798,33 +825,6 @@ namespace MaiChartManager {
         internal static string SelectVideoToConvert {
             get {
                 return ResourceManager.GetString("SelectVideoToConvert", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Batch PV conversion requires sponsor activation.
-        /// </summary>
-        internal static string BatchConvertPvNeedLicense {
-            get {
-                return ResourceManager.GetString("BatchConvertPvNeedLicense", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to No PV files found in the matching format.
-        /// </summary>
-        internal static string BatchConvertPvNoFiles {
-            get {
-                return ResourceManager.GetString("BatchConvertPvNoFiles", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   Looks up a localized string similar to Selected folder does not exist.
-        /// </summary>
-        internal static string BatchConvertPvFolderNotFound {
-            get {
-                return ResourceManager.GetString("BatchConvertPvFolderNotFound", resourceCulture);
             }
         }
         

@@ -17,6 +17,14 @@ export enum VerifyStatus {
   Valid = "Valid",
 }
 
+export enum StorePurchaseStatus {
+  Succeeded = "Succeeded",
+  AlreadyPurchased = "AlreadyPurchased",
+  NotPurchased = "NotPurchased",
+  NetworkError = "NetworkError",
+  ServerError = "ServerError",
+}
+
 export enum ShiftMethod {
   Legacy = "Legacy",
   Bar = "Bar",
@@ -90,6 +98,8 @@ export interface AppVersionResult {
   hardwareAcceleration?: HardwareAccelerationStatus;
   h264Encoder?: string | null;
   locale?: string | null;
+  platform?: string | null;
+  export?: boolean;
 }
 
 export interface AudioPreviewTime {
@@ -405,8 +415,7 @@ export interface RequestExportMaidataRequest {
 
 export interface RequestPurchaseResult {
   errorMessage?: string | null;
-  /** @format int32 */
-  status?: number;
+  status?: StorePurchaseStatus;
 }
 
 export interface ResourceDirectoryFileCount {

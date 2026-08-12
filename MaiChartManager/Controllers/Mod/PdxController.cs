@@ -20,7 +20,7 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
     {
         try
         {
-            return PdxDeviceHelper.GetDevicePaths(PdxDeviceHelper.PdxVid, PdxDeviceHelper.PdxPid);
+            return PdxDeviceHelper.GetDevicePaths();
         }
         catch (Exception ex)
         {
@@ -35,7 +35,7 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
         try
         {
             var paths = GetPdxDevicePaths();
-            var isWinUsb = PdxDeviceHelper.IsUsingWinUsb(PdxDeviceHelper.PdxVid, PdxDeviceHelper.PdxPid);
+            var isWinUsb = PdxDeviceHelper.IsUsingWinUsb();
             return new PdxDriverStatusDto(
                 IsUsingWinusb: isWinUsb,
                 DeviceCount: paths.Length,
@@ -98,8 +98,13 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
     /// </summary>
     private static class PdxDeviceHelper
     {
-        public const ushort PdxVid = 0x3356;
-        public const ushort PdxPid = 0x3003;
+        private readonly record struct SupportedDevice(ushort Vid, ushort Pid, byte Interface);
+
+        private static readonly SupportedDevice[] SupportedDevices =
+        [
+            new(0x3356, 0x3003, 1),
+            new(0x227D, 0x0103, 0)
+        ];
 
         private const int DIGCF_PRESENT = 0x02;
         private const int DIGCF_ALLCLASSES = 0x04;
@@ -145,10 +150,7 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
         [DllImport("setupapi.dll", CharSet = CharSet.Unicode)]
         private static extern bool SetupDiDestroyDeviceInfoList(IntPtr deviceInfoSet);
 
-        /// <summary>
-        /// 枚举所有匹配指定 VID/PID 的 USB 设备，返回它们的端口链路径（如 "2.2"）。
-        /// </summary>
-        public static string[] GetDevicePaths(ushort vid, ushort pid)
+        public static string[] GetDevicePaths()
         {
             var paths = new HashSet<string>();
             var deviceInfoSet = SetupDiGetClassDevs(
@@ -167,7 +169,8 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
 
                 for (var i = 0; SetupDiEnumDeviceInfo(deviceInfoSet, i, ref devInfoData); i++)
                 {
-                    if (!MatchesVidPid(deviceInfoSet, ref devInfoData, vid, pid))
+                    var hardwareIds = GetMultiStringProperty(deviceInfoSet, ref devInfoData, SPDRP_HARDWAREID);
+                    if (!MatchesSupportedDevice(hardwareIds, matchExclusiveInterface: false))
                         continue;
 
                     var portChain = GetPortChain(deviceInfoSet, ref devInfoData);
@@ -183,10 +186,7 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
             return [.. paths];
         }
 
-        /// <summary>
-        /// 检查是否有任何匹配指定 VID/PID 的 USB 设备正在使用 WinUSB 驱动。
-        /// </summary>
-        public static bool IsUsingWinUsb(ushort vid, ushort pid)
+        public static bool IsUsingWinUsb()
         {
             var deviceInfoSet = SetupDiGetClassDevs(
                 IntPtr.Zero, "USB", IntPtr.Zero,
@@ -204,12 +204,12 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
 
                 for (var i = 0; SetupDiEnumDeviceInfo(deviceInfoSet, i, ref devInfoData); i++)
                 {
-                    if (!MatchesVidPid(deviceInfoSet, ref devInfoData, vid, pid))
+                    var hardwareIds = GetMultiStringProperty(deviceInfoSet, ref devInfoData, SPDRP_HARDWAREID);
+                    if (!MatchesSupportedDevice(hardwareIds, matchExclusiveInterface: true))
                         continue;
 
                     var service = GetStringProperty(deviceInfoSet, ref devInfoData, SPDRP_SERVICE);
-                    if (string.Equals(service, "WinUSB", StringComparison.OrdinalIgnoreCase))
-                        return true;
+                    return string.Equals(service, "WinUSB", StringComparison.OrdinalIgnoreCase);
                 }
             }
             finally
@@ -220,23 +220,25 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
             return false;
         }
 
-        /// <summary>
-        /// 检查设备的 HardwareID 是否包含指定的 VID/PID。
-        /// HardwareID 格式如: USB\VID_3356&amp;PID_3003&amp;REV_0200
-        /// </summary>
-        private static bool MatchesVidPid(IntPtr deviceInfoSet, ref SP_DEVINFO_DATA devInfoData, ushort vid, ushort pid)
+        private static bool MatchesSupportedDevice(string[]? hardwareIds, bool matchExclusiveInterface)
         {
-            var hardwareIds = GetMultiStringProperty(deviceInfoSet, ref devInfoData, SPDRP_HARDWAREID);
             if (hardwareIds == null) return false;
 
-            var vidStr = $"VID_{vid:X4}";
-            var pidStr = $"PID_{pid:X4}";
-
-            foreach (var id in hardwareIds)
+            foreach (var device in SupportedDevices)
             {
-                if (id.Contains(vidStr, StringComparison.OrdinalIgnoreCase) &&
-                    id.Contains(pidStr, StringComparison.OrdinalIgnoreCase))
-                    return true;
+                var vid = $"VID_{device.Vid:X4}";
+                var pid = $"PID_{device.Pid:X4}";
+                var usbInterface = $"MI_{device.Interface:X2}";
+
+                foreach (var id in hardwareIds)
+                {
+                    if (!id.Contains(vid, StringComparison.OrdinalIgnoreCase) ||
+                        !id.Contains(pid, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    if (!matchExclusiveInterface || id.Contains(usbInterface, StringComparison.OrdinalIgnoreCase))
+                        return true;
+                }
             }
 
             return false;

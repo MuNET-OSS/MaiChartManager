@@ -1,0 +1,48 @@
+.page
+  width: 100%
+  min-width: 0
+  height: 100dvh
+
+  &:global(.tab-forward-enter-active), &:global(.tab-forward-leave-active), &:global(.tab-reverse-enter-active), &:global(.tab-reverse-leave-active)
+    transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out
+
+  @media (min-width: 768px)
+    &:global(.tab-forward-leave-to)
+      transform: translateY(-10em)
+      opacity: 0
+
+    &:global(.tab-forward-enter-from)
+      transform: translateY(10em)
+      opacity: 0
+
+    &:global(.tab-reverse-leave-to)
+      transform: translateY(10em)
+      opacity: 0
+
+    &:global(.tab-reverse-enter-from)
+      transform: translateY(-10em)
+      opacity: 0
+
+  @media (max-width: 767px)
+    &:global(.tab-forward-leave-to)
+      transform: translateX(-10em)
+      opacity: 0
+
+    &:global(.tab-forward-enter-from)
+      transform: translateX(10em)
+      opacity: 0
+
+    &:global(.tab-reverse-leave-to)
+      transform: translateX(10em)
+      opacity: 0
+
+    &:global(.tab-reverse-enter-from)
+      transform: translateX(-10em)
+      opacity: 0
+
+  @media (prefers-reduced-motion: reduce)
+    &:global(.tab-forward-enter-active), &:global(.tab-forward-leave-active), &:global(.tab-reverse-enter-active), &:global(.tab-reverse-leave-active)
+      transition-duration: 1ms
+
+    &:global(.tab-forward-leave-to), &:global(.tab-forward-enter-from), &:global(.tab-reverse-leave-to), &:global(.tab-reverse-enter-from)
+      transform: none
