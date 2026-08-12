@@ -517,10 +517,10 @@ mod:
     refresh: Refresh device status
     unavailable: PDX driver tool unavailable
     selectDevice: Select device
-    path1P: 1P Device Path
-    path2P: 2P Device Path
+    path1P: 1P Device Identifier
+    path2P: 2P Device Identifier
     pathDesc: >-
-      USB port path, e.g. 2.2. Use the path shown in the configuration tool.
+      USB serial number or port path, e.g. 2.2. Use the identifier shown in the configuration tool.
       Leave empty to use the first detected device as 1P
 tools:
   title: Tools

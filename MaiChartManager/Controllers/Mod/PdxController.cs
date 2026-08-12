@@ -138,6 +138,14 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
             ref SP_DEVINFO_DATA deviceInfoData);
 
         [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        private static extern bool SetupDiGetDeviceInstanceId(
+            IntPtr deviceInfoSet,
+            ref SP_DEVINFO_DATA deviceInfoData,
+            StringBuilder deviceInstanceId,
+            int deviceInstanceIdSize,
+            out int requiredSize);
+
+        [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         private static extern bool SetupDiGetDeviceRegistryProperty(
             IntPtr deviceInfoSet,
             ref SP_DEVINFO_DATA deviceInfoData,
@@ -152,7 +160,7 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
 
         public static string[] GetDevicePaths()
         {
-            var paths = new HashSet<string>();
+            var identifiersByPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var deviceInfoSet = SetupDiGetClassDevs(
                 IntPtr.Zero, "USB", IntPtr.Zero,
                 DIGCF_PRESENT | DIGCF_ALLCLASSES);
@@ -174,8 +182,15 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
                         continue;
 
                     var portChain = GetPortChain(deviceInfoSet, ref devInfoData);
-                    if (!string.IsNullOrEmpty(portChain))
-                        paths.Add(portChain);
+                    if (string.IsNullOrEmpty(portChain))
+                        continue;
+
+                    var identifier = GetSerialNumber(deviceInfoSet, ref devInfoData) ?? portChain;
+                    if (!identifiersByPath.TryGetValue(portChain, out var current) ||
+                        IsSerialNumber(identifier) && !IsSerialNumber(current))
+                    {
+                        identifiersByPath[portChain] = identifier;
+                    }
                 }
             }
             finally
@@ -183,7 +198,7 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
                 SetupDiDestroyDeviceInfoList(deviceInfoSet);
             }
 
-            return [.. paths];
+            return [.. identifiersByPath.Values];
         }
 
         public static bool IsUsingWinUsb()
@@ -264,6 +279,26 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
                 ports[i] = matches[i].Groups[1].Value;
 
             return string.Join(".", ports);
+        }
+
+        private static string? GetSerialNumber(IntPtr deviceInfoSet, ref SP_DEVINFO_DATA devInfoData)
+        {
+            var instanceId = new StringBuilder(256);
+            if (!SetupDiGetDeviceInstanceId(
+                    deviceInfoSet, ref devInfoData, instanceId, instanceId.Capacity, out _))
+                return null;
+
+            var parts = instanceId.ToString().Split('\\');
+            if (parts.Length < 2)
+                return null;
+
+            var candidate = parts[^1];
+            return IsSerialNumber(candidate) ? candidate : null;
+        }
+
+        private static bool IsSerialNumber(string identifier)
+        {
+            return !string.IsNullOrWhiteSpace(identifier) && !identifier.Contains('&');
         }
 
         /// <summary>

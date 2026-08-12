@@ -464,9 +464,9 @@ mod:
     refresh: 重新整理設備狀態
     unavailable: PDX 驅動工具不可用
     selectDevice: 選擇設備
-    path1P: 1P 設備路徑
-    path2P: 2P 設備路徑
-    pathDesc: USB 連接埠路徑，例如 2.2。請使用設定工具中顯示的路徑。留空則使用第一個偵測到的設備作為 1P
+    path1P: 1P 設備識別
+    path2P: 2P 設備識別
+    pathDesc: USB 序號或連接埠路徑，例如 2.2。請使用設定工具中顯示的識別。留空則使用第一個偵測到的設備作為 1P
 tools:
   title: 工具
   audioConvert: 音訊轉換（ACB + AWB）

@@ -458,9 +458,9 @@ mod:
     refresh: 刷新设备状态
     unavailable: PDX 驱动工具不可用
     selectDevice: 选择设备
-    path1P: 1P 设备路径
-    path2P: 2P 设备路径
-    pathDesc: USB 端口路径，例如 2.2。请使用配置工具中显示的路径。留空则使用第一个检测到的设备作为 1P
+    path1P: 1P 设备标识
+    path2P: 2P 设备标识
+    pathDesc: USB 序列号或端口路径，例如 2.2。请使用配置工具中显示的标识。留空则使用第一个检测到的设备作为 1P
 tools:
   title: 工具
   audioConvert: 音频转换（ACB + AWB）
