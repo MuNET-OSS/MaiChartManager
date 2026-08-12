@@ -1,3 +1,4 @@
+using System.Net;
 using MaiChartManager.Platform;
 using MaiChartManager.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -14,7 +15,8 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     [HttpGet]
     public ActionResult<ResourceJunctionOverview> GetResourceJunctionStatus()
     {
-        if (StaticSettings.Config.Export) return Forbid();
+        if (!IsLoopbackRequest() || StaticSettings.Config.Export)
+            return StatusCode(StatusCodes.Status403Forbidden);
         return Ok(service.GetOverview());
     }
 
@@ -83,7 +85,11 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
 
     private ActionResult? RejectUnavailableLocalAction()
     {
-        if (StaticSettings.Config.Export) return Forbid();
+        if (!IsLoopbackRequest() || StaticSettings.Config.Export)
+            return StatusCode(StatusCodes.Status403Forbidden);
         return Request.Headers[LocalActionHeader] != LocalActionValue ? BadRequest() : null;
     }
+
+    private bool IsLoopbackRequest()
+        => HttpContext.Connection.RemoteIpAddress is { } remoteIp && IPAddress.IsLoopback(remoteIp);
 }
