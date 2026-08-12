@@ -183,6 +183,25 @@ public sealed class ResourceJunctionServiceTests : IDisposable
     }
 
     [Fact]
+    public void SelectionStateIsIsolatedBetweenSessions()
+    {
+        var targetGame = CreateGame("target-game-session-isolation", [0, 0, 0]);
+        var firstSource = CreateGame("first-source-session-isolation", [1, 1, 1]);
+        var secondSource = CreateGame("second-source-session-isolation", [2, 2, 2]);
+        var service = new ResourceJunctionService(() => targetGame, () => [firstSource, secondSource]);
+
+        service.SelectManualSource(firstSource, "first");
+        service.SelectManualSource(secondSource, "second");
+
+        Assert.Equal(
+            Path.Combine(firstSource, "Package", "Sinmai_Data", "StreamingAssets", "A000"),
+            service.GetOverview("first").SourceRoot);
+        Assert.Equal(
+            Path.Combine(secondSource, "Package", "Sinmai_Data", "StreamingAssets", "A000"),
+            service.GetOverview("second").SourceRoot);
+    }
+
+    [Fact]
     public void ManualSelectionRejectsCurrentGame()
     {
         var targetGame = CreateGame("target-game-self", [0, 0, 0]);

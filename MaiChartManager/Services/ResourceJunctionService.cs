@@ -54,11 +54,8 @@ public class ResourceJunctionService
     private readonly Func<string> targetPathProvider;
     private readonly Func<IEnumerable<string>> candidatePathProvider;
     private readonly bool pathsAreA000Roots;
-    private string? selectedSourceRoot;
-    private string? selectedTargetRoot;
-    private ResourceSourceSelectionMode selectionMode;
-    private IReadOnlyList<ResourceDirectoryFileCount> selectedFileCounts = [];
-    private string? selectionDetail;
+    private readonly object stateGate = new();
+    private readonly Dictionary<string, SelectionState> sessionStates = new(StringComparer.Ordinal);
 
     public ResourceJunctionService()
         : this(() => StaticSettings.GamePath, GetDefaultCandidatePaths, false)
@@ -68,9 +65,10 @@ public class ResourceJunctionService
     public ResourceJunctionService(string sourceRoot, string targetRoot)
         : this(() => targetRoot, () => [], true)
     {
-        selectedSourceRoot = NormalizePath(sourceRoot);
-        selectionMode = ResourceSourceSelectionMode.Manual;
-        selectedFileCounts = CountResourceFiles(selectedSourceRoot);
+        var state = GetState("default");
+        state.SelectedSourceRoot = NormalizePath(sourceRoot);
+        state.SelectionMode = ResourceSourceSelectionMode.Manual;
+        state.SelectedFileCounts = CountResourceFiles(state.SelectedSourceRoot);
     }
 
     public ResourceJunctionService(Func<string> targetPathProvider, Func<IEnumerable<string>> candidatePathProvider)
@@ -88,11 +86,14 @@ public class ResourceJunctionService
         this.pathsAreA000Roots = pathsAreA000Roots;
     }
 
-    public ResourceJunctionOverview AutoSelectSource()
+    public ResourceJunctionOverview AutoSelectSource(string sessionId = "default")
     {
-        var targetRoot = GetTargetRoot();
+        lock (stateGate)
+        {
+        var state = GetState(sessionId);
+        var targetRoot = GetTargetRoot(state);
         if (targetRoot is null)
-            return ClearSelection(ResourceSourceSelectionMode.None, "The current game directory is invalid.");
+            return ClearSelection(state, ResourceSourceSelectionMode.None, "The current game directory is invalid.");
 
         var candidates = candidatePathProvider()
             .Select(TryResolveA000Root)
@@ -105,22 +106,26 @@ public class ResourceJunctionService
             .ToArray();
 
         if (candidates.Length == 0)
-            return ClearSelection(ResourceSourceSelectionMode.None, "No valid source game directory was found in game path history or adjacent directories.");
+            return ClearSelection(state, ResourceSourceSelectionMode.None, "No valid source game directory was found in game path history or adjacent directories.");
 
         var best = candidates[0];
         if (candidates.Skip(1).Any(candidate => candidate.TotalFileCount == best.TotalFileCount))
-            return ClearSelection(ResourceSourceSelectionMode.Tie, "Multiple source game directories have the same highest file count. Select one manually.");
+            return ClearSelection(state, ResourceSourceSelectionMode.Tie, "Multiple source game directories have the same highest file count. Select one manually.");
 
-        selectedSourceRoot = best.Root;
-        selectedFileCounts = best.FileCounts;
-        selectionMode = ResourceSourceSelectionMode.Automatic;
-        selectionDetail = null;
-        return GetOverview();
+        state.SelectedSourceRoot = best.Root;
+        state.SelectedFileCounts = best.FileCounts;
+        state.SelectionMode = ResourceSourceSelectionMode.Automatic;
+        state.SelectionDetail = null;
+        return GetOverviewCore(state);
+        }
     }
 
-    public ResourceJunctionOverview SelectManualSource(string path)
+    public ResourceJunctionOverview SelectManualSource(string path, string sessionId = "default")
     {
-        var targetRoot = GetTargetRoot() ?? throw new InvalidOperationException("The current game directory is invalid.");
+        lock (stateGate)
+        {
+        var state = GetState(sessionId);
+        var targetRoot = GetTargetRoot(state) ?? throw new InvalidOperationException("The current game directory is invalid.");
         var sourceRoot = TryResolveA000Root(path)
             ?? throw new ArgumentException("The selected folder is not a valid game root or Package directory.", nameof(path));
         if (SamePath(sourceRoot, targetRoot))
@@ -128,51 +133,67 @@ public class ResourceJunctionService
 
         var candidate = TryCreateCandidate(sourceRoot)
             ?? throw new ArgumentException("The selected source must contain three readable, real resource directories.", nameof(path));
-        selectedSourceRoot = candidate.Root;
-        selectedFileCounts = candidate.FileCounts;
-        selectionMode = ResourceSourceSelectionMode.Manual;
-        selectionDetail = null;
-        return GetOverview();
+        state.SelectedSourceRoot = candidate.Root;
+        state.SelectedFileCounts = candidate.FileCounts;
+        state.SelectionMode = ResourceSourceSelectionMode.Manual;
+        state.SelectionDetail = null;
+        return GetOverviewCore(state);
+        }
     }
 
-    public ResourceJunctionOverview SelectManualTarget(string path)
+    public ResourceJunctionOverview SelectManualTarget(string path, string sessionId = "default")
     {
+        lock (stateGate)
+        {
+        var state = GetState(sessionId);
         var targetRoot = TryResolveA000Root(path)
             ?? throw new ArgumentException("The selected folder is not a valid game root or Package directory.", nameof(path));
 
-        selectedTargetRoot = targetRoot;
-        if (selectedSourceRoot is not null && SamePath(selectedSourceRoot, targetRoot))
-            return ClearSelection(ResourceSourceSelectionMode.None, "The source must differ from the selected target. Select a source directory again.");
+        state.SelectedTargetRoot = targetRoot;
+        if (state.SelectedSourceRoot is not null && SamePath(state.SelectedSourceRoot, targetRoot))
+            return ClearSelection(state, ResourceSourceSelectionMode.None, "The source must differ from the selected target. Select a source directory again.");
 
-        return GetOverview();
+        return GetOverviewCore(state);
+        }
     }
 
-    public ResourceJunctionOverview GetOverview()
+    public ResourceJunctionOverview GetOverview(string sessionId = "default")
     {
-        var targetRoot = GetTargetRoot();
-        var items = selectedSourceRoot is null || targetRoot is null
-            ? BuildUnavailableItems(targetRoot)
-            : ResourceNames.Select(name => Inspect(name, selectedSourceRoot, targetRoot)).ToArray();
+        lock (stateGate)
+        {
+        return GetOverviewCore(GetState(sessionId));
+        }
+    }
+
+    private ResourceJunctionOverview GetOverviewCore(SelectionState state)
+    {
+        var targetRoot = GetTargetRoot(state);
+        var items = state.SelectedSourceRoot is null || targetRoot is null
+            ? BuildUnavailableItems(state, targetRoot)
+            : ResourceNames.Select(name => Inspect(name, state.SelectedSourceRoot, targetRoot)).ToArray();
         return new(
-            selectedSourceRoot,
+            state.SelectedSourceRoot,
             targetRoot,
-            selectionMode,
-            selectedFileCounts,
-            selectedFileCounts.Sum(item => item.FileCount),
-            selectionDetail,
+            state.SelectionMode,
+            state.SelectedFileCounts,
+            state.SelectedFileCounts.Sum(item => item.FileCount),
+            state.SelectionDetail,
             items);
     }
 
-    public IReadOnlyList<ResourceJunctionItem> Inspect()
+    public IReadOnlyList<ResourceJunctionItem> Inspect(string sessionId = "default")
     {
-        return GetOverview().Items;
+        return GetOverview(sessionId).Items;
     }
 
-    public IReadOnlyList<ResourceJunctionItem> CreateLinks()
+    public IReadOnlyList<ResourceJunctionItem> CreateLinks(string sessionId = "default")
     {
-        var sourceRoot = selectedSourceRoot;
-        var targetRoot = GetTargetRoot();
-        if (sourceRoot is null || targetRoot is null) return BuildUnavailableItems(targetRoot);
+        lock (stateGate)
+        {
+        var state = GetState(sessionId);
+        var sourceRoot = state.SelectedSourceRoot;
+        var targetRoot = GetTargetRoot(state);
+        if (sourceRoot is null || targetRoot is null) return BuildUnavailableItems(state, targetRoot);
 
         return ResourceNames.Select(name =>
         {
@@ -192,13 +213,17 @@ public class ResourceJunctionService
                 return item with { Status = ResourceJunctionStatus.Failed, Detail = e.Message };
             }
         }).ToArray();
+        }
     }
 
-    public IReadOnlyList<ResourceJunctionItem> RemoveLinks()
+    public IReadOnlyList<ResourceJunctionItem> RemoveLinks(string sessionId = "default")
     {
-        var sourceRoot = selectedSourceRoot;
-        var targetRoot = GetTargetRoot();
-        if (sourceRoot is null || targetRoot is null) return BuildUnavailableItems(targetRoot);
+        lock (stateGate)
+        {
+        var state = GetState(sessionId);
+        var sourceRoot = state.SelectedSourceRoot;
+        var targetRoot = GetTargetRoot(state);
+        if (sourceRoot is null || targetRoot is null) return BuildUnavailableItems(state, targetRoot);
 
         return ResourceNames.Select(name =>
         {
@@ -219,20 +244,21 @@ public class ResourceJunctionService
                 return item with { Status = ResourceJunctionStatus.Failed, Detail = e.Message };
             }
         }).ToArray();
+        }
     }
 
-    private ResourceJunctionOverview ClearSelection(ResourceSourceSelectionMode mode, string detail)
+    private ResourceJunctionOverview ClearSelection(SelectionState state, ResourceSourceSelectionMode mode, string detail)
     {
-        selectedSourceRoot = null;
-        selectedFileCounts = [];
-        selectionMode = mode;
-        selectionDetail = detail;
-        return GetOverview();
+        state.SelectedSourceRoot = null;
+        state.SelectedFileCounts = [];
+        state.SelectionMode = mode;
+        state.SelectionDetail = detail;
+        return GetOverviewCore(state);
     }
 
-    private string? GetTargetRoot()
+    private string? GetTargetRoot(SelectionState state)
     {
-        if (selectedTargetRoot is not null) return selectedTargetRoot;
+        if (state.SelectedTargetRoot is not null) return state.SelectedTargetRoot;
         var path = targetPathProvider();
         if (string.IsNullOrWhiteSpace(path)) return null;
         if (pathsAreA000Roots) return Directory.Exists(path) ? NormalizePath(path) : null;
@@ -342,15 +368,23 @@ public class ResourceJunctionService
         return count;
     }
 
-    private IReadOnlyList<ResourceJunctionItem> BuildUnavailableItems(string? targetRoot)
+    private IReadOnlyList<ResourceJunctionItem> BuildUnavailableItems(SelectionState state, string? targetRoot)
     {
         var status = targetRoot is null ? ResourceJunctionStatus.TargetRootMissing : ResourceJunctionStatus.SourceMissing;
         return ResourceNames.Select(name => new ResourceJunctionItem(
             name,
-            selectedSourceRoot is null ? "" : Path.Combine(selectedSourceRoot, name),
+            state.SelectedSourceRoot is null ? "" : Path.Combine(state.SelectedSourceRoot, name),
             targetRoot is null ? "" : Path.Combine(targetRoot, name),
             status,
-            selectionDetail)).ToArray();
+            state.SelectionDetail)).ToArray();
+    }
+
+    private SelectionState GetState(string sessionId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId)) throw new ArgumentException("Session id is required.", nameof(sessionId));
+        if (!sessionStates.TryGetValue(sessionId, out var state))
+            sessionStates[sessionId] = state = new SelectionState();
+        return state;
     }
 
     private static ResourceJunctionItem Inspect(string name, string sourceRoot, string targetRoot)
@@ -504,6 +538,15 @@ public class ResourceJunctionService
         string Root,
         IReadOnlyList<ResourceDirectoryFileCount> FileCounts,
         long TotalFileCount);
+
+    private sealed class SelectionState
+    {
+        public string? SelectedSourceRoot { get; set; }
+        public string? SelectedTargetRoot { get; set; }
+        public ResourceSourceSelectionMode SelectionMode { get; set; }
+        public IReadOnlyList<ResourceDirectoryFileCount> SelectedFileCounts { get; set; } = [];
+        public string? SelectionDetail { get; set; }
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct FileAttributeTagInfo

@@ -9,6 +9,7 @@ export default defineComponent({
     const { t } = useI18n();
     const show = ref(false);
     const loading = ref(false);
+    const sessionId = crypto.randomUUID();
     const overview = ref<ResourceJunctionOverview>();
     const items = computed(() => overview.value?.items ?? []);
 
@@ -32,11 +33,15 @@ export default defineComponent({
     const request = async (action: 'auto' | 'status' | 'manual' | 'manualTarget' | 'create' | 'remove') => {
       loading.value = true;
       try {
-        const writeParams = { headers: { 'X-MCM-Local-Action': 'resource-junction' } };
+        const writeParams = {
+          headers: {
+            'X-MCM-Resource-Junction-Session': sessionId,
+          },
+        };
         const response = action === 'auto'
           ? await api.AutoSelectResourceJunctionSource(writeParams)
           : action === 'status'
-            ? await api.GetResourceJunctionStatus()
+            ? await api.GetResourceJunctionStatus(writeParams)
             : action === 'manual'
               ? await api.SelectResourceJunctionSource(writeParams)
               : action === 'manualTarget'

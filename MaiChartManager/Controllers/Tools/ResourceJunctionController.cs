@@ -9,35 +9,34 @@ namespace MaiChartManager.Controllers.Tools;
 [Route("MaiChartManagerServlet/[action]Api")]
 public class ResourceJunctionController(ResourceJunctionService service, IDesktopDialogService dialogService) : ControllerBase
 {
-    private const string LocalActionHeader = "X-MCM-Local-Action";
-    private const string LocalActionValue = "resource-junction";
+    private const string SessionHeader = "X-MCM-Resource-Junction-Session";
 
     [HttpGet]
     public ActionResult<ResourceJunctionOverview> GetResourceJunctionStatus()
     {
-        if (!IsLoopbackRequest() || StaticSettings.Config.Export)
+        if (!IsLoopbackRequest())
             return StatusCode(StatusCodes.Status403Forbidden);
-        return Ok(service.GetOverview());
+        return Ok(service.GetOverview(GetSessionId()));
     }
 
     [HttpPost]
     public ActionResult<ResourceJunctionOverview> AutoSelectResourceJunctionSource()
     {
-        if (RejectUnavailableLocalAction() is { } rejection) return rejection;
-        return Ok(service.AutoSelectSource());
+        if (RejectRemoteRequest() is { } rejection) return rejection;
+        return Ok(service.AutoSelectSource(GetSessionId()));
     }
 
     [HttpPost]
     public ActionResult<ResourceJunctionOverview> SelectResourceJunctionSource()
     {
-        if (RejectUnavailableLocalAction() is { } rejection) return rejection;
+        if (RejectRemoteRequest() is { } rejection) return rejection;
 
         var path = dialogService.PickFolder(
             Locale.ResourceManager.GetString("SelectResourceJunctionSourceFolder", Locale.Culture));
-        if (path is null) return Ok(service.GetOverview());
+        if (path is null) return Ok(service.GetOverview(GetSessionId()));
         try
         {
-            return Ok(service.SelectManualSource(path));
+            return Ok(service.SelectManualSource(path, GetSessionId()));
         }
         catch (ArgumentException e)
         {
@@ -52,14 +51,14 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     [HttpPost]
     public ActionResult<ResourceJunctionOverview> SelectResourceJunctionTarget()
     {
-        if (RejectUnavailableLocalAction() is { } rejection) return rejection;
+        if (RejectRemoteRequest() is { } rejection) return rejection;
 
         var path = dialogService.PickFolder(
             Locale.ResourceManager.GetString("SelectResourceJunctionTargetFolder", Locale.Culture));
-        if (path is null) return Ok(service.GetOverview());
+        if (path is null) return Ok(service.GetOverview(GetSessionId()));
         try
         {
-            return Ok(service.SelectManualTarget(path));
+            return Ok(service.SelectManualTarget(path, GetSessionId()));
         }
         catch (ArgumentException e)
         {
@@ -70,26 +69,31 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     [HttpPost]
     public ActionResult<ResourceJunctionOverview> CreateResourceJunctions()
     {
-        if (RejectUnavailableLocalAction() is { } rejection) return rejection;
-        var items = service.CreateLinks();
-        return Ok(service.GetOverview() with { Items = items });
+        if (RejectRemoteRequest() is { } rejection) return rejection;
+        var sessionId = GetSessionId();
+        var items = service.CreateLinks(sessionId);
+        return Ok(service.GetOverview(sessionId) with { Items = items });
     }
 
     [HttpPost]
     public ActionResult<ResourceJunctionOverview> RemoveResourceJunctions()
     {
-        if (RejectUnavailableLocalAction() is { } rejection) return rejection;
-        var items = service.RemoveLinks();
-        return Ok(service.GetOverview() with { Items = items });
+        if (RejectRemoteRequest() is { } rejection) return rejection;
+        var sessionId = GetSessionId();
+        var items = service.RemoveLinks(sessionId);
+        return Ok(service.GetOverview(sessionId) with { Items = items });
     }
 
-    private ActionResult? RejectUnavailableLocalAction()
+    private ActionResult? RejectRemoteRequest()
     {
-        if (!IsLoopbackRequest() || StaticSettings.Config.Export)
+        if (!IsLoopbackRequest())
             return StatusCode(StatusCodes.Status403Forbidden);
-        return Request.Headers[LocalActionHeader] != LocalActionValue ? BadRequest() : null;
+        return null;
     }
 
     private bool IsLoopbackRequest()
         => HttpContext.Connection.RemoteIpAddress is { } remoteIp && IPAddress.IsLoopback(remoteIp);
+
+    private string GetSessionId()
+        => Request.Headers[SessionHeader].FirstOrDefault() ?? "default";
 }
