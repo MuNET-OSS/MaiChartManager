@@ -26,8 +26,6 @@ public sealed class ResourceJunctionControllerTests
     {
         var dialogService = new RecordingDialogService();
         var controller = CreateController(IPAddress.Parse("192.0.2.1"), dialogService);
-        controller.Request.Headers["X-MCM-Local-Action"] = "resource-junction";
-
         var result = controller.SelectResourceJunctionSource();
 
         var status = Assert.IsType<StatusCodeResult>(result.Result);
@@ -35,11 +33,36 @@ public sealed class ResourceJunctionControllerTests
         Assert.Equal(0, dialogService.PickFolderCalls);
     }
 
+    [Fact]
+    public void LocalWriteActionDoesNotRequireAnAuthenticationHeader()
+    {
+        var dialogService = new RecordingDialogService();
+        var controller = CreateController(IPAddress.Loopback, dialogService);
+
+        var result = controller.SelectResourceJunctionSource();
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(1, dialogService.PickFolderCalls);
+    }
+
+    [Fact]
+    public void LinuxUnsupportedStatusDoesNotOpenFolderPicker()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        var dialogService = new RecordingDialogService();
+        var controller = CreateController(IPAddress.Loopback, dialogService);
+
+        var result = controller.SelectResourceJunctionSource();
+
+        Assert.IsType<OkObjectResult>(result.Result);
+        Assert.Equal(0, dialogService.PickFolderCalls);
+    }
+
     private static ResourceJunctionController CreateController(
         IPAddress remoteAddress,
         RecordingDialogService? dialogService = null)
     {
-        StaticSettings.Config = new Config { Export = false };
+        StaticSettings.Config = new Config();
         var context = new DefaultHttpContext();
         context.Connection.RemoteIpAddress = remoteAddress;
         return new ResourceJunctionController(
@@ -64,4 +87,5 @@ public sealed class ResourceJunctionControllerTests
         public bool Confirm(string message, string title, bool defaultResult = false) => defaultResult;
         public void ShowError(string message, string title) { }
     }
+
 }

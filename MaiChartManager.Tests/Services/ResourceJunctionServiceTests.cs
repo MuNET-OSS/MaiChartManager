@@ -202,6 +202,32 @@ public sealed class ResourceJunctionServiceTests : IDisposable
     }
 
     [Fact]
+    public void UnsupportedOverviewUsesUnsupportedStatusForEveryResource()
+    {
+        var overview = ResourceJunctionService.CreateUnsupportedOverview();
+
+        Assert.All(overview.Items, item => Assert.Equal(ResourceJunctionStatus.Unsupported, item.Status));
+        Assert.Null(overview.SourceRoot);
+        Assert.Null(overview.TargetRoot);
+    }
+
+    [Fact]
+    public void AutoSelectionPreservesManualSourceForTheSameSession()
+    {
+        var sourceRoot = CreateGame("manual-source", [1, 2, 3]);
+        var targetRoot = CreateGame("manual-target", [0, 0, 0]);
+        var service = new ResourceJunctionService(
+            () => targetRoot,
+            () => [sourceRoot]);
+
+        var manual = service.SelectManualSource(sourceRoot, "session");
+        var afterAuto = service.AutoSelectSource("session");
+
+        Assert.Equal(manual.SourceRoot, afterAuto.SourceRoot);
+        Assert.Equal(ResourceSourceSelectionMode.Manual, afterAuto.SelectionMode);
+    }
+
+    [Fact]
     public void ManualSelectionRejectsCurrentGame()
     {
         var targetGame = CreateGame("target-game-self", [0, 0, 0]);

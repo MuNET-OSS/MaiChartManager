@@ -57,6 +57,19 @@ public class ResourceJunctionService
     private readonly object stateGate = new();
     private readonly Dictionary<string, SelectionState> sessionStates = new(StringComparer.Ordinal);
 
+    internal static ResourceJunctionOverview CreateUnsupportedOverview()
+    {
+        var items = ResourceNames
+            .Select(name => new ResourceJunctionItem(
+                name,
+                string.Empty,
+                string.Empty,
+                ResourceJunctionStatus.Unsupported,
+                "Junctions are only supported on Windows."))
+            .ToArray();
+        return new(null, null, ResourceSourceSelectionMode.None, [], 0, "Junctions are only supported on Windows.", items);
+    }
+
     public ResourceJunctionService()
         : this(() => StaticSettings.GamePath, GetDefaultCandidatePaths, false)
     {
@@ -91,6 +104,8 @@ public class ResourceJunctionService
         lock (stateGate)
         {
         var state = GetState(sessionId);
+        if (state.SelectionMode == ResourceSourceSelectionMode.Manual && state.SelectedSourceRoot is not null)
+            return GetOverviewCore(state);
         var targetRoot = GetTargetRoot(state);
         if (targetRoot is null)
             return ClearSelection(state, ResourceSourceSelectionMode.None, "The current game directory is invalid.");

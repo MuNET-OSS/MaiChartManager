@@ -16,6 +16,7 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     {
         if (!IsLoopbackRequest())
             return StatusCode(StatusCodes.Status403Forbidden);
+        if (!OperatingSystem.IsWindows()) return Ok(ResourceJunctionService.CreateUnsupportedOverview());
         return Ok(service.GetOverview(GetSessionId()));
     }
 
@@ -23,6 +24,7 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     public ActionResult<ResourceJunctionOverview> AutoSelectResourceJunctionSource()
     {
         if (RejectRemoteRequest() is { } rejection) return rejection;
+        if (!OperatingSystem.IsWindows()) return Ok(ResourceJunctionService.CreateUnsupportedOverview());
         return Ok(service.AutoSelectSource(GetSessionId()));
     }
 
@@ -30,6 +32,7 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     public ActionResult<ResourceJunctionOverview> SelectResourceJunctionSource()
     {
         if (RejectRemoteRequest() is { } rejection) return rejection;
+        if (!OperatingSystem.IsWindows()) return Ok(ResourceJunctionService.CreateUnsupportedOverview());
 
         var path = dialogService.PickFolder(
             Locale.ResourceManager.GetString("SelectResourceJunctionSourceFolder", Locale.Culture));
@@ -52,6 +55,7 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     public ActionResult<ResourceJunctionOverview> SelectResourceJunctionTarget()
     {
         if (RejectRemoteRequest() is { } rejection) return rejection;
+        if (!OperatingSystem.IsWindows()) return Ok(ResourceJunctionService.CreateUnsupportedOverview());
 
         var path = dialogService.PickFolder(
             Locale.ResourceManager.GetString("SelectResourceJunctionTargetFolder", Locale.Culture));
@@ -70,6 +74,7 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     public ActionResult<ResourceJunctionOverview> CreateResourceJunctions()
     {
         if (RejectRemoteRequest() is { } rejection) return rejection;
+        if (!OperatingSystem.IsWindows()) return Ok(ResourceJunctionService.CreateUnsupportedOverview());
         var sessionId = GetSessionId();
         var items = service.CreateLinks(sessionId);
         return Ok(service.GetOverview(sessionId) with { Items = items });
@@ -79,6 +84,7 @@ public class ResourceJunctionController(ResourceJunctionService service, IDeskto
     public ActionResult<ResourceJunctionOverview> RemoveResourceJunctions()
     {
         if (RejectRemoteRequest() is { } rejection) return rejection;
+        if (!OperatingSystem.IsWindows()) return Ok(ResourceJunctionService.CreateUnsupportedOverview());
         var sessionId = GetSessionId();
         var items = service.RemoveLinks(sessionId);
         return Ok(service.GetOverview(sessionId) with { Items = items });
