@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using MaiChartManager;
 
 [assembly: AssemblyCompany("Clansty")]
@@ -8,6 +9,7 @@ using MaiChartManager;
 // Linux 由 Packaging/arch/PKGBUILD 重写，两端一致地从 git tag 派生。
 [assembly: AssemblyFileVersion(AppMain.Version)]
 [assembly: AssemblyInformationalVersion(AppMain.Version)]
+[assembly: InternalsVisibleTo("MaiChartManager.Tests")]
 [assembly: AssemblyVersion(AppMain.Version)]
 #if WINDOWS
 [assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows10.0.17763.0")]

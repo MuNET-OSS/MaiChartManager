@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
@@ -206,7 +207,8 @@ public class ResourceJunctionService
 
             try
             {
-                Directory.Delete(item.Target, false);
+                if (!RemoveVerifiedJunction(item.Source, item.Target))
+                    return Inspect(name, sourceRoot, targetRoot);
                 var verified = Inspect(name, sourceRoot, targetRoot);
                 return verified.Status == ResourceJunctionStatus.Ready
                     ? verified with { Status = ResourceJunctionStatus.Removed }
@@ -428,6 +430,57 @@ public class ResourceJunctionService
             throw new IOException((error.Length > 0 ? error : output).Trim());
     }
 
+    internal static bool RemoveVerifiedJunction(string source, string target, Action? beforeDelete = null)
+    {
+        using var handle = CreateFile(
+            target,
+            0x00010000,
+            0x00000001 | 0x00000002,
+            IntPtr.Zero,
+            3,
+            0x00200000 | 0x02000000,
+            IntPtr.Zero);
+        if (handle.IsInvalid) return false;
+
+        var buffer = new byte[16 * 1024];
+        if (!DeviceIoControl(handle, 0x000900A8, IntPtr.Zero, 0, buffer, buffer.Length, out _, IntPtr.Zero))
+            return false;
+        if (BitConverter.ToUInt32(buffer, 0) != IoReparseTagMountPoint)
+            return false;
+
+        var destination = ReadMountPointDestination(buffer);
+        if (destination is null || !SamePath(destination, source))
+            return false;
+
+        beforeDelete?.Invoke();
+        var disposition = new FileDispositionInfo { DeleteFile = 1 };
+        if (!SetFileInformationByHandle(
+                handle,
+                4,
+                ref disposition,
+                (uint)Marshal.SizeOf<FileDispositionInfo>()))
+            throw new Win32Exception(Marshal.GetLastWin32Error());
+        return true;
+    }
+
+    private static string? ReadMountPointDestination(byte[] buffer)
+    {
+        const int pathBufferOffset = 16;
+        var printNameOffset = BitConverter.ToUInt16(buffer, 12);
+        var printNameLength = BitConverter.ToUInt16(buffer, 14);
+        if (printNameLength > 0)
+            return System.Text.Encoding.Unicode.GetString(buffer, pathBufferOffset + printNameOffset, printNameLength);
+
+        var substituteNameOffset = BitConverter.ToUInt16(buffer, 8);
+        var substituteNameLength = BitConverter.ToUInt16(buffer, 10);
+        if (substituteNameLength == 0) return null;
+        var substituteName = System.Text.Encoding.Unicode.GetString(
+            buffer,
+            pathBufferOffset + substituteNameOffset,
+            substituteNameLength);
+        return substituteName.StartsWith(@"\??\", StringComparison.Ordinal) ? substituteName[4..] : substituteName;
+    }
+
     private static bool TryGetReparseTag(string path, out uint tag)
     {
         tag = 0;
@@ -459,6 +512,12 @@ public class ResourceJunctionService
         public uint ReparseTag;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileDispositionInfo
+    {
+        public byte DeleteFile;
+    }
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern SafeFileHandle CreateFile(
         string fileName,
@@ -475,5 +534,25 @@ public class ResourceJunctionService
         SafeFileHandle file,
         int fileInformationClass,
         out FileAttributeTagInfo fileInformation,
+        uint bufferSize);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DeviceIoControl(
+        SafeFileHandle device,
+        uint controlCode,
+        IntPtr inputBuffer,
+        int inputBufferSize,
+        [Out] byte[] outputBuffer,
+        int outputBufferSize,
+        out int bytesReturned,
+        IntPtr overlapped);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool SetFileInformationByHandle(
+        SafeFileHandle file,
+        int fileInformationClass,
+        ref FileDispositionInfo fileInformation,
         uint bufferSize);
 }

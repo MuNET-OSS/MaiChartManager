@@ -277,6 +277,36 @@ public sealed class ResourceJunctionServiceTests : IDisposable
         Assert.True(Directory.Exists(target));
     }
 
+    [Fact]
+    public void VerifiedJunctionCannotBeReplacedBeforeDeletion()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        var source = Path.Combine(sourceRoot, ResourceJunctionService.ResourceNames[0]);
+        var target = Path.Combine(targetRoot, ResourceJunctionService.ResourceNames[0]);
+        CreateJunction(source, target);
+        var replacementSucceeded = false;
+
+        var removed = ResourceJunctionService.RemoveVerifiedJunction(
+            source,
+            target,
+            () =>
+            {
+                try
+                {
+                    Directory.Delete(target, false);
+                    Directory.CreateDirectory(target);
+                    replacementSucceeded = true;
+                }
+                catch (IOException)
+                {
+                }
+            });
+
+        Assert.True(removed);
+        Assert.False(replacementSucceeded);
+        Assert.False(Directory.Exists(target));
+    }
+
     public void Dispose()
     {
         if (!Directory.Exists(root)) return;
