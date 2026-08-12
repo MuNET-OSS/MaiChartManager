@@ -1,5 +1,5 @@
 import api from '@/client/api';
-import { ResourceJunctionOverview, ResourceJunctionStatus } from '@/client/apiGen';
+import { ResourceJunctionOverview, ResourceJunctionStatus, ResourceSourceSelectionMode } from '@/client/apiGen';
 import { Button, Modal, addToast, showTransactionalDialog } from '@munet/ui';
 import { computed, defineComponent, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
@@ -76,10 +76,14 @@ export default defineComponent({
       await request(action);
     };
 
-    const trigger = () => {
+    const trigger = async () => {
       show.value = true;
-      overview.value = undefined;
-      request('auto');
+      await request('status');
+      if (
+        overview.value?.sourceRoot
+        || overview.value?.selectionMode === ResourceSourceSelectionMode.Manual
+      ) return;
+      await request('auto');
     };
     expose({ trigger });
 
