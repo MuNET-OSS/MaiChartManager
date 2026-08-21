@@ -2,7 +2,7 @@ import { computed, defineComponent, PropType, useId, watch } from "vue";
 import { Button, CheckBox, Modal, NumberInput, Popover, Section, Select } from "@munet/ui";
 import type { ImportChartMessageEx, ImportMeta, SavedOptions, TempOptions } from "./types";
 import noJacket from '@/assets/noJacket.webp';
-import { addVersionList, genreList, showNeedPurchaseDialog } from "@/store/refs";
+import { addVersionList, genreList, showNeedPurchaseDialog, version } from "@/store/refs";
 import GenreInput from "@/components/GenreInput";
 import VersionInput from "@/components/VersionInput";
 import { UTAGE_GENRE } from "@/consts";
@@ -76,7 +76,7 @@ export default defineComponent({
             </CheckBox>
             <Section title={t('chart.import.option.advancedOptions')}>
                 <ShiftModeSelector tempOptions={props.tempOptions}></ShiftModeSelector>
-                <div class="flex items-center gap-1" style="margin-top: 0.25rem">
+                {version.value?.platform === 'Windows' && <div class="flex items-center gap-1" style="margin-top: 0.25rem">
                   <CheckBox v-model:value={props.tempOptions.ignoreGapless}>{t('chart.import.option.ignoreGapless')}</CheckBox>
                   <Popover trigger="hover">
                     {{
@@ -84,7 +84,7 @@ export default defineComponent({
                       default: () => <div class="max-w-60">{t('chart.import.option.ignoreGaplessTip')}</div>
                     }}
                   </Popover>
-                </div>
+                </div>}
             </Section>
         </>}
       </div>,

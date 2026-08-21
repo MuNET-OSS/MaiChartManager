@@ -43,9 +43,12 @@ export const getUrl = (suffix: string) => {
   return `${base}/MaiChartManagerServlet/${suffix}`;
 }
 
-// 是否运行在 Photino(WebKitGTK) 宿主：本地宿主但不是 Windows WebView2。
-// WebKitGTK 不支持 window.open 弹新窗口，需要走后端用系统浏览器打开。
-export const isPhotino = isLocalHost && !isWebView;
+// 是否运行在 Photino(WebKitGTK) 宿主。
+// 不能仅用 isLocalHost && !isWebView：因为Export 模式下用本机浏览器访问 localhost 也满足该条件。
+// Photino 暴露 window.external.sendMessage（见 PreviewChartButton），普通浏览器没有。
+export const isPhotino =
+  isLocalHost && !isWebView &&
+  typeof (window as any).external?.sendMessage === 'function';
 
 // 用系统浏览器打开一个 http/https URL（后端 xdg-open 等）。
 // 给 Photino 用：WebKitGTK 弹不出 window.open 的新窗口，预览谱面等改为外部浏览器打开。
