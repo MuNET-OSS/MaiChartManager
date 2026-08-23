@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using MaiChartManager.Models;
+using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 using MusicXml = MaiChartManager.Models.MusicXml;
@@ -8,7 +9,7 @@ namespace MaiChartManager.Controllers.Music;
 
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api/{assetDir}/{id:int}")]
-public class MusicController(StaticSettings settings, ILogger<MusicController> logger) : ControllerBase
+public class MusicController(StaticSettings settings, ILogger<MusicController> logger, IShellService shellService) : ControllerBase
 {
     [HttpGet]
     public MusicXmlWithABJacket? GetMusicDetail(int id, string assetDir)
@@ -211,7 +212,7 @@ public class MusicController(StaticSettings settings, ILogger<MusicController> l
         var music = settings.GetMusic(id, assetDir);
         if (music != null)
         {
-            Process.Start("explorer.exe", $"/select,\"{music.FilePath}\"");
+            shellService.RevealInFileManager(music.FilePath);
         }
     }
 
