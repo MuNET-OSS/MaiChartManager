@@ -1,4 +1,9 @@
 <Project>
+  <PropertyGroup>
+    <!-- Linux 上的设计时构建通常使用 Debug，不能依赖 Linux* 配置名才能拿到正确的框架引用。 -->
+    <IsLinuxBuild Condition="$(Configuration.StartsWith('Linux')) or $([MSBuild]::IsOSPlatform('Linux'))">true</IsLinuxBuild>
+  </PropertyGroup>
+
   <!-- 仅在 Windows 上构建时，让随 MaiChartManager 一起发布的 MuConvert 为自包含 win-x64，
        使打包进 Windows 版的 MuConvert.exe 可独立运行（不依赖单独的 dotnet 运行时）。
        Linux 原生构建则不强制，MuConvert 随主项目按 linux-x64 框架依赖构建。

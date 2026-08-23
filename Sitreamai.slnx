@@ -2,6 +2,8 @@
   <Configurations>
     <BuildType Name="Crack" />
     <BuildType Name="Debug" />
+    <BuildType Name="LinuxDebug" />
+    <BuildType Name="LinuxRelease" />
     <BuildType Name="Release" />
   </Configurations>
   <Project Path="MaiChartManager/MaiChartManager.csproj" />

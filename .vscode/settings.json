@@ -1,5 +1,5 @@
 {
-    "dotnet.defaultSolution": "Sitreamai.sln",
+    "dotnet.defaultSolution": "Sitreamai.slnx",
     "workbench.colorCustomizations": {
         "activityBar.activeBackground": "#f9c3d9",
         "activityBar.background": "#f9c3d9",
