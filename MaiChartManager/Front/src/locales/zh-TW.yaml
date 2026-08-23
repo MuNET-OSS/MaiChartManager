@@ -477,6 +477,39 @@ tools:
   videoConvertError: 影片轉換出錯
   imageToAb: 圖片轉 AssetBundle
   imageToAbError: 圖片轉 AB 出錯
+  resourceJunction:
+    label: 遊戲資源連結
+    title: 遊戲資源連結
+    source: 唯讀來源目錄
+    target: 目標目錄
+    noSource: 未自動選出來源目錄，請手動選擇
+    selectSource: 手動選擇來源目錄
+    selectTarget: 選擇目標目錄
+    fileCounts: 來源目錄資源檔案數
+    total: 合計
+    refresh: 重新整理狀態
+    create: 建立連結
+    remove: 移除連結
+    loading: 正在讀取狀態…
+    requestFailed: 遊戲資源連結操作失敗
+    createConfirm: 只會在目標位置不存在時建立三個資源 Junction，確認繼續？
+    removeConfirm: 只會移除正確指向目前來源目錄的 Junction，不會刪除來源檔案，確認繼續？
+    selection:
+      None: 未選擇
+      Automatic: 自動選擇
+      Manual: 手動選擇
+      Tie: 檔案數並列，請手動選擇
+    status:
+      Ready: 可建立
+      Created: 已建立
+      AlreadyLinked: 已正確連結
+      Removed: 已移除
+      SourceMissing: 來源目錄缺失
+      TargetRootMissing: 目標根目錄缺失
+      Conflict: 目標存在且不是 Junction
+      WrongTarget: Junction 指向錯誤
+      Failed: 操作失敗
+      Unsupported: 目前系統不支援
   pvConvert:
     label: 轉換 PV
     single: 單個轉換

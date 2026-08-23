@@ -326,4 +326,10 @@
   <data name="UnsupportedChartFormat" xml:space="preserve">
       <value>不支援的檔案格式</value>
     </data>
+  <data name="SelectResourceJunctionSourceFolder" xml:space="preserve">
+    <value>選擇來源遊戲目錄或 Package 目錄</value>
+  </data>
+  <data name="SelectResourceJunctionTargetFolder" xml:space="preserve">
+    <value>選擇目標遊戲目錄或 Package 目錄</value>
+  </data>
 </root>

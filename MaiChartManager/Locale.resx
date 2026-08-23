@@ -334,4 +334,10 @@ If you notice any issues with the conversion result, you can try testing it in A
   <data name="UnsupportedChartFormat" xml:space="preserve">
       <value>Unsupported file format</value>
     </data>
+  <data name="SelectResourceJunctionSourceFolder" xml:space="preserve">
+    <value>Select a source game directory or Package directory</value>
+  </data>
+  <data name="SelectResourceJunctionTargetFolder" xml:space="preserve">
+    <value>Select a target game directory or Package directory</value>
+  </data>
 </root>
