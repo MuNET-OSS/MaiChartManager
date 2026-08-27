@@ -104,6 +104,7 @@ export default defineComponent({
         v-model:show={show.value}
       >
         <div class="flex flex-col gap-4">
+          {t('tools.resourceJunction.warning')}
           <div class="grid gap-3 text-sm">
             <div class="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1">
               <div class="min-w-0">

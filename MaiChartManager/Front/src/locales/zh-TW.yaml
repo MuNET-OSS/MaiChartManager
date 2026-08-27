@@ -478,6 +478,7 @@ tools:
   imageToAb: 圖片轉 AssetBundle
   imageToAbError: 圖片轉 AB 出錯
   resourceJunction:
+    warning: 此功能只適用於知道在做什么的高級用戶
     label: 遊戲資源連結
     title: 遊戲資源連結
     source: 唯讀來源目錄

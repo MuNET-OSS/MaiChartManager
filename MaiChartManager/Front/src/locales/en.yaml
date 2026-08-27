@@ -533,6 +533,7 @@ tools:
   imageToAb: Image to AssetBundle
   imageToAbError: Image to AB conversion error
   resourceJunction:
+    warning: This feature is only for advanced users who know what they are doing
     label: Game Resource Links
     title: Game Resource Links
     source: Read-only source
