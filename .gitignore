@@ -12,3 +12,4 @@ nul
 .sisyphus
 .omo
 *.lscache
+.vscode/tasks.json
