@@ -156,10 +156,12 @@ export default defineComponent({
           addVersionId: savedOptions.value.addVersionId,
           version: savedOptions.value.version,
           shift: tempOptions.value.shift,
-          utageDoublePlayer: music.utageMapping?.isDoublePlayer,
-          utageBasicLevel: music.utageMapping?.basicLevel,
-          utageLeftLevel: music.utageMapping?.leftLevel,
-          utageRightLevel: music.utageMapping?.rightLevel,
+          ...(music.utageMapping ? {
+            utageDoublePlayer: music.utageMapping.isDoublePlayer,
+            utageBasicLevel: music.utageMapping.basicLevel,
+            utageLeftLevel: music.utageMapping.leftLevel,
+            utageRightLevel: music.utageMapping.rightLevel,
+          } : {}),
           debug: import.meta.env.DEV,
           assetDir: selectedADir.value,
         })).data;
