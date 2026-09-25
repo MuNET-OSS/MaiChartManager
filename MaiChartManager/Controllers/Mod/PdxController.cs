@@ -220,11 +220,13 @@ public class PdxController(ILogger<PdxController> logger) : ControllerBase
                 for (var i = 0; SetupDiEnumDeviceInfo(deviceInfoSet, i, ref devInfoData); i++)
                 {
                     var hardwareIds = GetMultiStringProperty(deviceInfoSet, ref devInfoData, SPDRP_HARDWAREID);
-                    if (!MatchesSupportedDevice(hardwareIds, matchExclusiveInterface: true))
+                    if (!MatchesSupportedDevice(hardwareIds, matchExclusiveInterface: false))
                         continue;
 
                     var service = GetStringProperty(deviceInfoSet, ref devInfoData, SPDRP_SERVICE);
-                    return string.Equals(service, "WinUSB", StringComparison.OrdinalIgnoreCase);
+                    // 复合设备会先枚举到父节点，老 PDX 则没有 MI 接口；必须继续扫描所有节点。
+                    if (string.Equals(service, "WinUSB", StringComparison.OrdinalIgnoreCase))
+                        return true;
                 }
             }
             finally
