@@ -654,6 +654,7 @@ public partial class MusicTransferController(
             logger.LogError("{message}", message);
             throw new DirectoryNotFoundException(message);
         }
+        var isUtage = music.Id >= 100000 || music.GenreId == 107;
 
         var simaiFile = new Maidata();
         simaiFile.Title = music.Name;
@@ -698,20 +699,14 @@ public partial class MusicTransferController(
                 chartPath = fallbackPath;
             }
 
-            try
-            {
-                var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
-                var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
-                var (simai, _) = new SimaiGenerator().Generate(cvtChart);
-
-                var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
-                simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer));
-                simaiFile.ClockCount = cvtChart.ClockCount; // 通过多次写入，自然实现取最后一个有效难度的clockCount，作为写入maidata中的
-            }
-            catch (Exception e)
-            {
-                logger.LogError("ExportAsMaidata FAILED! {title}, {filename}: {e}", music.Name, chartPath, e);
-                throw;
+            var simaiLevelId = isUtage ? 7 : i + 2;
+            await ConvertToSimai(music, chart, chartPath, simaiFile, simaiLevelId);
+            
+            if (isUtage && music.UtagePlayStyle == 1)
+            { // 双人宴谱，尝试把右侧导出成难度8
+                var rightPath = Path.Combine(musicDir, chart.Path.Replace(".ma2", "_R.ma2", StringComparison.OrdinalIgnoreCase));
+                if (!System.IO.File.Exists(rightPath)) continue;
+                await ConvertToSimai(music, chart, rightPath, simaiFile, 8);
             }
         }
         
@@ -792,6 +787,25 @@ public partial class MusicTransferController(
         }
 
         return (simaiFile, mp3, img, imgExt, video);
+    }
+
+    private async Task ConvertToSimai(MusicXmlWithABJacket music, MusicXml.Chart chart, string chartPath, Maidata simaiFile, int simaiLevelId)
+    {
+        try
+        {
+            var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
+            var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
+            var (simai, _) = new SimaiGenerator().Generate(cvtChart);
+
+            var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
+            simaiFile.AddLevel(simaiLevelId, new MaidataLevel(simai, lvStr, chart.Designer));
+            simaiFile.ClockCount = cvtChart.ClockCount; // 通过多次写入，自然实现取最后一个有效难度的clockCount，作为写入maidata中的
+        }
+        catch (Exception e)
+        {
+            logger.LogError("ExportAsMaidata FAILED! {title}, {filename}: {e}", music.Name, chartPath, e);
+            throw;
+        }
     }
 
     // 把单首歌导出为 maidata 文件（maidata.txt + 封面 + 音频）写入 targetDir。
