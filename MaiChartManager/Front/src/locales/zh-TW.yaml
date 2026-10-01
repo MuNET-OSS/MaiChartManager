@@ -17,6 +17,7 @@ common:
   loading: 載入中…
   processing: 處理中…
   ok: 知道了
+  done: 完成
   management: 管理
   dismiss: 放棄
   longMusic: LongMusic
@@ -167,6 +168,8 @@ music:
     currentProcessing: 目前處理
     exportFailed: 匯出失敗
     exportSuccess: 匯出成功
+    exportCompletedSummary: 已完成，成功匯出了{success}/{total}首歌曲
+    exportFailedList: 匯出失敗的歌曲
     deleteSuccess: 刪除成功
   delete:
     confirm: 確認

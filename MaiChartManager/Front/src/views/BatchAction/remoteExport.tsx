@@ -1,8 +1,11 @@
 import { STEP } from "@/views/BatchAction/index";
 import {
   currentProcessItem,
-  progressAll,
+  exportFailedItems,
+  exportFinished,
+  exportSuccessCount,
   progressCurrent,
+  resetExportProgress,
 } from "@/views/BatchAction/ProgressDisplay";
 import { MusicXmlWithABJacket } from "@/client/apiGen";
 import { BlobWriter, ZipReader } from "@zip.js/zip.js";
@@ -11,7 +14,6 @@ import {
   MAIDATA_SUBDIR,
   OPTIONS,
 } from "@/views/BatchAction/ChooseAction";
-import { addToast } from "@munet/ui";
 import { getUrl } from "@/client/api";
 import { addVersionList, genreList } from "@/store/refs";
 import { t } from "@/locales";
@@ -67,11 +69,15 @@ export default async (
     return parentDir ? `${parentDir}/${targetDir}` : targetDir;
   };
 
-  progressCurrent.value = 0;
-  progressAll.value = musicList.length;
-  currentProcessItem.value = "";
-
+  resetExportProgress(musicList.length);
   setStep(STEP.ProgressDisplay);
+
+  const recordFailure = (music: MusicXmlWithABJacket) => {
+    exportFailedItems.value.push({
+      id: music.id!,
+      name: music.name || t("music.list.unknown"),
+    });
+  };
 
   const getExportUrl = (music: MusicXmlWithABJacket) => {
     switch (action) {
@@ -107,7 +113,7 @@ export default async (
     }
   };
 
-  const exportOne = async (music: MusicXmlWithABJacket) => {
+  const exportOne = async (music: MusicXmlWithABJacket): Promise<boolean> => {
     const musicName = music.name || t("music.list.unknown");
     currentProcessItem.value = musicName;
 
@@ -168,19 +174,23 @@ export default async (
         }
 
         if (hasEntryError) {
-          addToast({ type: 'error', message: `${t('error.exportFailed')}: ${musicName}` });
+          recordFailure(music);
+          return false;
         }
+        return true;
       } finally {
         await zipReader.close();
       }
     } catch (e) {
       console.error(e);
-      addToast({ type: 'error', message: `${t('error.exportFailed')}: ${musicName}` });
+      recordFailure(music);
+      return false;
     }
   };
 
   let nextIndex = 0;
   let completedCount = 0;
+  let successCount = 0;
   const workerCount = Math.min(musicList.length, getMaxParallelExports());
 
   const worker = async () => {
@@ -190,7 +200,11 @@ export default async (
         return;
       }
 
-      await exportOne(musicList[currentIndex]);
+      const ok = await exportOne(musicList[currentIndex]);
+      if (ok) {
+        successCount += 1;
+        exportSuccessCount.value = successCount;
+      }
       completedCount += 1;
       progressCurrent.value = completedCount;
     }
@@ -198,14 +212,13 @@ export default async (
 
   try {
     await Promise.all(Array.from({ length: workerCount }, () => worker()));
-    addToast({ message: t('music.batch.exportSuccess'), type: 'success' });
   }
   catch (e) {
     console.error(e);
-    addToast({ type: 'error', message: `${t('error.exportFailed')}` });
   }
   finally {
     currentProcessItem.value = "";
-    setStep(STEP.Select);
+    exportSuccessCount.value = successCount;
+    exportFinished.value = true;
   }
 };
