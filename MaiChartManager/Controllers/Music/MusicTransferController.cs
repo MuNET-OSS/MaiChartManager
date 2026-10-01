@@ -613,6 +613,40 @@ public partial class MusicTransferController(
     {
         var music = settings.GetMusic(id, assetDir);
         if (music is null) return;
+        var (simaiFile, track, img, imgExt, video) = await _exportAsMaidata(music, ignoreVideo);
+        
+        await using var zipStream = HttpContext.Response.BodyWriter.AsStream();
+        using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
+        
+        var maidataEntry = zipArchive.CreateEntry("maidata.txt");
+        await using var maidataStream = maidataEntry.Open();
+        await maidataStream.WriteAsync(Encoding.UTF8.GetBytes(simaiFile.ToString()));
+        maidataStream.Close();
+        
+        if (img is not null)
+        {
+            var imageEntry = zipArchive.CreateEntry($"bg{imgExt}");
+            await using var imageStream = imageEntry.Open();
+            await imageStream.WriteAsync(img);
+            imageStream.Close();
+        }
+        
+        var soundEntry = zipArchive.CreateEntry("track.mp3");
+        await using var soundStream = soundEntry.Open();
+        await soundStream.WriteAsync(track);
+        soundStream.Close();
+
+        if (video is not null)
+        {
+            var pvEntry = zipArchive.CreateEntry("pv.mp4");
+            await using var pvStream = pvEntry.Open();
+            await pvStream.WriteAsync(video);
+            pvStream.Close();
+        }
+    }
+    
+    private async Task<(Maidata simaiFile, byte[] track, byte[]? img, string imgExt, byte[]? video)> _exportAsMaidata(MusicXmlWithABJacket music, bool ignoreVideo = false)
+    {
         var musicDir = Path.GetDirectoryName(music.FilePath);
         if (string.IsNullOrWhiteSpace(musicDir) || !Directory.Exists(musicDir))
         {
@@ -684,29 +718,12 @@ public partial class MusicTransferController(
         var appVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
         simaiFile["chartconverter"] = $"MaiChartManager v{appVersion}";
 
-        await using var zipStream = HttpContext.Response.BodyWriter.AsStream();
-        using var zipArchive = new ZipArchive(zipStream, ZipArchiveMode.Create, leaveOpen: true);
-        
-        var maidataEntry = zipArchive.CreateEntry("maidata.txt");
-        await using var maidataStream = maidataEntry.Open();
-        await maidataStream.WriteAsync(Encoding.UTF8.GetBytes(simaiFile.ToString()));
-        maidataStream.Close();
-
-        // 复制封面
+        // 导出封面
         var img = music.GetMusicJacketPngData();
-        if (img is not null)
-        {
-            var imgExt = (Path.GetExtension(music.RealJacketPath) ?? ".png").ToLowerInvariant();
-            if (imgExt == ".ab") imgExt = ".png";
-            var imageEntry = zipArchive.CreateEntry($"bg{imgExt}");
-            await using var imageStream = imageEntry.Open();
-            await imageStream.WriteAsync(img);
-            imageStream.Close();
-        }
+        var imgExt = (Path.GetExtension(music.RealJacketPath) ?? ".png").ToLowerInvariant();
+        if (imgExt == ".ab") imgExt = ".png";
 
         // 导出音频
-        var soundEntry = zipArchive.CreateEntry("track.mp3");
-        await using var soundStream = soundEntry.Open();
         var tag = new ID3TagData
         {
             Title = music.Name,
@@ -724,10 +741,10 @@ public partial class MusicTransferController(
             throw new FileNotFoundException(message);
         }
         var wav = Audio.AcbToWav(acbPath);
-        AudioConvert.ConvertWavToMp3Stream(wav, soundStream, tag);
-        soundStream.Close();
-
-
+        var mp3 = AudioConvert.ConvertWavToMp3(wav, tag);
+        
+        // 导出视频
+        byte[]? video = null;
         if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
         {
             DirectoryInfo? tmpDir = null;
@@ -751,7 +768,7 @@ public partial class MusicTransferController(
 
                 if (pvMp4Path is not null && System.IO.File.Exists(pvMp4Path))
                 {
-                    zipArchive.CreateEntryFromFile(pvMp4Path, "pv.mp4");
+                    video = await System.IO.File.ReadAllBytesAsync(pvMp4Path);
                 }
             }
             catch (Exception ex)
@@ -773,6 +790,8 @@ public partial class MusicTransferController(
                 }
             }
         }
+
+        return (simaiFile, mp3, img, imgExt, video);
     }
 
     // 把单首歌导出为 maidata 文件（maidata.txt + 封面 + 音频）写入 targetDir。
@@ -781,160 +800,21 @@ public partial class MusicTransferController(
     {
         var music = settings.GetMusic(id, assetDir);
         if (music is null) return;
-        var musicDir = Path.GetDirectoryName(music.FilePath);
-        if (string.IsNullOrWhiteSpace(musicDir) || !Directory.Exists(musicDir))
-        {
-            var message = $"Invalid source directory for music {music.Id}: {music.FilePath}";
-            logger.LogError("{message}", message);
-            throw new DirectoryNotFoundException(message);
-        }
-
         Directory.CreateDirectory(targetDir);
+        var (simaiFile, track, img, imgExt, video) = await _exportAsMaidata(music, ignoreVideo);
 
-        var simaiFile = new Maidata();
-        simaiFile.Title = music.Name;
-        simaiFile.Artist = music.Artist;
-        simaiFile.WholeBpm = music.Bpm;
-        simaiFile.First = 0;
-        simaiFile["shortid"] = music.Id.ToString();
-        simaiFile["genreid"] = music.GenreId.ToString();
-        var genre = StaticSettings.GenreList.FirstOrDefault(it => it.Id == music.GenreId);
-        if (genre is not null) simaiFile["genre"] = genre.GenreName;
-        simaiFile["versionid"] = music.AddVersionId.ToString();
-        var version = StaticSettings.VersionList.FirstOrDefault(it => it.Id == music.AddVersionId);
-        if (version is not null) simaiFile["version"] = version.GenreName;
-
-        // demo_seek（预览起止时间），依赖 CriUtils
-        try
-        {
-            if (AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out _, out var previewAcb, out _) && previewAcb is not null)
-            {
-                var previewTime = CriUtils.GetAudioPreviewTime(previewAcb);
-                if (previewTime.StartTime >= 0 && previewTime.EndTime > previewTime.StartTime)
-                {
-                    simaiFile.Demo = ((float)previewTime.StartTime, (float)(previewTime.EndTime - previewTime.StartTime));
-                }
-            }
-        }
-        catch (Exception e)
-        {
-            logger.LogWarning(e, "WriteMaidataToDirectory: 获取音频预览时间失败，已忽略。");
-        }
-
-        for (var i = 0; i < music.Charts.Length; i++)
-        {
-            var chart = music.Charts[i];
-            if (chart is null || !chart.Enable || string.IsNullOrWhiteSpace(chart.Path)) continue;
-
-            var chartPath = Path.Combine(musicDir, chart.Path);
-            if (!System.IO.File.Exists(chartPath))
-            {
-                var fallbackPath = Path.Combine(musicDir, chart.Path.Replace(".ma2", "_L.ma2", StringComparison.OrdinalIgnoreCase));
-                if (!System.IO.File.Exists(fallbackPath)) continue;
-                chartPath = fallbackPath;
-            }
-
-            try
-            {
-                var ma2Content = await System.IO.File.ReadAllTextAsync(chartPath);
-                var (cvtChart, _) = new MA2Parser().Parse(ma2Content);
-                var (simai, _) = new SimaiGenerator().Generate(cvtChart);
-
-                var lvStr = $"{chart.Level}.{chart.LevelDecimal}";
-                simaiFile.AddLevel(i + 2, new MaidataLevel(simai, lvStr, chart.Designer));
-                simaiFile.ClockCount = cvtChart.ClockCount; // 通过多次写入，自然实现取最后一个有效难度的clockCount，作为写入maidata中的
-            }
-            catch (Exception e)
-            {
-                logger.LogError("WriteMaidataToDirectory FAILED! {title}, {filename}: {e}", music.Name, chartPath, e);
-                throw;
-            }
-        }
-
-        var appVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "";
-        simaiFile["chartconverter"] = $"MaiChartManager v{appVersion}";
-
-        // 写 maidata.txt
         await System.IO.File.WriteAllTextAsync(Path.Combine(targetDir, "maidata.txt"), simaiFile.ToString(), Encoding.UTF8);
 
-        // 写封面 bg{ext}
-        var img = music.GetMusicJacketPngData();
         if (img is not null)
         {
-            var imgExt = (Path.GetExtension(music.RealJacketPath) ?? ".png").ToLowerInvariant();
-            if (imgExt == ".ab") imgExt = ".png";
             await System.IO.File.WriteAllBytesAsync(Path.Combine(targetDir, $"bg{imgExt}"), img);
         }
 
-        // 导出音频 track.mp3，依赖 AudioConvert/CriUtils
-        var tag = new ID3TagData
+        await System.IO.File.WriteAllBytesAsync(Path.Combine(targetDir, "track.mp3"), track);
+
+        if (video is not null)
         {
-            Title = music.Name,
-            Artist = music.Artist,
-            Album = genre?.GenreName,
-            Track = music.Id.ToString(),
-            Comment = version?.GenreName,
-            AlbumArt = img,
-        };
-
-        if (!AudioConvert.TryResolveAcbAwb(GetAudioCandidateIds(music), out _, out var acbPath, out var awbPath) || acbPath is null || awbPath is null)
-        {
-            var message = BuildAudioResolveErrorMessage(music);
-            logger.LogError("{message}", message);
-            throw new FileNotFoundException(message);
-        }
-        var wav = Audio.AcbToWav(acbPath);
-        await using (var soundStream = System.IO.File.Create(Path.Combine(targetDir, "track.mp3")))
-        {
-            AudioConvert.ConvertWavToMp3Stream(wav, soundStream, tag);
-        }
-
-
-        // 导出 PV 视频 pv.mp4（与 zip 版保持一致，未加 #if WINDOWS 限制）
-        if (!ignoreVideo && StaticSettings.MovieDataMap.TryGetValue(music.NonDxId, out var movieUsmPath))
-        {
-            DirectoryInfo? tmpDir = null;
-            try
-            {
-                string? pvMp4Path = null;
-                var ext = Path.GetExtension(movieUsmPath).ToLowerInvariant();
-
-                if (ext == ".dat" || ext == ".usm")
-                {
-                    tmpDir = Directory.CreateTempSubdirectory();
-                    logger.LogInformation("Temp dir: {tmpDir}", tmpDir.FullName);
-                    pvMp4Path = Path.Combine(tmpDir.FullName, "pv.mp4");
-
-                    await VideoConvert.ConvertUsmToMp4(movieUsmPath, pvMp4Path);
-                }
-                else if (ext == ".mp4")
-                {
-                    pvMp4Path = movieUsmPath;
-                }
-
-                if (pvMp4Path is not null && System.IO.File.Exists(pvMp4Path))
-                {
-                    System.IO.File.Copy(pvMp4Path, Path.Combine(targetDir, "pv.mp4"), true);
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "导出音乐 {musicId}（{name}）的 pv.mp4 失败，跳过视频。", music.Id, music.Name);
-            }
-            finally
-            {
-                if (tmpDir is not null)
-                {
-                    try
-                    {
-                        tmpDir.Delete(true);
-                    }
-                    catch
-                    {
-                        // 忽略清理错误
-                    }
-                }
-            }
+            await System.IO.File.WriteAllBytesAsync(Path.Combine(targetDir, "pv.mp4"), video);
         }
     }
 
