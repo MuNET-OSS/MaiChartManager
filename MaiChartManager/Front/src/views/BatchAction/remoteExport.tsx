@@ -7,13 +7,10 @@ import {
   progressCurrent,
   resetExportProgress,
 } from "@/views/BatchAction/ProgressDisplay";
-import { MusicXmlWithABJacket } from "@/client/apiGen";
+import { MaidataSubdirMode, MusicXmlWithABJacket } from "@/client/apiGen";
 import { BlobWriter, ZipReader } from "@zip.js/zip.js";
 import getSubDirFile from "@/utils/getSubDirFile";
-import {
-  MAIDATA_SUBDIR,
-  OPTIONS,
-} from "@/views/BatchAction/ChooseAction";
+import { OPTIONS } from "@/views/BatchAction/ChooseAction";
 import { getUrl } from "@/client/api";
 import { addVersionList, genreList } from "@/store/refs";
 import { t } from "@/locales";
@@ -23,7 +20,7 @@ export default async (
   setStep: (step: STEP) => void,
   musicList: MusicXmlWithABJacket[],
   action: OPTIONS,
-  dirOption: MAIDATA_SUBDIR,
+  dirOption: MaidataSubdirMode,
 ) => {
   let folderHandle: FileSystemDirectoryHandle;
   try {
@@ -39,12 +36,12 @@ export default async (
   const getMaidataExportDir = (music: MusicXmlWithABJacket) => {
     let parentDir = "";
     switch (dirOption) {
-      case MAIDATA_SUBDIR.Genre:
+      case MaidataSubdirMode.Genre:
         parentDir =
           genreList.value.find((genre) => genre.id === music.genreId)
             ?.genreName || t("music.list.unknown");
         break;
-      case MAIDATA_SUBDIR.Version:
+      case MaidataSubdirMode.Version:
         parentDir =
           addVersionList.value.find(
             (version) => version.id === music.addVersionId,

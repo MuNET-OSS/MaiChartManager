@@ -23,8 +23,21 @@ public partial class MusicTransferController(
 {
     public record RequestCopyToRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool removeEvents, bool legacyFormat);
 
-    // 原生选目录导出 maidata 的请求体：music 为要导出的歌曲列表，ignoreVideo 控制是否跳过 PV 视频。
-    public record RequestExportMaidataRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool ignoreVideo = false);
+    public enum MaidataSubdirMode
+    {
+        None = 0,
+        Genre = 1,
+        Version = 2,
+    }
+
+    // 原生选目录导出 maidata 的请求体：
+    // music 为要导出的歌曲列表；ignoreVideo 控制是否跳过 PV；
+    // subdir 控制是否按流派/版本建一级子目录；byId 为 true 时叶子目录用歌曲 id 命名。
+    public record RequestExportMaidataRequest(
+        MusicBatchController.MusicIdAndAssetDirPair[] music,
+        bool ignoreVideo = false,
+        MaidataSubdirMode subdir = MaidataSubdirMode.None,
+        bool byId = false);
 
     private static int[] GetAudioCandidateIds(MusicXmlWithABJacket music)
     {
@@ -888,19 +901,34 @@ public partial class MusicTransferController(
 
             try
             {
-                // 子目录命名：安全化歌名 + DX 后缀（与前端 remoteExport 保持一致）；为空回退到 id。
-                var suffix = music.Id is > 10000 and < 20000 ? " [DX]" : "";
-                var baseName = SanitizeFileNameSegment(music.Name ?? "", music.Id.ToString()) + suffix;
+                // 一级分组目录（与前端 remoteExport 的 selectedMaidataSubdir 对齐）
+                string? parentDir = request.subdir switch
+                {
+                    MaidataSubdirMode.Genre => SanitizeFileNameSegment(
+                        StaticSettings.GenreList.FirstOrDefault(it => it.Id == music.GenreId)?.GenreName ?? "", "Unknown"),
+                    MaidataSubdirMode.Version => SanitizeFileNameSegment(
+                        StaticSettings.VersionList.FirstOrDefault(it => it.Id == music.AddVersionId)?.GenreName ?? "", "Unknown"),
+                    _ => null,
+                };
+
+                // 叶子目录：byId 用 id；否则安全化歌名 + DX 后缀（与前端 remoteExport 保持一致）
+                string baseName;
+                if (request.byId) baseName = music.Id.ToString();
+                else
+                {
+                    var suffix = music.Id is > 10000 and < 20000 ? " [DX]" : "";
+                    baseName = SanitizeFileNameSegment(music.Name ?? "", music.Id.ToString()) + suffix;
+                }
 
                 // 处理重名：追加 id，再不行追加序号
-                var dirName = baseName;
+                var dirName = parentDir is null ? baseName : Path.Combine(parentDir, baseName);
                 if (!usedDirNames.Add(dirName))
                 {
-                    dirName = $"{baseName}_{music.Id}";
+                    dirName += $"_{music.Id}";
                     var n = 1;
                     while (!usedDirNames.Add(dirName))
                     {
-                        dirName = $"{baseName}_{music.Id}_{n++}";
+                        dirName += $"_{n++}";
                     }
                 }
 
