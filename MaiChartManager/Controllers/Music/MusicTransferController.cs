@@ -822,7 +822,7 @@ public partial class MusicTransferController(
     }
 
     // 把单首歌导出为 maidata 文件（maidata.txt + 封面 + 音频）写入 targetDir。
-    // 该方法供原生选目录导出复用；与 zip 版 ExportAsMaidata 产物保持一致（Linux 下不导出音频）。
+    // 该方法供原生选目录导出复用；与 zip 版 ExportAsMaidata 产物保持一致。
     private async Task WriteMaidataToDirectory(int id, string assetDir, string targetDir, bool ignoreVideo)
     {
         var music = settings.GetMusic(id, assetDir);
@@ -846,13 +846,16 @@ public partial class MusicTransferController(
     }
 
     // 把文件名中的非法字符替换为下划线，空结果回退到 fallback。
-    private static string SanitizeFileNameSegment(string name, string fallback)
+    // treatDotAsInvalid 为 true 时，`.` 也视为非法字符。流派名和版本名本身不含句点，
+    // 用来避免 "." / ".." 被 Path.Combine 解析到目标目录之外；歌名不传此参数，以免改掉正常句点。
+    private static string SanitizeFileNameSegment(string name, string fallback, bool treatDotAsInvalid = false)
     {
         var invalidChars = Path.GetInvalidFileNameChars();
         var builder = new StringBuilder(name.Length);
         foreach (var ch in name)
         {
-            builder.Append(Array.IndexOf(invalidChars, ch) >= 0 ? '_' : ch);
+            var invalid = Array.IndexOf(invalidChars, ch) >= 0 || (treatDotAsInvalid && ch == '.');
+            builder.Append(invalid ? '_' : ch);
         }
 
         var result = builder.ToString().Trim();
@@ -905,9 +908,9 @@ public partial class MusicTransferController(
                 string? parentDir = request.subdir switch
                 {
                     MaidataSubdirMode.Genre => SanitizeFileNameSegment(
-                        StaticSettings.GenreList.FirstOrDefault(it => it.Id == music.GenreId)?.GenreName ?? "", "Unknown"),
+                        StaticSettings.GenreList.FirstOrDefault(it => it.Id == music.GenreId)?.GenreName ?? "", "Unknown", treatDotAsInvalid: true),
                     MaidataSubdirMode.Version => SanitizeFileNameSegment(
-                        StaticSettings.VersionList.FirstOrDefault(it => it.Id == music.AddVersionId)?.GenreName ?? "", "Unknown"),
+                        StaticSettings.VersionList.FirstOrDefault(it => it.Id == music.AddVersionId)?.GenreName ?? "", "Unknown", treatDotAsInvalid: true),
                     _ => null,
                 };
 
