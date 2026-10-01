@@ -2,7 +2,7 @@ import { defineComponent, PropType, ref } from "vue";
 import { MusicXmlWithABJacket } from "@/client/apiGen";
 import { Button, Radio, Select, Popover, addToast } from "@munet/ui";
 import { STEP } from "@/views/BatchAction/index";
-import api, { isLocalHost, requestExportMaidata } from "@/client/api";
+import api, { isLocalHost } from "@/client/api";
 import { showNeedPurchaseDialog, updateMusicList, version } from "@/store/refs";
 import remoteExport from "@/views/BatchAction/remoteExport";
 import TransitionVertical from "@/components/TransitionVertical.vue";
@@ -80,10 +80,10 @@ export default defineComponent({
             // 远程路径（remoteExport）仍按 ID 命名，保持原样。
             load.value = true;
             try {
-              await requestExportMaidata(
-                props.selectedMusic!.map(it => ({id: it.id!, assetDir: it.assetDir!})),
-                selectedOption.value === OPTIONS.ConvertToMaidataIgnoreVideo,
-              );
+              await api.RequestExportMaidata({
+                music: props.selectedMusic!.map(it => ({id: it.id!, assetDir: it.assetDir!})),
+                ignoreVideo: selectedOption.value === OPTIONS.ConvertToMaidataIgnoreVideo,
+              });
               addToast({message: t('music.batch.exportSuccess'), type: 'success'});
             } finally {
               load.value = false;
