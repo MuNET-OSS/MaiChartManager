@@ -159,6 +159,42 @@ public partial class Launcher : Form
             return;
         }
 
+        try
+        {
+            string mlDllPath = Path.Combine(StaticSettings.GamePath, "MelonLoader", "MelonLoader.dll");
+            if (!File.Exists(mlDllPath))
+            {
+                mlDllPath = Path.Combine(StaticSettings.GamePath, "..", "MelonLoader", "MelonLoader.dll");
+            }
+
+            if (File.Exists(mlDllPath))
+            {
+                var versionInfo = System.Diagnostics.FileVersionInfo.GetVersionInfo(mlDllPath);
+                string version = versionInfo.ProductVersion ?? "unknown";
+
+                if (!version.StartsWith("0.6.4"))
+                {
+                    // i8n pls
+                    var dialogResult = MessageBox.Show(
+                        $"Detected MelonLoader version {version}, but 0.6.4 is recommended for stability. Continue anyway?",
+                        "MelonLoader Version Warning",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+
+                    if (dialogResult == DialogResult.No) return;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // add i8n, pleeeeease
+            MessageBox.Show(
+                            $"Failed to check MelonLoader version: {ex.Message}. Please ensure MelonLoader 0.6.4 is installed.",
+                            "MelonLoader Check Error",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+        }
+
         if (ContainsSpecialCharacters(StaticSettings.GamePath))
         {
             MessageBox.Show(Locale.PathContainsSpecialChars, Locale.PathContainsSpecialCharsTitle, MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -177,7 +213,7 @@ public partial class Launcher : Form
         StaticSettings.Config.AuthUsername = textBoxLanAuthUser.Text;
         StaticSettings.Config.AuthPassword = textBoxLanAuthPass.Text;
         StaticSettings.Config.Save();
-# endif
+#endif
 
         textBox1.Enabled = false;
         button1.Enabled = false;
