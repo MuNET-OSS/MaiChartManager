@@ -68,6 +68,12 @@ export enum MessageLevel {
   Fatal = "Fatal",
 }
 
+export enum MaidataSubdirMode {
+  None = "None",
+  Genre = "Genre",
+  Version = "Version",
+}
+
 export enum LicenseStatus {
   Pending = "Pending",
   Active = "Active",
@@ -411,6 +417,8 @@ export interface RequestCopyToRequest {
 export interface RequestExportMaidataRequest {
   music?: MusicIdAndAssetDirPair[] | null;
   ignoreVideo?: boolean;
+  subdir?: MaidataSubdirMode;
+  byId?: boolean;
 }
 
 export interface RequestPurchaseResult {

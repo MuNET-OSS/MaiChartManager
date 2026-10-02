@@ -73,7 +73,7 @@ public static class AudioConvert
         return cachePath;
     }
 
-    public static void ConvertWavToMp3Stream(byte[] wav, Stream mp3Stream, ID3TagData? tagData = null)
+    public static byte[] ConvertWavToMp3(byte[] wav, ID3TagData? tagData = null)
     {
         var tempFileGuid = Guid.NewGuid();
         var inputPath = Path.Combine(StaticSettings.tempPath, $"ConvertToMp3_{tempFileGuid:N}.wav");
@@ -129,8 +129,7 @@ public static class AudioConvert
                 throw new InvalidOperationException("ffmpeg produced empty mp3 file from wav input.");
             }
 
-            using var outputFile = new FileStream(outputPath, FileMode.Open, FileAccess.Read);
-            outputFile.CopyTo(mp3Stream);
+            return File.ReadAllBytes(outputPath);
         }
         finally
         {

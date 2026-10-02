@@ -49,36 +49,3 @@ export const getUrl = (suffix: string) => {
 export const isPhotino =
   isLocalHost && !isWebView &&
   typeof (window as any).external?.sendMessage === 'function';
-
-// 用系统浏览器打开一个 http/https URL（后端 xdg-open 等）。
-// 给 Photino 用：WebKitGTK 弹不出 window.open 的新窗口，预览谱面等改为外部浏览器打开。
-export const openExternalUrl = async (url: string) => {
-  const res = await fetch(getUrl('OpenExternalUrlApi'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ url }),
-  });
-  if (!res.ok) {
-    throw new Error(`OpenExternalUrl 失败: ${res.status} ${res.statusText}`);
-  }
-}
-
-// 本地宿主（Photino/WebKitGTK、WebView2）专用的 maidata 导出：
-// 后端弹原生选目录对话框，并把每首歌的 maidata 写进所选目录（每首一个子目录）。
-// 这里手写 fetch 而不是用生成的 apiGen，是因为本环境无法连接后端重新生成 client。
-// 接口：POST /MaiChartManagerServlet/RequestExportMaidataApi
-//   body: { music: [{ id, assetDir }], ignoreVideo?: boolean }
-export const requestExportMaidata = async (
-  music: { id: number; assetDir: string }[],
-  ignoreVideo = false,
-) => {
-  const res = await fetch(getUrl('RequestExportMaidataApi'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ music, ignoreVideo }),
-  });
-  if (!res.ok) {
-    throw new Error(`RequestExportMaidata 失败: ${res.status} ${res.statusText}`);
-  }
-  return res;
-}

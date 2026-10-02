@@ -1,8 +1,8 @@
 import { defineComponent, PropType, ref } from "vue";
-import { MusicXmlWithABJacket } from "@/client/apiGen";
+import { MaidataSubdirMode, MusicXmlWithABJacket } from "@/client/apiGen";
 import { Button, Radio, Select, Popover, addToast } from "@munet/ui";
 import { STEP } from "@/views/BatchAction/index";
-import api, { isLocalHost, requestExportMaidata } from "@/client/api";
+import api, { isLocalHost } from "@/client/api";
 import { showNeedPurchaseDialog, updateMusicList, version } from "@/store/refs";
 import remoteExport from "@/views/BatchAction/remoteExport";
 import TransitionVertical from "@/components/TransitionVertical.vue";
@@ -21,12 +21,6 @@ export enum OPTIONS {
   ConvertToMaidataById,
 }
 
-export enum MAIDATA_SUBDIR {
-  None,
-  Genre,
-  Version,
-}
-
 export default defineComponent({
   props: {
     selectedMusic: Array as PropType<MusicXmlWithABJacket[]>,
@@ -34,7 +28,7 @@ export default defineComponent({
   },
   setup(props) {
     const selectedOption = ref(OPTIONS.None);
-    const selectedMaidataSubdir = useStorage('selectedMaidataSubdir', MAIDATA_SUBDIR.None);
+    const selectedMaidataSubdir = useStorage<MaidataSubdirMode>('selectedMaidataSubdir', MaidataSubdirMode.None);
     const load = ref(false);
 
     const { t } = useI18n();
@@ -75,15 +69,15 @@ export default defineComponent({
           }
           if (isLocalHost) {
             // 本地宿主（Photino/WebKitGTK、WebView2）：走后端 RequestExportMaidata，弹原生选目录对话框。
-            // 注意：ConvertToMaidataById（按 ID 命名子目录）在本地路径下无法精确还原——
-            // 后端目前按「歌名 + DX」命名子目录，因此本地路径下 ById 等同于普通 maidata 导出。
-            // 远程路径（remoteExport）仍按 ID 命名，保持原样。
+            // subdir / byId 与 remoteExport 行为对齐：按流派或版本建一级子目录，ById 用歌曲 id 命名叶子目录。
             load.value = true;
             try {
-              await requestExportMaidata(
-                props.selectedMusic!.map(it => ({id: it.id!, assetDir: it.assetDir!})),
-                selectedOption.value === OPTIONS.ConvertToMaidataIgnoreVideo,
-              );
+              await api.RequestExportMaidata({
+                music: props.selectedMusic!.map(it => ({id: it.id!, assetDir: it.assetDir!})),
+                ignoreVideo: selectedOption.value === OPTIONS.ConvertToMaidataIgnoreVideo,
+                subdir: selectedMaidataSubdir.value,
+                byId: selectedOption.value === OPTIONS.ConvertToMaidataById,
+              });
               addToast({message: t('music.batch.exportSuccess'), type: 'success'});
             } finally {
               load.value = false;
@@ -149,7 +143,7 @@ export default defineComponent({
 
           <TransitionVertical>
             {(selectedOption.value === OPTIONS.ConvertToMaidata || selectedOption.value === OPTIONS.ConvertToMaidataIgnoreVideo || selectedOption.value === OPTIONS.ConvertToMaidataById) &&
-              <Select v-model:value={selectedMaidataSubdir.value} options={[{label: t('music.batch.subdirOption.none'), value: MAIDATA_SUBDIR.None}, {label: t('music.batch.subdirOption.genre'), value: MAIDATA_SUBDIR.Genre}, {label: t('music.batch.subdirOption.version'), value: MAIDATA_SUBDIR.Version}]}/>}
+              <Select v-model:value={selectedMaidataSubdir.value} options={[{label: t('music.batch.subdirOption.none'), value: MaidataSubdirMode.None}, {label: t('music.batch.subdirOption.genre'), value: MaidataSubdirMode.Genre}, {label: t('music.batch.subdirOption.version'), value: MaidataSubdirMode.Version}]}/>}
           </TransitionVertical>
         </div>
       </fieldset>

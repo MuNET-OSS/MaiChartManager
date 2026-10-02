@@ -29,7 +29,7 @@ export default defineComponent({
       {step.value === STEP.Select && <MusicSelector v-model:selectedMusicIds={selectedMusic.value} continue={() => step.value = STEP.ChooseAction} cancel={() => { step.value = STEP.Select; selectedMusic.value = []; }}/>}
       {step.value === STEP.ChooseAction && <ChooseAction selectedMusic={selectedMusic.value} continue={(action: STEP) => step.value = action}/>}
       {step.value === STEP.EditProps && <EditProps selectedMusicIds={selectedMusic.value} closeModal={() => { step.value = STEP.Select; selectedMusic.value = []; }}/>}
-      {step.value === STEP.ProgressDisplay && <ProgressDisplay/>}
+      {step.value === STEP.ProgressDisplay && <ProgressDisplay continue={() => { step.value = STEP.Select; selectedMusic.value = []; }}/>}
     </div>;
   }
 })

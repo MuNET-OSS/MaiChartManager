@@ -1,5 +1,5 @@
 import { computed, defineComponent, ref } from "vue";
-import api, { getUrl, isLocalHost, requestExportMaidata } from "@/client/api";
+import api, { getUrl, isLocalHost } from "@/client/api";
 import { globalCapture, selectedADir, selectedMusic, selectMusicId, showNeedPurchaseDialog, version } from "@/store/refs";
 import { DropMenu, addToast } from "@munet/ui";
 import { BlobWriter, ZipReader } from "@zip.js/zip.js";
@@ -88,10 +88,10 @@ export default defineComponent({
           });
         } else {
           // maidata 导出改用后端新接口 RequestExportMaidata
-          await requestExportMaidata(
-            [{id: selectMusicId.value, assetDir: selectedADir.value}],
-            type === CopyType.exportMaidataIgnoreVideo,
-          );
+          await api.RequestExportMaidata({
+            music: [{id: selectMusicId.value, assetDir: selectedADir.value}],
+            ignoreVideo: type === CopyType.exportMaidataIgnoreVideo,
+          });
         }
       } finally {
         wait.value = false;

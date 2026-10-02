@@ -17,6 +17,7 @@ common:
   loading: Loading...
   processing: Processing...
   ok: OK
+  done: Done
   management: Management
   dismiss: Dismiss
   longMusic: LongMusic
@@ -178,6 +179,8 @@ music:
     currentProcessing: Currently Processing
     exportFailed: Failed to export
     exportSuccess: Export successful
+    exportCompletedSummary: 'Completed: successfully exported {success}/{total} songs'
+    exportFailedList: Failed songs
     deleteSuccess: Deleted successfully
   delete:
     confirm: Confirm
