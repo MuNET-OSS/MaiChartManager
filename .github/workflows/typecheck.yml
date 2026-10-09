@@ -1,0 +1,54 @@
+name: Typecheck
+
+on:
+  push:
+    branches: [ "main" ]
+    paths-ignore:
+      - '**.md'
+  # PR 上不加 paths 过滤：加了之后 docs-only PR 会整条 workflow 被跳过，
+  # 一旦这个 check 被设成 required 就会卡住合并
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    # 不要传 version：根 package.json 的 packageManager 是 "pnpm@10.20.0+sha512.…"，
+    # 而 action-setup 会拿去掉 "pnpm@" 的整串去和 version 严格比较，
+    # 于是哪怕 version 写 10.20.0 也会报 Multiple versions of pnpm specified
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+
+    # 必须在 action-setup 之后：pnpm 缓存要跑 `pnpm store path`，此时 pnpm 得已就绪。
+    # 缓存键用的 pnpm-lock.yaml 在仓库根，默认的 cache-dependency-path 能直接找到
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        cache: 'pnpm'
+
+    # 显式 --frozen-lockfile（CI 下本来也是默认）：lockfile 与任一 workspace 成员
+    # 的 manifest 不同步就直接失败，别让 CI 偷偷改写 lockfile
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+
+    # 根目录 pnpm typecheck = pnpm -r run typecheck，同时覆盖 MaiChartManager/Front
+    # 和 MuNET-UI（被 pin 的子模块），所以这条也能挡住把类型有问题的子模块指针合进来。
+    # 注意它只跑 tsc、不跑 vite build，打包坏掉要等 build.yml 在 main 上才发现。
+    - name: Typecheck
+      run: pnpm typecheck

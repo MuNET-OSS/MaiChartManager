@@ -109,6 +109,9 @@ powershell Packaging/Build.ps1 -Mode Canary
 - Browser.cs 通过 WebView2 加载前端，注入 `globalThis.backendUrl`，前端通过 localhost API 通信
 - Python 和 FFmpeg 是嵌入式运行时，通过 csproj CopyToOutputDirectory 打包
 - MaiChartManager.CLI 共享主项目部分代码，但是独立 csproj
-- CI 构建分两步：Linux 上 pnpm build 前端 → self-hosted Windows 上 dotnet publish + makeappx
+- CI 分两个 workflow：`build.yml`（Build Canary，push 到 main / 手动触发）负责 Linux 上 pnpm build 前端 → self-hosted Windows 上 dotnet publish + makeappx；`typecheck.yml` 跑 `pnpm typecheck`，PR 和 push 到 main 都会触发
+- 改前端依赖后必须 `pnpm install` 并把 `pnpm-lock.yaml` 一起提交：CI 里 `CI=true` 会让 pnpm 默认走 `--frozen-lockfile`，lockfile 与任何 workspace 成员的 manifest 不同步都会在 install 步骤直接失败
+- `typecheck.yml` 只跑 `tsc`，不跑 `vite build`：PR 上过类型检查但打包坏掉的改动，要等合并后 `build.yml` 才拦得住。需要 PR 级别的打包验证就得自己 `workflow_dispatch` 跑一次 Build Canary
+- 新增 pnpm workspace 成员时**必须同时加 `typecheck` 脚本**：`pnpm -r run typecheck` 会静默跳过没定义该脚本的成员，不会报错
 - Canary 发布使用 Crack 配置，产物上传到 Alist 而非 GitHub Release
 - 前端 `genClient.ts` 从两个 OpenAPI 源生成：本地后端 swagger + 远端 AquaMai 版本配置

@@ -77,7 +77,7 @@ pnpm --filter @munet/ui typecheck     # 只检查 UI 包
 | `src/env.ts`、`src/shims-vue.ts` | 环境声明 | **刻意用 `.ts` 而不是 `.d.ts`**，原因见下 |
 | `tsconfig.node.json` | `Front/*.ts` | `vite.config.ts` / `uno.config.ts` / `genClient.ts` 等构建脚本，用 `@types/node` |
 
-已知盲区：`tsc` 不解析 `.vue`，`src/components/TransitionVertical.vue` 里的 `<script setup lang="ts">` 不会被检查。
+已知盲区：`tsc` 不解析 `.vue`。全 workspace 有 3 个 `.vue` 落在盲区里：Front 的 `src/components/TransitionVertical.vue`，以及 MuNET-UI 的 `TransitionVertical.vue` / `Range.vue`（它 tsconfig 里的 `src/**/*.vue` 那条 include 对 plain tsc 是 no-op）。要覆盖得上 `vue-tsc`。
 
 修类型错误时禁止用 `any` / `as any` / `@ts-ignore` / `@ts-expect-error` 消音，也不要靠改 tsconfig 放宽检查——要改到类型真正成立。
 
