@@ -24,7 +24,10 @@
         "activityBarTop.inactiveForeground": "#15202b99",
         "commandCenter.foreground": "#595959",
         "statusBar.debuggingBackground": "#f594bb",
-        "statusBar.debuggingForeground": "#15202b"
+        "statusBar.debuggingForeground": "#15202b",
+        "activityBar.activeBorder": "#15202b",
+        "activityBarTop.activeBorder": "#15202b",
+        "statusBar.inactiveBackground": "#f594bb"
     },
     "peacock.color": "#f594bb",
     "i18n-ally.localesPaths": [

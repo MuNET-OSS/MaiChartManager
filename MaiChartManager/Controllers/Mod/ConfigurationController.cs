@@ -94,6 +94,8 @@ public class ConfigurationController : ControllerBase
             }
         }
 
+        modConfigService.SyncExclusiveFullscreenCompatFlag(configEdit);
+
         var serializer = configInterface.CreateConfigSerializer(new IConfigSerializer.Options()
         {
             Lang = StaticSettings.CurrentLocale.StartsWith("zh") ? "zh" : "en",

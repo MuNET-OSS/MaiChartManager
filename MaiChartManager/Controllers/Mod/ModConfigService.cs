@@ -6,6 +6,8 @@ namespace MaiChartManager.Controllers.Mod;
 
 public class ModConfigService
 {
+    private const string ExclusiveFullscreenSectionPath = "GameSystem.Window";
+    private const string ExclusiveFullscreenEntryPath = "GameSystem.Window.ExclusiveFullscreen";
     private readonly MuModService _muModService;
 
     public ModConfigService(MuModService muModService)
@@ -63,6 +65,37 @@ public class ModConfigService
         }
 
         throw new AquaMaiNotInstalledException();
+    }
+
+    /// <summary>
+    /// 独占全屏跳过桌面合成，但前提是 Sinmai.exe 关掉了 Windows 的“全屏优化”，否则系统会用合成窗口模拟独占全屏，延迟反而比默认更高。
+    /// 所以勾上这个选项时顺手把这个兼容性标记写上。
+    /// 取消勾选时不做处理：不独占全屏的时候留着这个标记没有影响，何况用户可能本来就是自己在兼容性设置里勾的。
+    /// </summary>
+    public void SyncExclusiveFullscreenCompatFlag(IConfig config)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(StaticSettings.GamePath)) return;
+            var exePath = Path.Combine(StaticSettings.GamePath, "Sinmai.exe");
+            if (!File.Exists(exePath)) return;
+
+            var entry = config.GetEntryState(ExclusiveFullscreenEntryPath);
+            // 这个 AquaMai 版本还没这个选项，就不该由我们来碰这个设置
+            if (entry?.Value is not true) return;
+
+            // 选项所在的 section 没启用的话，这个选项也不会生效
+            if (config.ReflectionManager.TryGetSection(ExclusiveFullscreenSectionPath, out var section)
+                && !config.GetSectionState(section).Enabled) return;
+
+            AppCompatFlags.AddFlag(exePath, AppCompatFlags.DisableFullscreenOptimizations);
+        }
+        catch (Exception e)
+        {
+            // 写注册表失败不该让保存配置跟着失败
+            Console.WriteLine("同步全屏优化兼容性设置失败");
+            Console.WriteLine(e);
+        }
     }
 
     public async Task<IConfig> GetCurrentAquaMaiConfig(bool forceDefault = false, bool skipSignatureCheck = false, CancellationToken ct = default)

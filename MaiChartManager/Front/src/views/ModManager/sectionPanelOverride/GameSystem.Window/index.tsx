@@ -56,11 +56,17 @@ export default defineComponent({
       onClick: () => applyPreset(preset),
     })));
 
+    // 独占全屏要 Sinmai.exe 关掉 Windows 全屏优化才有效，保存配置时后端会自己写兼容性设置
+    const exclusiveFullscreen = computed(() => !!props.entryStates[WINDOW_PREFIX + 'ExclusiveFullscreen']?.value);
+
     return () => <div class="flex flex-col gap-2">
       <div class="pl-40 flex items-center gap-2">
         预设:
         <WhateverNaviBar items={naviItems.value}/>
       </div>
+      {exclusiveFullscreen.value && <div class="pl-40 text-sm op-60">
+        保存后会自动为 Sinmai.exe 关闭 Windows 的“全屏优化”（兼容性设置）
+      </div>}
     </div>;
   },
 });
