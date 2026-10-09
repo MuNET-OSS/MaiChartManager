@@ -17,8 +17,9 @@ public sealed class OobeBrowser : Form
 
         Text = "MaiChartManager";
         ClientSize = new Size(1200, 1000);
-        FormBorderStyle = FormBorderStyle.FixedSingle;
-        MaximizeBox = false;
+        FormBorderStyle = FormBorderStyle.Sizable;
+        MaximizeBox = true;
+        MinimumSize = new Size(480, 480);
 
         var rm = new ComponentResourceManager(typeof(Launcher));
         Icon = (Icon?)rm.GetObject("notifyIcon1.Icon");
