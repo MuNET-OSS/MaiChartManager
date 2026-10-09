@@ -68,7 +68,6 @@ export default defineComponent({
 
     return () => <div class={["flex flex-col p-1 border-transparent border-solid border-1px rd hover:border-[oklch(0.68_0.17_var(--hue))] group"]}>
       {!props.section.attribute!.alwaysEnabled && <div class="flex gap-2 items-start"
-        // @ts-ignore
                                                        title={props.section.path!}
       >
         <div class="ml-1 text-lg w-9em shrink-0">{getNameForPath(props.section.path!, props.section.path!.split('.').pop()!, props.section.attribute?.comment?.nameZh)}</div>

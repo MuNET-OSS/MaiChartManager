@@ -70,7 +70,6 @@ export default defineComponent({
           return <Button variant="primary" onClick={save}><span class="i-material-symbols-done text-6 c-gray-6"/></Button>
         if (confirmDelete.value)
           return <Button danger={!deleteLoad.value} variant="secondary" onClick={del} ing={deleteLoad.value}
-            // @ts-ignore
                           onMouseleave={() => confirmDelete.value = false}>
             {!deleteLoad.value && <span class="i-material-symbols-delete-outline text-6 c-gray-6"/>}
           </Button>

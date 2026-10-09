@@ -9,12 +9,12 @@ export const ensureBackendUrl = () => new Promise<void>(resolve => {
     resolve();
     return;
   }
-  if ((globalThis as any).backendUrl) {
+  if (globalThis.backendUrl) {
     resolve();
     return;
   }
   const interval = setInterval(() => {
-    if ((globalThis as any).backendUrl) {
+    if (globalThis.backendUrl) {
       clearInterval(interval);
       resolve();
     }

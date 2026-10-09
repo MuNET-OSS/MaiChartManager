@@ -33,7 +33,6 @@ export default defineComponent({
 
 
     return () => <Button onClick={del} ing={deleteLoading.value} class={deleteConfirm.value && 'bg-red-300!'}
-      // @ts-ignore
                           onMouseleave={() => deleteConfirm.value = false}>
       {deleteConfirm.value ? t('music.delete.confirm') : t('common.delete')}
     </Button>;

@@ -83,7 +83,6 @@ export default defineComponent({
               onClick={del}
               ing={deleteLoading.value}
               danger={deleteConfirm.value}
-              // @ts-ignore
               onMouseleave={() => deleteConfirm.value = false}
             >
               {t('common.delete')}

@@ -18,15 +18,15 @@ export const errorContext = ref<string>();
 
 export const globalCapture = async (err: any, context: string) => {
   console.log(err)
-  if (err instanceof Response && !(err as any).error) {
-    if (!err.bodyUsed) {
-      // @ts-ignore
-      const errText = err.error = await err.text();
+  // Response 上没有 error 字段，这里主动挂一个可读的错误信息，供下面上报时读取
+  const response = err instanceof Response ? err as Response & { error?: string } : undefined;
+  if (response && !response.error) {
+    if (!response.bodyUsed) {
+      const errText = response.error = await response.text();
       try {
         const json = JSON.parse(errText);
         if (json.exception.details && json.detail) {
-          // @ts-ignore
-          err.error = json.detail + '\n' + json.exception.details;
+          response.error = json.detail + '\n' + json.exception.details;
         }
       } catch {
       }

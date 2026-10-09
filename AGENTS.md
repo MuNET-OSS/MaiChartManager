@@ -44,6 +44,7 @@ Sitreamai/
 |------|----------|-------|
 | 添加/修改 API 接口 | `MaiChartManager/Controllers/` | 按领域分目录，见子目录 AGENTS.md |
 | 前端 UI 修改 | `MaiChartManager/Front/src/` | Vue 3 + Naive UI + UnoCSS，见子目录 AGENTS.md |
+| 前端类型检查 | 根目录 `pnpm typecheck` | `tsc --noEmit`，覆盖 MaiChartManager/Front + MuNET-UI，见 Front 的 AGENTS.md |
 | 音频处理逻辑 | `MaiChartManager/Utils/Audio*.cs`, `CriUtils.cs` | FFmpeg + CRI SDK |
 | 谱面导入/解析 | `Controllers/Charts/Services/`, `MaiLib/`, `SimaiSharp/` | MaiLib 和 SimaiSharp 是 submodule |
 | 应用启动流程 | `Program.cs` → `AppMain.cs` → `ServerManager.cs` | 单实例 + Kestrel + WebView2 |
@@ -64,6 +65,7 @@ Sitreamai/
 - **7 个 git submodule**，各自有独立仓库，勿直接修改 submodule 内代码
 - **pnpm workspace**：根 `pnpm-workspace.yaml` 包含 `MaiChartManager/Front` 和 `MuNET-UI`
 - **前端 API client** 由 `genClient.ts` 使用 swagger-typescript-api 自动生成，勿手动编辑 `apiGen.ts`
+- **前端类型检查**：根目录 `pnpm typecheck`（`tsc --noEmit`）必须保持通过，改完前端代码自行跑一次；细节见 `MaiChartManager/Front/AGENTS.md`「类型检查」
 - **后端路由**：`[Route("MaiChartManagerServlet/[action]Api")]` 风格
 - **控制器按领域分子目录**：App / AssetDir / Catagory / Charts / Mod / Music / Tools
 - **`Catagory` 是 typo**（应为 Category），但已是既定命名，保持一致
@@ -89,6 +91,9 @@ cd MaiChartManager/Front && pnpm install && pnpm dev
 
 # 前端构建（输出到 ../wwwroot）
 cd MaiChartManager/Front && pnpm build
+
+# 前端类型检查（根目录，检查 Front 与 MuNET-UI）
+pnpm typecheck
 
 # 生成 API client（需先启动后端 localhost:5181）
 cd MaiChartManager/Front && pnpm genClient

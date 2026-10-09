@@ -55,6 +55,7 @@ MaiChartManager/
 - Controllers 按领域分 7 个子目录：App / AssetDir / Catagory / Charts / Mod / Music / Tools
 - `Catagory` 是已知 typo（应为 Category），**保持一致，不要修改**
 - `wwwroot/` 是 `Front/` 构建产物，通过 `pnpm build` 生成
+- `Front/` 有类型检查：仓库根目录 `pnpm typecheck`（`tsc --noEmit`），细节见 `Front/AGENTS.md`「类型检查」
 - 服务注册在 `ServerManager.cs`：`StaticSettings`、导入服务、`MuModService`、`ModConfigService`、HttpClient
 - DI 模式：控制器构造注入服务，业务逻辑不用复杂中间层
 

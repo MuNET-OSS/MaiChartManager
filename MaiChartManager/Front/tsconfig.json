@@ -28,11 +28,11 @@
     "types": [
       "@modyfi/vite-plugin-yaml/modules",
       "@types/wicg-file-system-access"
-    ]
+    ],
+    "skipLibCheck": true
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.d.ts",
     "src/**/*.tsx"
   ]
 }

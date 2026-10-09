@@ -37,7 +37,6 @@ export default defineComponent({
 
 
     return () => <Button variant="secondary" onClick={del} ing={deleteLoading.value} danger={deleteConfirm.value}
-      // @ts-ignore
                           onMouseleave={() => deleteConfirm.value = false}>
       {deleteConfirm.value ? t('common.confirm') : t('common.delete')}
     </Button>;

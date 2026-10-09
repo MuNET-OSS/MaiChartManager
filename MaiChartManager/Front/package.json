@@ -7,7 +7,8 @@
     "dev:expose": "vite --host",
     "build": "vite build",
     "preview": "vite preview",
-    "genClient": "tsx genClient"
+    "genClient": "tsx genClient",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.node.json"
   },
   "devDependencies": {
     "@chenfengyuan/vue-qrcode": "^2.0.0",

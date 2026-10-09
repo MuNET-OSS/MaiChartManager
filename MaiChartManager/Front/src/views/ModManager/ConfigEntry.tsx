@@ -69,7 +69,6 @@ export default defineComponent({
     })
 
     return () => <div class="flex gap-2 items-start"
-      // @ts-ignore
                       title={props.entry.path!}
     >
       <div class={ENTRY_LABEL_CLASS}>{getNameForPath(props.entry.path!, props.entry.name!, props.entry.attribute?.comment?.nameZh)}</div>

@@ -140,7 +140,7 @@ export default defineComponent({
                 <div class="font-medium">{t('tools.resourceJunction.fileCounts')}</div>
                 <div class="flex flex-wrap gap-x-4 gap-y-1 op-65">
                   {overview.value.fileCounts.map(item => (
-                    <span key={item.name}>{item.name}: {item.fileCount}</span>
+                    <span key={item.name!}>{item.name}: {item.fileCount}</span>
                   ))}
                   <span>{t('tools.resourceJunction.total')}: {overview.value.totalFileCount}</span>
                 </div>
@@ -152,7 +152,7 @@ export default defineComponent({
           <div class="border border-solid border-gray-200 rounded-md overflow-hidden">
             {items.value.map((item, index) => (
               <div
-                key={item.name}
+                key={item.name!}
                 class={[
                   'grid grid-cols-[minmax(0,1fr)_auto] gap-3 px-4 py-3 items-center',
                   index > 0 && 'border-t border-t-solid border-t-gray-200',

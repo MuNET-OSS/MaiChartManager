@@ -1,8 +1,8 @@
 import { defineComponent, PropType } from "vue";
 import { Popover } from "@munet/ui";
 import { MusicXmlWithABJacket } from "@/client/apiGen";
-import OverrideUpIcon from '@/icons/override-up.svg'
-import OverrideDownIcon from '@/icons/override-down.svg'
+import OverrideUpIcon from '@/icons/override-up.svg?component'
+import OverrideDownIcon from '@/icons/override-down.svg?component'
 import { useI18n } from 'vue-i18n';
 
 export default defineComponent({
@@ -16,7 +16,6 @@ export default defineComponent({
     return () => !!props.conflicts.length && <Popover trigger="hover">
       {{
         trigger: () => props.type === 'up' ?
-          // @ts-ignore
           <OverrideUpIcon class="c-blue text-2em"/> : <OverrideDownIcon class="c-indigo text-2em"/>,
         default: () => <div class="flex flex-col gap-2">
           {props.type === 'up' ? t('assetDir.conflictOverrides') : t('assetDir.conflictOverriddenBy')}

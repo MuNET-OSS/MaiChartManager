@@ -61,7 +61,6 @@ export const loadLocaleFromBackend = async () => {
 };
 
 // 导出全局 t 函数
-// @ts-ignore
 export const t = i18n.global.t;
 
 // 导出 locale，可以直接访问当前语言

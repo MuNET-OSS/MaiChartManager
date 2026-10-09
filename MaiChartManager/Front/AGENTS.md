@@ -46,6 +46,7 @@ Front/
 | 国际化文本 | `src/locales/` |
 | 重新生成 API client | `pnpm genClient`（需先启动后端 localhost:5181）|
 | 前端入口 | `src/main.ts` → `App.vue` → router/i18n/posthog/sentry |
+| 类型检查 | 仓库根目录 `pnpm typecheck`，见下方「类型检查」 |
 
 ## DATA FLOW
 
@@ -59,6 +60,32 @@ WebView2 集成：
 - `location.hostname === 'mcm.invalid'` 判断是否在 WebView2 内
 - 后端通过 `PostWebMessageAsString(url)` 推送 backendUrl
 - 前端监听 `chrome.webview` message 并动态更新 `apiClient.baseUrl`
+
+## 类型检查
+
+```bash
+pnpm typecheck                        # 仓库根目录：pnpm -r 依次检查 MaiChartManager/Front 与 MuNET-UI
+pnpm --filter mcm-frontend typecheck  # 只检查前端
+pnpm --filter @munet/ui typecheck     # 只检查 UI 包
+```
+
+前端拆成两个 tsconfig，缺一不可：
+
+| 配置 | 范围 | 说明 |
+|------|------|------|
+| `tsconfig.json` | `src/**` | 主应用。开启 `skipLibCheck`：vueuse 引 `Bluetooth*`、naive-ui 引没装的 `katex`、vue-i18n 引 vue 里不存在的 `GenericComponentInstance` 等，都是三方 `.d.ts` 自身的问题，关掉会淹掉真正的源码错误 |
+| `src/env.ts`、`src/shims-vue.ts` | 环境声明 | **刻意用 `.ts` 而不是 `.d.ts`**，原因见下 |
+| `tsconfig.node.json` | `Front/*.ts` | `vite.config.ts` / `uno.config.ts` / `genClient.ts` 等构建脚本，用 `@types/node` |
+
+已知盲区：`tsc` 不解析 `.vue`，`src/components/TransitionVertical.vue` 里的 `<script setup lang="ts">` 不会被检查。
+
+修类型错误时禁止用 `any` / `as any` / `@ts-ignore` / `@ts-expect-error` 消音，也不要靠改 tsconfig 放宽检查——要改到类型真正成立。
+
+两处容易踩的坑：
+
+- `src/client/apiGen.ts` 与 `aquaMaiVersionConfigApiGen.ts` 的 `// @ts-nocheck` 由 `genClient.ts` 在生成后剥掉（swagger-typescript-api 的 `FILE_PREFIX` 里硬编码了它，没有开关可关）。这两份生成代码必须始终能过类型检查，不要手工加回去。
+- 环境声明写成 `env.ts` / `shims-vue.ts` 而不是 `.d.ts`：`skipLibCheck` 会连带跳过**我们自己** `.d.ts` 里的语义错误（写错类型名不报错、静默退化成 any），实测 `declare const x: ThisTypeDoesNotExist;` 放 `.d.ts` 里 exit 0、放 `.ts` 里才是 TS2304。用 `.ts` 后这些声明照常参与检查，且不影响运行时（没有任何代码 import 它们）。
+- `src/icons/*.svg` 当组件用时必须写 `?component` 后缀：`vite/client` 把 `*.svg` 声明成 URL 字符串，与 vite-svg-loader 编译成组件的真实行为不符；`*.svg?component` 才是我们自己在 `env.d.ts` 里声明的组件类型。不要试图覆盖 `*.svg`——会和 `vite/client` 的声明合并成重复的 `export default`。
 
 ## CONVENTIONS
 
