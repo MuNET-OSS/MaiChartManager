@@ -76,17 +76,23 @@ const Component = defineComponent({
         return;
       }
 
+      // 宴会场特有的双人谱（L/R）没法直接转换
+      if (info.value.utagePlayStyle === 1) {
+        await showTransactionalDialog(
+          t('music.edit.utageConvertTitle'),
+          t('music.edit.utageConvertDoublePlayerChart'),
+          undefined, true
+        );
+        revertGenre(oldGenreId);
+        return;
+      }
+
       const oldId = info.value.id!;
       const newId = oldId < 1e5 ? oldId + 1e5 : oldId;
       const needChangeId = newId !== oldId;
+      const needOverwrite = needChangeId && hasIdConflict(newId);
 
-      // 改 ID 时目标 ID 上的乐曲会被删掉，先确认没有同 ID 的乐曲，避免误删
-      if (needChangeId && musicList.value.some(music => music.id === newId)) {
-        await showTransactionalDialog(
-          t('music.edit.utageConvertTitle'),
-          t('music.edit.utageConvertIdExists', { newId }),
-          undefined, true
-        );
+      if (needOverwrite && !(await confirmOverwrite(newId))) {
         revertGenre(oldGenreId);
         return;
       }
@@ -108,22 +114,7 @@ const Component = defineComponent({
         return;
       }
 
-      try {
-        if (needConvertChart) {
-          const error = (await api.ConvertSingleChartToBasic(oldId, selectedADir.value)).data;
-          if (error) throw new Error(error);
-        }
-        if (needChangeId) {
-          await api.ModifyId(oldId, selectedADir.value, newId);
-        }
-        await api.EditMusicGenre(newId, selectedADir.value, UTAGE_GENRE);
-        await api.SaveMusic(newId, selectedADir.value);
-        await updateMusicList();
-        if (needChangeId) selectMusicId.value = newId;
-      } catch (e) {
-        revertGenre(oldGenreId);
-        await globalCapture(e, t('music.edit.utageConvertFailed'));
-      }
+      await requestGenreChange(UTAGE_GENRE, oldGenreId, needOverwrite, t('music.edit.utageConvertFailed'));
     };
 
     // 从宴会场切回其他流派：宴会场 ID 需要减 100000
@@ -139,12 +130,8 @@ const Component = defineComponent({
         return;
       }
 
-      if (musicList.value.some(music => music.id === newId)) {
-        await showTransactionalDialog(
-          t('music.edit.utageRevertTitle'),
-          t('music.edit.utageConvertIdExists', { newId }),
-          undefined, true
-        );
+      const needOverwrite = hasIdConflict(newId);
+      if (needOverwrite && !(await confirmOverwrite(newId))) {
         revertGenre(oldGenreId);
         return;
       }
@@ -160,18 +147,48 @@ const Component = defineComponent({
         return;
       }
 
-      try {
-        await api.ModifyId(oldId, selectedADir.value, newId);
-        await api.EditMusicGenre(newId, selectedADir.value, newGenreId);
-        await api.SaveMusic(newId, selectedADir.value);
-        await updateMusicList();
-        selectMusicId.value = newId;
-      } catch (e) {
-        revertGenre(oldGenreId);
-        await globalCapture(e, t('music.edit.utageRevertFailed'));
-      }
+      await requestGenreChange(newGenreId, oldGenreId, needOverwrite, t('music.edit.utageRevertFailed'));
     };
 
+    // 目标 ID 在当前资源目录里已有乐曲时询问是否覆盖（其他目录/包里的同 ID 不受影响）
+    const hasIdConflict = (id: number) => musicList.value.some(music => music.id === id);
+
+    const confirmOverwrite = async (id: number) => showTransactionalDialog(
+      t('music.edit.utageConvertTitle'),
+      t('music.edit.utageConvertOverwrite', { newId: id }),
+      [{ text: t('common.cancel'), action: false }, { text: t('copy.overwrite'), action: true, danger: true }]
+    );
+
+    // 后端返回的错误码 → 文案
+    const genreChangeErrorKeys: Record<string, string> = {
+      'no-enabled-chart': 'music.edit.utageConvertNoChart',
+      'multiple-enabled-charts': 'music.edit.utageConvertMultipleCharts',
+      'double-player-chart': 'music.edit.utageConvertDoublePlayerChart',
+      'target-id-exists': 'music.edit.utageConvertIdExists',
+    };
+
+    // 谱面转换 + ID 变更 + 流派变更都由后端一次做完，前端只负责刷新
+    const requestGenreChange = async (genreId: number, oldGenreId: number | undefined, overwrite: boolean, failMessage: string) => {
+      const oldId = info.value!.id!;
+      try {
+        const result = (await api.ChangeMusicGenre(oldId, selectedADir.value, { genreId, overwrite })).data;
+        if (!result.success) {
+          revertGenre(oldGenreId);
+          const key = result.error ? genreChangeErrorKeys[result.error] : undefined;
+          if (key) {
+            await showTransactionalDialog(t('music.edit.utageConvertTitle'), t(key), undefined, true);
+          } else {
+            await globalCapture(new Error(result.error ?? ''), failMessage);
+          }
+          return;
+        }
+        await updateMusicList();
+        if (result.newId && result.newId !== oldId) selectMusicId.value = result.newId;
+      } catch (e) {
+        revertGenre(oldGenreId);
+        await globalCapture(e, failMessage);
+      }
+    };
     watch(() => info.value?.name, sync('name', api.EditMusicName));
     watch(() => info.value?.artist, sync('artist', api.EditMusicArtist));
     watch(() => info.value?.bpm, sync('bpm', api.EditMusicBpm));

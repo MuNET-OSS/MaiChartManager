@@ -140,9 +140,11 @@ music:
     utageConvertConfirmIdOnly: The genre will be changed to Utage, and the music ID will be changed from {oldId} to {newId}. Continue?
     utageConvertConfirmChartOnly: The genre will be changed to Utage, and the enabled {difficulty} chart will be converted to a Basic chart. Continue?
     utageConvertConfirmBoth: The genre will be changed to Utage, the music ID will be changed from {oldId} to {newId}, and the enabled {difficulty} chart will be converted to a Basic chart. Continue?
-    utageConvertMultipleCharts: Multiple difficulties are enabled. Please disable all but one before converting.
+    utageConvertMultipleCharts: Multiple difficulties are enabled. Please keep only one enabled difficulty before converting.
     utageConvertNoChart: No chart is enabled. Please enable one before converting.
-    utageConvertIdExists: ID {newId} is already taken. Please delete that music first or use another ID.
+    utageConvertDoublePlayerChart: This chart contains Utage-only L and R charts. Please convert it to a normal Utage music first.
+    utageConvertIdExists: ID {newId} is already taken. Please delete the music with this ID first.
+    utageConvertOverwrite: ID {newId} is already taken. Overwrite the music with ID {newId}?
     utageConvertFailed: Failed to change to Utage
     utageRevertTitle: Change music genre
     utageRevertConfirm: The genre will be changed from Utage to {genreName}, and the music ID will be changed from {oldId} to {newId}. Continue?

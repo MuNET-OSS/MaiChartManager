@@ -121,65 +121,6 @@ public class MusicController(StaticSettings settings, ILogger<MusicController> l
         }
     }
 
-    /// <summary>
-    /// 把唯一启用的难度谱面转换成 Basic（绿谱）谱面。
-    /// 宴会场只识别 Basic 槽位的谱面，所以把普通乐曲改成宴会场之前需要先把选中的难度整体挪到 Basic 槽位。
-    /// 返回空字符串表示成功，否则是错误信息。
-    /// </summary>
-    [HttpPost]
-    public string ConvertSingleChartToBasic(int id, string assetDir)
-    {
-        var music = settings.GetMusic(id, assetDir);
-        if (music is null) return "Music not found";
-
-        var enabledIndexes = Enumerable.Range(0, 5).Where(index => music.Charts[index].Enable).ToList();
-        if (enabledIndexes.Count == 0) return "No enabled chart";
-        if (enabledIndexes.Count > 1) return "Multiple charts enabled";
-
-        var sourceIndex = enabledIndexes[0];
-        if (sourceIndex == 0) return ""; // 已经是 Basic 谱面，无需转换
-
-        var musicDir = Path.GetDirectoryName(music.FilePath);
-        if (string.IsNullOrWhiteSpace(musicDir) || !Directory.Exists(musicDir)) return "Invalid music directory";
-
-        var sourceChart = music.Charts[sourceIndex];
-        var targetChart = music.Charts[0];
-
-        // 交换两个槽位的谱面文件：源难度的谱面挪到 Basic 的文件名（_00），
-        // 旧的 Basic 谱面挪到源难度的文件名，这样两个槽位的 path 都仍然指向真实存在的文件。
-        // 注意：path 本身不动，槽位还是指向自己原来的文件名。
-        foreach (var suffix in new[] { "", "_L", "_R" })
-        {
-            var sourcePath = Path.Combine(musicDir, sourceChart.Path.Replace(".ma2", suffix + ".ma2"));
-            var targetPath = Path.Combine(musicDir, targetChart.Path.Replace(".ma2", suffix + ".ma2"));
-            if (!System.IO.File.Exists(sourcePath)) continue;
-            var tempPath = sourcePath + ".mcmswap";
-            PlatformFile.MoveFile(sourcePath, tempPath);
-            if (System.IO.File.Exists(targetPath)) PlatformFile.MoveFile(targetPath, sourcePath);
-            PlatformFile.MoveFile(tempPath, targetPath);
-        }
-
-        // 把原难度的谱面信息搬到 Basic 槽位并启用 Basic，原难度禁用
-        var level = sourceChart.Level;
-        var levelDecimal = sourceChart.LevelDecimal;
-        var levelId = sourceChart.LevelId;
-        var maxNotes = sourceChart.MaxNotes;
-        var designer = sourceChart.Designer;
-
-        targetChart.Level = level;
-        targetChart.LevelDecimal = levelDecimal;
-        targetChart.LevelId = levelId;
-        targetChart.MaxNotes = maxNotes;
-        targetChart.Designer = designer ?? "";
-        targetChart.Enable = true;
-
-        sourceChart.Enable = false;
-
-        music.Save();
-        music.Refresh();
-        return "";
-    }
-
     [HttpPost]
     public void SaveMusic(int id, string assetDir)
     {

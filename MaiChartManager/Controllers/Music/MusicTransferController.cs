@@ -22,6 +22,8 @@ public partial class MusicTransferController(
     IProgressController progressController) : ControllerBase
 {
     public record RequestCopyToRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool removeEvents, bool legacyFormat);
+    public record GenreChangeResult(bool Success, string? Error, int NewId);
+    public record GenreChangeRequest(int GenreId, bool Overwrite = false);
 
     public enum MaidataSubdirMode
     {
@@ -583,15 +585,24 @@ public partial class MusicTransferController(
 #endif
         var music = settings.GetMusic(id, assetDir);
         if (music is null) return;
+        var error = await ModifyIdCore(music, newId, assetDir);
+        if (error is not null) throw new InvalidOperationException(error);
+    }
+
+    /// <summary>
+    /// 改乐曲 ID 的实现。返回 null 表示成功，否则是错误信息。
+    /// </summary>
+    private async Task<string?> ModifyIdCore(MusicXmlWithABJacket music, int newId, string assetDir)
+    {
         var musicDir = Path.GetDirectoryName(music.FilePath);
         if (string.IsNullOrWhiteSpace(musicDir) || !Directory.Exists(musicDir))
         {
             var message = $"Invalid source directory for music {music.Id}: {music.FilePath}";
             logger.LogError("{message}", message);
-            throw new DirectoryNotFoundException(message);
+            return message;
         }
-        if (music.Id == newId) return;
-        
+        if (music.Id == newId) return null;
+
         var newMusicDir = Path.Combine(StaticSettings.StreamingAssets, assetDir, "music", $"music{newId:000000}");
         DeleteIfExists(newMusicDir);
 
@@ -599,7 +610,7 @@ public partial class MusicTransferController(
 
         // 谱面
         var oldMusicDir = Path.GetDirectoryName(music.FilePath)!;
-        for (var i = 0; i < 6; i++)
+        for (var i = 0; i < music.Charts.Length; i++)
         {
             var chart = music.Charts[i];
             if (!chart.Enable) continue;
@@ -619,6 +630,106 @@ public partial class MusicTransferController(
 
         // 重新扫描全部
         await settings.RescanAll();
+        return null;
+    }
+
+    /// <summary>
+    /// 切换乐曲流派。切到/切回宴会场时，ID 变更（±100000）和谱面转换都在这个接口里一次做完，
+    /// 避免前端分步调用留下半改状态。返回 Error 为 null 表示成功，NewId 是处理后的乐曲 ID。
+    /// </summary>
+    [HttpPost]
+    public async Task<GenreChangeResult> ChangeMusicGenre(int id, [FromBody] GenreChangeRequest request, string assetDir)
+    {
+        var genreId = request.GenreId;
+        var music = settings.GetMusic(id, assetDir);
+        if (music is null) return new GenreChangeResult(false, GenreChangeError.MusicNotFound, id);
+
+        var wasUtage = music.GenreId == UtageConverter.UtageGenreId;
+        var toUtage = genreId == UtageConverter.UtageGenreId;
+
+        // 和宴会场无关的流派切换保持原来的行为：只改流派
+        if (wasUtage == toUtage)
+        {
+            music.GenreId = genreId;
+            music.Save();
+            return new GenreChangeResult(true, null, id);
+        }
+
+        var newId = id;
+        var chartIndex = -1;
+        if (toUtage)
+        {
+            // 宴会场只认 Basic 谱面，先确认只有一个启用的难度
+            var error = UtageConverter.FindSingleEnabledChart(music, out chartIndex);
+            if (error is not null) return new GenreChangeResult(false, error, id);
+            newId = id < UtageConverter.UtageIdOffset ? id + UtageConverter.UtageIdOffset : id;
+        }
+        else
+        {
+            newId = id > UtageConverter.UtageIdOffset ? id - UtageConverter.UtageIdOffset : id;
+        }
+
+        if (newId != id)
+        {
+#if WINDOWS
+            if (IapManager.License != IapManager.LicenseStatus.Active)
+                return new GenreChangeResult(false, GenreChangeError.LicenseRequired, id);
+#endif
+            // 只检查当前资源目录；其他目录（其他包）里同 ID 的乐曲互不影响
+            if (!request.Overwrite && settings.GetMusic(newId, assetDir) is not null)
+                return new GenreChangeResult(false, GenreChangeError.TargetIdExists, id);
+        }
+
+        var converted = false;
+        try
+        {
+            if (toUtage && chartIndex > 0)
+            {
+                var error = UtageConverter.MoveToBasic(music, chartIndex, logger);
+                if (error is not null) return new GenreChangeResult(false, error, id);
+                converted = true;
+            }
+
+            var targetId = id;
+            if (newId != id)
+            {
+                var error = await ModifyIdCore(music, newId, assetDir);
+                if (error is not null)
+                {
+                    if (converted) UtageConverter.RestoreFromBasic(music, chartIndex, logger);
+                    logger.LogError("切换流派时改 ID 失败: {error}", error);
+                    return new GenreChangeResult(false, GenreChangeError.InvalidMusicDirectory, id);
+                }
+                targetId = newId;
+            }
+
+            var target = settings.GetMusic(targetId, assetDir);
+            if (target is null)
+            {
+                if (converted) UtageConverter.RestoreFromBasic(music, chartIndex, logger);
+                return new GenreChangeResult(false, GenreChangeError.MusicNotFound, id);
+            }
+
+            target.GenreId = genreId;
+            target.Save();
+            return new GenreChangeResult(true, null, targetId);
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "切换流派失败: {id} -> {genreId}", id, genreId);
+            if (converted)
+            {
+                try
+                {
+                    UtageConverter.RestoreFromBasic(music, chartIndex, logger);
+                }
+                catch (Exception rollbackError)
+                {
+                    logger.LogError(rollbackError, "回滚谱面转换失败");
+                }
+            }
+            return new GenreChangeResult(false, GenreChangeError.Unexpected, id);
+        }
     }
 
     [HttpGet]
