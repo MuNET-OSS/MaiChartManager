@@ -1,5 +1,5 @@
 import { computed, defineComponent, onMounted, PropType, provide, ref, watch } from "vue";
-import { addVersionList, genreList, globalCapture, selectedADir, selectedMusic as info, selectMusicId, updateAddVersionList, updateGenreList, updateMusicList, selectedLevel, disableSync, gameVersion, b15ver } from "@/store/refs";
+import { addVersionList, genreList, globalCapture, musicList, selectedADir, selectedMusic as info, selectMusicId, updateAddVersionList, updateGenreList, updateMusicList, selectedLevel, disableSync, gameVersion, b15ver } from "@/store/refs";
 import type { Chart, MusicXmlWithABJacket } from "@/client/apiGen";
 import api from "@/client/api";
 
@@ -16,7 +16,7 @@ import { captureException } from "@sentry/vue"
 import noJacket from "@/assets/noJacket.webp";
 import { getUrl } from "@/client/api";
 import { t } from "@/locales";
-import { CheckBox, NumberInput, TextInput, Tabs, TabPane, Popover } from "@munet/ui";
+import { CheckBox, NumberInput, TextInput, Tabs, TabPane, Popover, showTransactionalDialog } from "@munet/ui";
 import { NTabPane, NTabs } from "naive-ui";
 import styles from './index.module.sass';
 
@@ -44,11 +44,151 @@ const Component = defineComponent({
       }
     }
 
+    // 已启用的难度，正常情况下应该只有一个
+    const enabledChartIndexes = computed(() => (info.value?.charts ?? [])
+      .slice(0, DIFFICULTY.length)
+      .map((chart, index) => chart?.enable ? index : -1)
+      .filter(index => index >= 0));
+
+    // 取消或失败时，把下拉框里的流派恢复原样
+    const revertGenre = (value?: number) => {
+      if (!info.value) return;
+      disableSync.value = true;
+      info.value.genreId = value;
+      // 让 watch 先忽略掉这次回滚，下一帧再恢复同步
+      setTimeout(() => disableSync.value = false);
+    };
+
+    // 宴会场只认 Basic（绿）谱面：切换到宴会场时顺带改 ID，并把唯一启用的难度谱面转成 Basic
+    const changeGenreToUtage = async (oldGenreId?: number) => {
+      if (!info.value) return;
+      const enabledIndexes = enabledChartIndexes.value;
+
+      if (enabledIndexes.length !== 1) {
+        await showTransactionalDialog(
+          t('music.edit.utageConvertTitle'),
+          enabledIndexes.length === 0
+            ? t('music.edit.utageConvertNoChart')
+            : t('music.edit.utageConvertMultipleCharts'),
+          undefined, true
+        );
+        revertGenre(oldGenreId);
+        return;
+      }
+
+      const oldId = info.value.id!;
+      const newId = oldId < 1e5 ? oldId + 1e5 : oldId;
+      const needChangeId = newId !== oldId;
+
+      // 改 ID 时目标 ID 上的乐曲会被删掉，先确认没有同 ID 的乐曲，避免误删
+      if (needChangeId && musicList.value.some(music => music.id === newId)) {
+        await showTransactionalDialog(
+          t('music.edit.utageConvertTitle'),
+          t('music.edit.utageConvertIdExists', { newId }),
+          undefined, true
+        );
+        revertGenre(oldGenreId);
+        return;
+      }
+
+      const enabledIndex = enabledIndexes[0];
+      const difficulty = DIFFICULTY[enabledIndex];
+      // 本来就只有 Basic 启用的话，不需要再提「把 Basic 转为 Basic」
+      const needConvertChart = enabledIndex !== 0;
+      const messageKey = needChangeId
+        ? (needConvertChart ? 'utageConvertConfirmBoth' : 'utageConvertConfirmIdOnly')
+        : (needConvertChart ? 'utageConvertConfirmChartOnly' : 'utageConvertConfirmPlain');
+      const confirmed = await showTransactionalDialog(
+        t('music.edit.utageConvertTitle'),
+        t(`music.edit.${messageKey}`, { oldId, newId, difficulty }),
+        [{ text: t('common.cancel'), action: false }, { text: t('common.confirm'), action: true }]
+      );
+      if (!confirmed) {
+        revertGenre(oldGenreId);
+        return;
+      }
+
+      try {
+        if (needConvertChart) {
+          const error = (await api.ConvertSingleChartToBasic(oldId, selectedADir.value)).data;
+          if (error) throw new Error(error);
+        }
+        if (needChangeId) {
+          await api.ModifyId(oldId, selectedADir.value, newId);
+        }
+        await api.EditMusicGenre(newId, selectedADir.value, UTAGE_GENRE);
+        await api.SaveMusic(newId, selectedADir.value);
+        await updateMusicList();
+        if (needChangeId) selectMusicId.value = newId;
+      } catch (e) {
+        revertGenre(oldGenreId);
+        await globalCapture(e, t('music.edit.utageConvertFailed'));
+      }
+    };
+
+    // 从宴会场切回其他流派：宴会场 ID 需要减 100000
+    const revertGenreFromUtage = async (newGenreId: number, oldGenreId?: number) => {
+      if (!info.value) return;
+      const oldId = info.value.id!;
+      const newId = oldId > 1e5 ? oldId - 1e5 : oldId;
+
+      // 不需要改 ID 时，保持原来的普通修改流程
+      if (newId === oldId) {
+        info.value.modified = true;
+        await api.EditMusicGenre(oldId, info.value.assetDir!, newGenreId);
+        return;
+      }
+
+      if (musicList.value.some(music => music.id === newId)) {
+        await showTransactionalDialog(
+          t('music.edit.utageRevertTitle'),
+          t('music.edit.utageConvertIdExists', { newId }),
+          undefined, true
+        );
+        revertGenre(oldGenreId);
+        return;
+      }
+
+      const genreName = genreList.value.find(genre => genre.id === newGenreId)?.genreName ?? '';
+      const confirmed = await showTransactionalDialog(
+        t('music.edit.utageRevertTitle'),
+        t('music.edit.utageRevertConfirm', { genreName, oldId, newId }),
+        [{ text: t('common.cancel'), action: false }, { text: t('common.confirm'), action: true }]
+      );
+      if (!confirmed) {
+        revertGenre(oldGenreId);
+        return;
+      }
+
+      try {
+        await api.ModifyId(oldId, selectedADir.value, newId);
+        await api.EditMusicGenre(newId, selectedADir.value, newGenreId);
+        await api.SaveMusic(newId, selectedADir.value);
+        await updateMusicList();
+        selectMusicId.value = newId;
+      } catch (e) {
+        revertGenre(oldGenreId);
+        await globalCapture(e, t('music.edit.utageRevertFailed'));
+      }
+    };
+
     watch(() => info.value?.name, sync('name', api.EditMusicName));
     watch(() => info.value?.artist, sync('artist', api.EditMusicArtist));
     watch(() => info.value?.bpm, sync('bpm', api.EditMusicBpm));
     watch(() => info.value?.version, sync('version', api.EditMusicVersion));
-    watch(() => info.value?.genreId, sync('genreId', api.EditMusicGenre));
+    watch(() => info.value?.genreId, async (value, oldValue) => {
+      if (disableSync.value || !info.value || value === undefined) return;
+      if (value === UTAGE_GENRE && oldValue !== UTAGE_GENRE) {
+        await changeGenreToUtage(oldValue);
+        return;
+      }
+      if (oldValue === UTAGE_GENRE && value !== UTAGE_GENRE) {
+        await revertGenreFromUtage(value, oldValue);
+        return;
+      }
+      info.value.modified = true;
+      await api.EditMusicGenre(info.value.id!, info.value.assetDir!, value);
+    });
     watch(() => info.value?.addVersionId, sync('addVersionId', api.EditMusicAddVersion));
     watch(() => info.value?.utageKanji, sync('utageKanji', api.EditMusicUtageKanji));
     watch(() => info.value?.comment, sync('comment', api.EditMusicComment));

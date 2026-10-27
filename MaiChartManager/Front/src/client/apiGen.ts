@@ -2241,6 +2241,25 @@ export class Api<
      * No description
      *
      * @tags Music
+     * @name ConvertSingleChartToBasic
+     * @request POST:/MaiChartManagerServlet/ConvertSingleChartToBasicApi/{assetDir}/{id}
+     */
+    ConvertSingleChartToBasic: (
+      id: number,
+      assetDir: string,
+      params: RequestParams = {},
+    ) =>
+      this.request<string, any>({
+        path: `/MaiChartManagerServlet/ConvertSingleChartToBasicApi/${assetDir}/${id}`,
+        method: "POST",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags Music
      * @name SaveMusic
      * @request POST:/MaiChartManagerServlet/SaveMusicApi/{assetDir}/{id}
      */

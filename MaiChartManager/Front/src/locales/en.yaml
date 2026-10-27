@@ -135,6 +135,18 @@ music:
     audioPreviewEnd: End Time (s)
     includeB35: Include in B35
     includeB15: Include in B15
+    utageConvertTitle: Change genre to Utage
+    utageConvertConfirmPlain: The genre will be changed to Utage. Continue?
+    utageConvertConfirmIdOnly: The genre will be changed to Utage, and the music ID will be changed from {oldId} to {newId}. Continue?
+    utageConvertConfirmChartOnly: The genre will be changed to Utage, and the enabled {difficulty} chart will be converted to a Basic chart. Continue?
+    utageConvertConfirmBoth: The genre will be changed to Utage, the music ID will be changed from {oldId} to {newId}, and the enabled {difficulty} chart will be converted to a Basic chart. Continue?
+    utageConvertMultipleCharts: Multiple difficulties are enabled. Please disable all but one before converting.
+    utageConvertNoChart: No chart is enabled. Please enable one before converting.
+    utageConvertIdExists: ID {newId} is already taken. Please delete that music first or use another ID.
+    utageConvertFailed: Failed to change to Utage
+    utageRevertTitle: Change music genre
+    utageRevertConfirm: The genre will be changed from Utage to {genreName}, and the music ID will be changed from {oldId} to {newId}. Continue?
+    utageRevertFailed: Failed to change genre from Utage
     versionHint: >-
       If game version is 1.{gameVersion}, numbers >= {b15ver} will appear in
       B15, otherwise in B35. This value also controls the order when sorting by

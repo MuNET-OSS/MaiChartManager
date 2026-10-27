@@ -127,6 +127,18 @@ music:
     audioPreviewEnd: 終點時間（秒）
     includeB35: 計入 B35
     includeB15: 計入 B15
+    utageConvertTitle: 樂曲流派更改為宴會場
+    utageConvertConfirmPlain: 樂曲流派將更改為宴會場。是否繼續？
+    utageConvertConfirmIdOnly: 樂曲流派將更改為宴會場，並把樂曲 ID 從 {oldId} 改為 {newId}。是否繼續？
+    utageConvertConfirmChartOnly: 樂曲流派將更改為宴會場，並把已啟用的 {difficulty} 譜面轉換為 Basic 譜面。是否繼續？
+    utageConvertConfirmBoth: 樂曲流派將更改為宴會場，把樂曲 ID 從 {oldId} 改為 {newId}，並把已啟用的 {difficulty} 譜面轉換為 Basic 譜面。是否繼續？
+    utageConvertMultipleCharts: 譜面有多個難度，請禁用一個難度再進行轉換
+    utageConvertNoChart: 目前沒有啟用的譜面，請先啟用一個難度再進行轉換
+    utageConvertIdExists: ID {newId} 已被佔用，請先刪除該樂曲或改用其他 ID
+    utageConvertFailed: 變更為宴會場失敗
+    utageRevertTitle: 樂曲流派變更
+    utageRevertConfirm: 樂曲流派將從宴會場變更為 {genreName}，並把樂曲 ID 從 {oldId} 改為 {newId}。是否繼續？
+    utageRevertFailed: 從宴會場變更流派失敗
     versionHint: >-
       如果遊戲版本是 1.{gameVersion} 的話，這裡的數字大於等於 {b15ver} 就會讓歌出現在 B15 裡面，否則就會出現在 B35
       裡面。這個值還會控制按上線時間排序時的順序
