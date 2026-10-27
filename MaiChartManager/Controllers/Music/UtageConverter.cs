@@ -16,6 +16,7 @@ internal static class GenreChangeError
     public const string TargetIdExists = "target-id-exists";
     public const string LicenseRequired = "license-required";
     public const string InvalidMusicDirectory = "invalid-music-directory";
+    public const string InvalidChartPath = "invalid-chart-path";
     public const string ChartFileNotFound = "chart-file-not-found";
     public const string SwapFailed = "swap-failed";
     public const string Unexpected = "unexpected";
@@ -74,6 +75,9 @@ internal static class UtageConverter
         var basicChart = music.Charts[0];
         var otherChart = music.Charts[sourceIndex];
 
+        // 谱面路径必须落在乐曲目录内，防止 XML 里的 ../ 之类内容去动别的文件
+        if (!IsInsideMusicDir(musicDir, basicChart.Path) || !IsInsideMusicDir(musicDir, otherChart.Path))
+            return GenreChangeError.InvalidChartPath;
         // 宴会场特有的双人谱（_L / _R）不能这样转，需要先改成普通宴会场乐曲
         if (HasSideChart(musicDir, otherChart.Path)) return GenreChangeError.DoublePlayerChart;
         // 源难度必须真的有谱面文件，否则转换后 Basic 的内容会和 XML 对不上
@@ -95,6 +99,21 @@ internal static class UtageConverter
     private static bool HasSideChart(string musicDir, string path)
         => File.Exists(Path.Combine(musicDir, WithSuffix(path, "_L")))
            || File.Exists(Path.Combine(musicDir, WithSuffix(path, "_R")));
+
+    private static bool IsInsideMusicDir(string musicDir, string path)
+    {
+        try
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(musicDir, path));
+            var root = Path.GetFullPath(musicDir) + Path.DirectorySeparatorChar;
+            return fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception)
+        {
+            // 非法路径字符等，直接当作不合法处理
+            return false;
+        }
+    }
 
     private static void SwapChartInfo(MusicXml.Chart a, MusicXml.Chart b)
     {

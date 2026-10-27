@@ -456,6 +456,11 @@ public partial class MusicTransferController(
         }
     }
 
+    /// <summary>
+    /// 双人谱的文件名：xxx.ma2 -> xxx_L.ma2
+    /// </summary>
+    private static string WithSide(string path, string side) => path.Replace(".ma2", side + ".ma2");
+
     private void DeleteIfExists(params string[] path)
     {
         foreach (var p in path)
@@ -614,10 +619,27 @@ public partial class MusicTransferController(
         {
             var chart = music.Charts[i];
             if (!chart.Enable) continue;
-            if (!System.IO.File.Exists(Path.Combine(oldMusicDir, chart.Path))) continue;
+
+            var oldFilePath = Path.Combine(oldMusicDir, chart.Path);
             var newFileName = $"{newId:000000}_0{i}.ma2";
+            var newFilePath = Path.Combine(oldMusicDir, newFileName);
+
+            // 双人谱只有 _L / _R 两个文件，没有单谱文件，任意一种存在就算有谱面
+            if (!System.IO.File.Exists(oldFilePath)
+                && !System.IO.File.Exists(WithSide(oldFilePath, "_L"))
+                && !System.IO.File.Exists(WithSide(oldFilePath, "_R")))
+                continue;
+
             logger.LogInformation("Move chart: {chart.Path} -> {newFileName}", chart.Path, newFileName);
-            PlatformFile.MoveFile(Path.Combine(oldMusicDir, chart.Path), Path.Combine(oldMusicDir, newFileName));
+            if (System.IO.File.Exists(oldFilePath)) PlatformFile.MoveFile(oldFilePath, newFilePath);
+            // 双人谱的左右谱面文件一起改名
+            foreach (var side in new[] { "_L", "_R" })
+            {
+                var oldSideFile = WithSide(oldFilePath, side);
+                if (System.IO.File.Exists(oldSideFile))
+                    PlatformFile.MoveFile(oldSideFile, WithSide(newFilePath, side));
+            }
+
             chart.Path = newFileName;
         }
 
