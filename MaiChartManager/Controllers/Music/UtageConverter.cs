@@ -100,6 +100,24 @@ internal static class UtageConverter
         => File.Exists(Path.Combine(musicDir, WithSuffix(path, "_L")))
            || File.Exists(Path.Combine(musicDir, WithSuffix(path, "_R")));
 
+    /// <summary>
+    /// 乐曲是否存在宴会场特有的双人谱（_L / _R）。这类谱面无法和普通谱面互相转换。
+    /// </summary>
+    public static bool HasSideCharts(MusicXmlWithABJacket music)
+    {
+        if (music.UtagePlayStyle == 1) return true;
+
+        var musicDir = Path.GetDirectoryName(music.FilePath);
+        if (string.IsNullOrWhiteSpace(musicDir) || !Directory.Exists(musicDir)) return false;
+
+        foreach (var chart in music.Charts)
+        {
+            if (HasSideChart(musicDir, chart.Path)) return true;
+        }
+
+        return false;
+    }
+
     private static bool IsInsideMusicDir(string musicDir, string path)
     {
         try

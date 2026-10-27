@@ -134,7 +134,7 @@ music:
     utageConvertConfirmBoth: 樂曲流派將更改為宴會場，把樂曲 ID 從 {oldId} 改為 {newId}，並把已啟用的 {difficulty} 譜面轉換為 Basic 譜面。是否繼續？
     utageConvertMultipleCharts: 譜面有多個難度，請只保留一個啟用的難度再進行轉換
     utageConvertNoChart: 目前沒有啟用的譜面，請先啟用一個難度再進行轉換
-    utageConvertDoublePlayerChart: 該譜面包含宴會場特有的 L 譜面和 R 譜面，請先變更為普通宴會場樂曲後再操作
+    utageConvertDoublePlayerChart: 該譜面包含宴會場特有的 L 譜面和 R 譜面，不支援自動轉換，請手動處理後再操作
     utageConvertIdExists: ID {newId} 已被佔用，請先刪除該 ID 上的樂曲
     utageConvertOverwrite: ID {newId} 已被佔用，是否覆蓋 ID {newId} 的樂曲？
     utageConvertFailed: 變更為宴會場失敗

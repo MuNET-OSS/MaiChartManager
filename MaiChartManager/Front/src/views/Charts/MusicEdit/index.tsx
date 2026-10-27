@@ -120,6 +120,18 @@ const Component = defineComponent({
     // 从宴会场切回其他流派：宴会场 ID 需要减 100000
     const revertGenreFromUtage = async (newGenreId: number, oldGenreId?: number) => {
       if (!info.value) return;
+
+      // 含宴会场特有 L/R 双人谱的乐曲无法转成普通谱面
+      if (info.value.utagePlayStyle === 1) {
+        await showTransactionalDialog(
+          t('music.edit.utageRevertTitle'),
+          t('music.edit.utageConvertDoublePlayerChart'),
+          undefined, true
+        );
+        revertGenre(oldGenreId);
+        return;
+      }
+
       const oldId = info.value.id!;
       const newId = oldId > 1e5 ? oldId - 1e5 : oldId;
 

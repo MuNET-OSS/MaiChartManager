@@ -688,6 +688,9 @@ public partial class MusicTransferController(
         }
         else
         {
+            // 含宴会场特有 L/R 双人谱的乐曲无法转成普通谱面
+            if (UtageConverter.HasSideCharts(music))
+                return new GenreChangeResult(false, GenreChangeError.DoublePlayerChart, id);
             newId = id > UtageConverter.UtageIdOffset ? id - UtageConverter.UtageIdOffset : id;
         }
 
