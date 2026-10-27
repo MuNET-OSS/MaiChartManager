@@ -55,16 +55,17 @@ internal static class UtageConverter
     /// 返回 null 表示成功，否则是错误码。
     /// </summary>
     public static string? MoveToBasic(MusicXmlWithABJacket music, int sourceIndex, ILogger logger)
-        => SwapWithBasic(music, sourceIndex, sourceIsEnabled: false, logger);
+        => SwapWithBasic(music, sourceIndex, sourceIsEnabled: false, requireSourceFile: true, logger);
 
     /// <summary>
     /// MoveToBasic 的逆操作，用于失败时回滚。
+    /// 回滚时源难度的谱面文件可能已经不存在（它被挪到了 Basic），所以不校验文件。
     /// </summary>
     public static string? RestoreFromBasic(MusicXmlWithABJacket music, int sourceIndex, ILogger logger)
-        => SwapWithBasic(music, sourceIndex, sourceIsEnabled: true, logger);
+        => SwapWithBasic(music, sourceIndex, sourceIsEnabled: true, requireSourceFile: false, logger);
 
     private static string? SwapWithBasic(MusicXmlWithABJacket music, int sourceIndex, bool sourceIsEnabled,
-        ILogger logger)
+        bool requireSourceFile, ILogger logger)
     {
         if (sourceIndex <= 0 || sourceIndex >= music.Charts.Length) return null;
 
@@ -80,8 +81,10 @@ internal static class UtageConverter
             return GenreChangeError.InvalidChartPath;
         // 宴会场特有的双人谱（_L / _R）不能这样转，需要先改成普通宴会场乐曲
         if (HasSideChart(musicDir, otherChart.Path)) return GenreChangeError.DoublePlayerChart;
-        // 源难度必须真的有谱面文件，否则转换后 Basic 的内容会和 XML 对不上
-        if (!File.Exists(Path.Combine(musicDir, otherChart.Path))) return GenreChangeError.ChartFileNotFound;
+        // 源难度必须真的有谱面文件，否则转换后 Basic 的内容会和 XML 对不上。
+        // 回滚方向不做这个校验：转换后源难度的文件已经挪走了。
+        if (requireSourceFile && !File.Exists(Path.Combine(musicDir, otherChart.Path)))
+            return GenreChangeError.ChartFileNotFound;
 
         var error = SwapChartFiles(musicDir, basicChart.Path, otherChart.Path, logger);
         if (error is not null) return error;
@@ -124,7 +127,9 @@ internal static class UtageConverter
         {
             var fullPath = Path.GetFullPath(Path.Combine(musicDir, path));
             var root = Path.GetFullPath(musicDir) + Path.DirectorySeparatorChar;
-            return fullPath.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+            // Windows 文件系统大小写不敏感，Linux 敏感，比较方式要和平台一致
+            return fullPath.StartsWith(root,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
         }
         catch (Exception)
         {
@@ -151,6 +156,12 @@ internal static class UtageConverter
     {
         var basicFile = Path.Combine(musicDir, basicPath);
         var otherFile = Path.Combine(musicDir, otherPath);
+        var basicExists = File.Exists(basicFile);
+        var otherExists = File.Exists(otherFile);
+
+        // 两边都没有文件就没法交换（正常情况下调用方已经拦掉了）
+        if (!basicExists && !otherExists) return GenreChangeError.ChartFileNotFound;
+
         var tempFile = Path.Combine(musicDir, $".mcmswap-{Guid.NewGuid():N}.tmp");
 
         var journal = new List<(string From, string To)>();
@@ -158,11 +169,11 @@ internal static class UtageConverter
         try
         {
             // 1. 源谱面先挪到临时名，给旧的 Basic 谱面腾位置
-            Move(otherFile, tempFile);
+            if (otherExists) Move(otherFile, tempFile);
             // 2. 旧的 Basic 谱面挪到源难度的文件名
-            if (File.Exists(basicFile)) Move(basicFile, otherFile);
+            if (basicExists) Move(basicFile, otherFile);
             // 3. 临时文件挪到 Basic 的文件名
-            Move(tempFile, basicFile);
+            if (otherExists) Move(tempFile, basicFile);
             return null;
         }
         catch (Exception e)

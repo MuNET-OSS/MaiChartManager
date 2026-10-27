@@ -141,6 +141,13 @@ music:
     utageRevertTitle: 乐曲流派更改
     utageRevertConfirm: 乐曲流派将从宴会场更改为 {genreName}，并把乐曲 ID 从 {oldId} 改为 {newId}。是否继续？
     utageRevertFailed: 从宴会场更改流派失败
+    utageConvertMusicNotFound: 找不到该乐曲，请刷新后重试
+    utageConvertLicenseRequired: 需要有效的授权才能更改乐曲 ID
+    utageConvertInvalidMusicDir: 乐曲目录不存在或不可访问
+    utageConvertInvalidChartPath: 谱面路径不合法，请检查 Music.xml 里的谱面文件名
+    utageConvertChartFileNotFound: 启用的难度找不到谱面文件，请先确认谱面文件完整
+    utageConvertSwapFailed: 交换谱面文件失败，谱面未被修改
+    utageConvertUnexpected: 切换流派失败，请查看日志
     versionHint: >-
       如果游戏版本是 1.{gameVersion} 的话，这里的数字大于等于 {b15ver} 就会让歌出现在 B15 里面，否则就会出现在 B35
       里面。这个值还会控制按上线时间排序时的顺序

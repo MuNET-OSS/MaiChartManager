@@ -149,6 +149,13 @@ music:
     utageRevertTitle: Change music genre
     utageRevertConfirm: The genre will be changed from Utage to {genreName}, and the music ID will be changed from {oldId} to {newId}. Continue?
     utageRevertFailed: Failed to change genre from Utage
+    utageConvertMusicNotFound: Could not find this music. Please refresh and try again.
+    utageConvertLicenseRequired: A valid license is required to change the music ID.
+    utageConvertInvalidMusicDir: The music directory does not exist or is not accessible.
+    utageConvertInvalidChartPath: Invalid chart path. Please check the chart file names in Music.xml.
+    utageConvertChartFileNotFound: The enabled difficulty has no chart file. Please make sure the chart files are complete.
+    utageConvertSwapFailed: Failed to swap chart files. No chart was modified.
+    utageConvertUnexpected: Failed to change the genre. Please check the log.
     versionHint: >-
       If game version is 1.{gameVersion}, numbers >= {b15ver} will appear in
       B15, otherwise in B35. This value also controls the order when sorting by

@@ -721,7 +721,7 @@ public partial class MusicTransferController(
                 var error = await ModifyIdCore(music, newId, assetDir);
                 if (error is not null)
                 {
-                    if (converted) UtageConverter.RestoreFromBasic(music, chartIndex, logger);
+                    TryRollback();
                     logger.LogError("切换流派时改 ID 失败: {error}", error);
                     return new GenreChangeResult(false, GenreChangeError.InvalidMusicDirectory, id);
                 }
@@ -731,7 +731,7 @@ public partial class MusicTransferController(
             var target = settings.GetMusic(targetId, assetDir);
             if (target is null)
             {
-                if (converted) UtageConverter.RestoreFromBasic(music, chartIndex, logger);
+                TryRollback();
                 return new GenreChangeResult(false, GenreChangeError.MusicNotFound, id);
             }
 
@@ -742,18 +742,23 @@ public partial class MusicTransferController(
         catch (Exception e)
         {
             logger.LogError(e, "切换流派失败: {id} -> {genreId}", id, genreId);
-            if (converted)
-            {
-                try
-                {
-                    UtageConverter.RestoreFromBasic(music, chartIndex, logger);
-                }
-                catch (Exception rollbackError)
-                {
-                    logger.LogError(rollbackError, "回滚谱面转换失败");
-                }
-            }
+            TryRollback();
             return new GenreChangeResult(false, GenreChangeError.Unexpected, id);
+        }
+
+        // 谱面已经转换成功、但后续步骤失败时，把谱面换回去
+        void TryRollback()
+        {
+            if (!converted) return;
+            try
+            {
+                var error = UtageConverter.RestoreFromBasic(music, chartIndex, logger);
+                if (error is not null) logger.LogError("回滚谱面转换失败: {error}", error);
+            }
+            catch (Exception rollbackError)
+            {
+                logger.LogError(rollbackError, "回滚谱面转换失败");
+            }
         }
     }
 

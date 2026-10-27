@@ -92,7 +92,7 @@ const Component = defineComponent({
       const needChangeId = newId !== oldId;
       const needOverwrite = needChangeId && hasIdConflict(newId);
 
-      if (needOverwrite && !(await confirmOverwrite(newId))) {
+      if (needOverwrite && !(await confirmOverwrite(newId, 'music.edit.utageConvertTitle'))) {
         revertGenre(oldGenreId);
         return;
       }
@@ -114,7 +114,8 @@ const Component = defineComponent({
         return;
       }
 
-      await requestGenreChange(UTAGE_GENRE, oldGenreId, needOverwrite, t('music.edit.utageConvertFailed'));
+      await requestGenreChange(UTAGE_GENRE, newId, oldGenreId, needOverwrite,
+        'music.edit.utageConvertTitle', t('music.edit.utageConvertFailed'));
     };
 
     // 从宴会场切回其他流派：宴会场 ID 需要减 100000
@@ -143,7 +144,7 @@ const Component = defineComponent({
       }
 
       const needOverwrite = hasIdConflict(newId);
-      if (needOverwrite && !(await confirmOverwrite(newId))) {
+      if (needOverwrite && !(await confirmOverwrite(newId, 'music.edit.utageRevertTitle'))) {
         revertGenre(oldGenreId);
         return;
       }
@@ -159,39 +160,50 @@ const Component = defineComponent({
         return;
       }
 
-      await requestGenreChange(newGenreId, oldGenreId, needOverwrite, t('music.edit.utageRevertFailed'));
+      await requestGenreChange(newGenreId, newId, oldGenreId, needOverwrite,
+        'music.edit.utageRevertTitle', t('music.edit.utageRevertFailed'));
     };
 
     // 目标 ID 在当前资源目录里已有乐曲时询问是否覆盖（其他目录/包里的同 ID 不受影响）
     const hasIdConflict = (id: number) => musicList.value.some(music => music.id === id);
 
-    const confirmOverwrite = async (id: number) => showTransactionalDialog(
-      t('music.edit.utageConvertTitle'),
+    const confirmOverwrite = async (id: number, titleKey: string) => showTransactionalDialog(
+      t(titleKey),
       t('music.edit.utageConvertOverwrite', { newId: id }),
       [{ text: t('common.cancel'), action: false }, { text: t('copy.overwrite'), action: true, danger: true }]
     );
 
     // 后端返回的错误码 → 文案
     const genreChangeErrorKeys: Record<string, string> = {
+      'music-not-found': 'music.edit.utageConvertMusicNotFound',
       'no-enabled-chart': 'music.edit.utageConvertNoChart',
       'multiple-enabled-charts': 'music.edit.utageConvertMultipleCharts',
       'double-player-chart': 'music.edit.utageConvertDoublePlayerChart',
       'target-id-exists': 'music.edit.utageConvertIdExists',
+      'license-required': 'music.edit.utageConvertLicenseRequired',
+      'invalid-music-directory': 'music.edit.utageConvertInvalidMusicDir',
+      'invalid-chart-path': 'music.edit.utageConvertInvalidChartPath',
+      'chart-file-not-found': 'music.edit.utageConvertChartFileNotFound',
+      'swap-failed': 'music.edit.utageConvertSwapFailed',
+      'unexpected': 'music.edit.utageConvertUnexpected',
     };
 
     // 谱面转换 + ID 变更 + 流派变更都由后端一次做完，前端只负责刷新
-    const requestGenreChange = async (genreId: number, oldGenreId: number | undefined, overwrite: boolean, failMessage: string) => {
+    const requestGenreChange = async (genreId: number, targetId: number, oldGenreId: number | undefined,
+                                       overwrite: boolean, titleKey: string, failMessage: string) => {
       const oldId = info.value!.id!;
       try {
         const result = (await api.ChangeMusicGenre(oldId, selectedADir.value, { genreId, overwrite })).data;
         if (!result.success) {
           revertGenre(oldGenreId);
           const key = result.error ? genreChangeErrorKeys[result.error] : undefined;
-          if (key) {
-            await showTransactionalDialog(t('music.edit.utageConvertTitle'), t(key), undefined, true);
-          } else {
-            await globalCapture(new Error(result.error ?? ''), failMessage);
-          }
+          await showTransactionalDialog(
+            t(titleKey),
+            key
+              ? t(key, { newId: targetId })
+              : `${failMessage}${result.error ? ` (${result.error})` : ''}`,
+            undefined, true
+          );
           return;
         }
         await updateMusicList();
