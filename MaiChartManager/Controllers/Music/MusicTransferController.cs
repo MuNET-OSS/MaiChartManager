@@ -704,7 +704,14 @@ public partial class MusicTransferController(
             // 含宴会场特有 L/R 双人谱的乐曲无法转成普通谱面
             if (UtageConverter.HasSideCharts(music))
                 return new GenreChangeResult(false, GenreChangeError.DoublePlayerChart, id);
-            newId = id > UtageConverter.UtageIdStart ? id - UtageConverter.UtageIdStart : id;
+            // 流派是宴会场但 ID 不是宴会场 ID（历史数据、手动改过）时没有可恢复的 ID，保持 ID 不动
+            if (UtageConverter.IsUtageId(id))
+            {
+                var restored = UtageConverter.RestoreNormalId(id);
+                if (restored is null)
+                    return new GenreChangeResult(false, GenreChangeError.UtageIdNotRestorable, id);
+                newId = restored.Value;
+            }
         }
 
         if (newId != id)

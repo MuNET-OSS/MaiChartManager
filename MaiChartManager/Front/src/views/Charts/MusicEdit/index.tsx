@@ -7,7 +7,7 @@ import JacketBox from "../../../components/JacketBox";
 import dxIcon from "@/assets/dxIcon.png";
 import stdIcon from "@/assets/stdIcon.png";
 import ChartPanel from "./ChartPanel";
-import { DIFFICULTY, LEVEL_COLOR, LEVEL_HUE, UTAGE_GENRE } from "@/consts";
+import { DIFFICULTY, isUtageId, LEVEL_COLOR, LEVEL_HUE, UTAGE_GENRE, UTAGE_ID_START } from "@/consts";
 import ProblemsDisplay from "@/components/ProblemsDisplay";
 import AcbAwb from "@/views/Charts/MusicEdit/AcbAwb";
 import GenreInput from "@/components/GenreInput";
@@ -30,7 +30,7 @@ const Component = defineComponent({
       selectedLevel.value = firstEnabledChart;
     }
     const isUtage = computed(() => info.value !== undefined &&
-      (info.value.genreId === UTAGE_GENRE || (info.value.id ?? 0) >= 1e5));
+      (info.value.genreId === UTAGE_GENRE || isUtageId(info.value.id)));
     const chartIndexes = computed(() => isUtage.value ? [0] : [0, 1, 2, 3, 4]);
 
     const sync = (key: keyof MusicXmlWithABJacket, method: Function) => async () => {
@@ -87,7 +87,7 @@ const Component = defineComponent({
 
       const oldId = info.value.id!;
       // 宴会场 ID 由后端挑选（后四位固定、序号顺延），前端只用来生成文案
-      const needChangeId = oldId < 1e5;
+      const needChangeId = !isUtageId(oldId);
 
       const enabledIndex = enabledIndexes[0];
       const difficulty = DIFFICULTY[enabledIndex];
@@ -131,12 +131,23 @@ const Component = defineComponent({
       }
 
       const oldId = info.value.id!;
-      const newId = oldId > 1e5 ? oldId - 1e5 : oldId;
 
-      // 不需要改 ID 时，保持原来的普通修改流程
-      if (newId === oldId) {
+      // 流派是宴会场但 ID 不是宴会场 ID（历史数据、手动改过）时没有可恢复的 ID，直接改流派
+      if (!isUtageId(oldId)) {
         info.value.modified = true;
         await api.EditMusicGenre(oldId, info.value.assetDir!, newGenreId);
+        return;
+      }
+
+      const newId = oldId - UTAGE_ID_START;
+      // 序号太大时推不出普通曲 ID，只能让用户手动改
+      if (isUtageId(newId)) {
+        await showTransactionalDialog(
+          t('music.edit.utageRevertTitle'),
+          t('music.edit.utageRevertNotRestorable', { oldId }),
+          undefined, true
+        );
+        revertGenre(oldGenreId);
         return;
       }
 
@@ -163,6 +174,7 @@ const Component = defineComponent({
       'double-player-chart': 'music.edit.utageConvertDoublePlayerChart',
       'target-id-exists': 'music.edit.utageConvertIdExists',
       'no-available-id': 'music.edit.utageConvertNoAvailableId',
+      'utage-id-not-restorable': 'music.edit.utageRevertNotRestorable',
       'license-required': 'music.edit.utageConvertLicenseRequired',
       'invalid-music-directory': 'music.edit.utageConvertInvalidMusicDir',
       'invalid-chart-path': 'music.edit.utageConvertInvalidChartPath',
@@ -183,7 +195,7 @@ const Component = defineComponent({
           await showTransactionalDialog(
             t(titleKey),
             key
-              ? t(key, { newId: oldId - 1e5 })
+              ? t(key, { newId: oldId - UTAGE_ID_START, oldId })
               : `${failMessage}${result.error ? ` (${result.error})` : ''}`,
             undefined, true
           );

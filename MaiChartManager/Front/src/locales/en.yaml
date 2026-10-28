@@ -149,6 +149,7 @@ music:
     utageRevertTitle: Change music genre
     utageRevertConfirm: The genre will be changed from Utage to {genreName}, and the music ID will be changed from {oldId} to {newId}. Continue?
     utageRevertFailed: Failed to change genre from Utage
+    utageRevertNotRestorable: Cannot derive a normal music ID from Utage ID {oldId}. Please change the music ID manually first.
     utageConvertMusicNotFound: Could not find this music. Please refresh and try again.
     utageConvertLicenseRequired: A valid license is required to change the music ID.
     utageConvertInvalidMusicDir: The music directory does not exist or is not accessible.

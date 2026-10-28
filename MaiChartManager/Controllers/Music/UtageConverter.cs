@@ -15,6 +15,7 @@ internal static class GenreChangeError
     public const string DoublePlayerChart = "double-player-chart";
     public const string TargetIdExists = "target-id-exists";
     public const string NoAvailableId = "no-available-id";
+    public const string UtageIdNotRestorable = "utage-id-not-restorable";
     public const string LicenseRequired = "license-required";
     public const string InvalidMusicDirectory = "invalid-music-directory";
     public const string InvalidChartPath = "invalid-chart-path";
@@ -44,6 +45,16 @@ internal static class UtageConverter
 
     /// <summary>是否为宴会场 ID（6 位，后四位是原曲 ID）</summary>
     public static bool IsUtageId(int id) => id is >= UtageIdStart and < 1_000_000;
+
+    /// <summary>
+    /// 宴会场 ID 对应的普通曲 ID（序号 10、11 分别对应 0、10000 号段）。
+    /// 返回 null 表示序号太大、推不出普通曲 ID，只能让用户手动指定。
+    /// </summary>
+    public static int? RestoreNormalId(int utageId)
+    {
+        var restored = utageId - UtageIdStart;
+        return IsUtageId(restored) ? null : restored;
+    }
 
     /// <summary>
     /// 找出该曲下一个可用的宴会场 ID（后四位保持不变，只顺延序号）。

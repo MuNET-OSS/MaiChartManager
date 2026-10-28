@@ -141,6 +141,7 @@ music:
     utageRevertTitle: 樂曲流派變更
     utageRevertConfirm: 樂曲流派將從宴會場變更為 {genreName}，並把樂曲 ID 從 {oldId} 改為 {newId}。是否繼續？
     utageRevertFailed: 從宴會場變更流派失敗
+    utageRevertNotRestorable: 無法從宴會場 ID {oldId} 推回普通曲 ID，請先手動把樂曲 ID 改回普通曲 ID 再變更流派
     utageConvertMusicNotFound: 找不到該樂曲，請重新整理後再試
     utageConvertLicenseRequired: 需要有效的授權才能變更樂曲 ID
     utageConvertInvalidMusicDir: 樂曲目錄不存在或無法存取
