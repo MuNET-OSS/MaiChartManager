@@ -423,6 +423,11 @@ export default defineComponent({
       ? getUrl(`GetCamouflageJacketApi?id=${musicId.value}&t=${previewToken.value}`)
       : ''));
 
+    // 视频一律静音播放，声音单独播一份 acb 解码后的 wav（左右分屏也只有这一路声音，不会重声）
+    const introAudioSrc = computed(() => (musicId.value && introInfo.value?.hasAudio && !previewSuppressed.value
+      ? getUrl(`GetIntroAudioFileApi?id=${musicId.value}&t=${previewToken.value}`)
+      : ''));
+
     const entryRow = (id: number, title: string, desc: string, onDelete: (id: number) => void) => (
       <div key={id} class="flex items-center gap-2 px-2 py-1 rounded hover:bg-[oklch(0.97_0.01_var(--hue))]">
         <span class="text-sm font-500 tabular-nums w-16 shrink-0">#{id}</span>
@@ -441,20 +446,38 @@ export default defineComponent({
     let sameVideoEl: HTMLVideoElement | null = null;
     let leftVideoEl: HTMLVideoElement | null = null;
     let rightVideoEl: HTMLVideoElement | null = null;
+    let audioEl: HTMLAudioElement | null = null;
 
     const readMeta = (e: Event) => {
       const video = e.target as HTMLVideoElement;
       return video.videoWidth && video.videoHeight ? `${video.videoWidth} × ${video.videoHeight}` : '';
     };
 
+    // 播放/暂停跟着视频走，声音只有 audioEl 这一路
+    const playAudio = (playing: boolean) => {
+      if (!audioEl) return;
+      if (playing) audioEl.play().catch(() => {});
+      else audioEl.pause();
+    };
+
+    const syncAudioSeek = (from: HTMLVideoElement | null) => {
+      if (!audioEl || !from || !Number.isFinite(from.currentTime)) return;
+      if (Math.abs(audioEl.currentTime - from.currentTime) > 0.15) audioEl.currentTime = from.currentTime;
+    };
+
     const syncPlay = (from: HTMLVideoElement | null, to: HTMLVideoElement | null) => {
-      if (!from || !to) return;
-      if (from.paused) to.pause();
-      else to.play().catch(() => {});
+      if (!from) return;
+      const playing = !from.paused;
+      if (to) {
+        if (playing) to.play().catch(() => {});
+        else to.pause();
+      }
+      playAudio(playing);
     };
 
     // 手动拖动进度条时把另一侧也拖到同一时间点；差值小于阈值就不动，避免两侧互相触发死循环
     const syncSeek = (from: HTMLVideoElement | null, to: HTMLVideoElement | null) => {
+      syncAudioSeek(from);
       if (!from || !to) return;
       if (!Number.isFinite(from.currentTime)) return;
       if (Math.abs(to.currentTime - from.currentTime) <= 0.15) return;
@@ -474,6 +497,11 @@ export default defineComponent({
           // 忽略
         }
       }
+      try {
+        audioEl?.pause();
+      } catch {
+        // 忽略
+      }
     };
 
     const renderIntroPreview = () => {
@@ -484,10 +512,13 @@ export default defineComponent({
       if (introSame.value) {
         // 高度驱动尺寸：开场视频本身是 1:1，写死宽度会把画面压成中间一小块
         return <div class="flex flex-col items-center gap-1">
-          <video key={samePreviewSrc.value} src={samePreviewSrc.value} controls
+          <video key={samePreviewSrc.value} src={samePreviewSrc.value} controls muted
                  ref={(el) => { sameVideoEl = el as HTMLVideoElement | null; }}
                  class="max-h-72 max-w-full rounded bg-black object-contain"
-                 onLoadedmetadata={(e: Event) => { videoMeta.value = readMeta(e); }}/>
+                 onLoadedmetadata={(e: Event) => { videoMeta.value = readMeta(e); }}
+                 onPlay={() => syncPlay(sameVideoEl, null)}
+                 onPause={() => syncPlay(sameVideoEl, null)}
+                 onSeeked={() => syncSeek(sameVideoEl, null)}/>
           <div class="text-xs op-50 tabular-nums break-all">
             {[videoMeta.value, samePreviewPath.value].filter(Boolean).join(' · ')}
           </div>
@@ -497,14 +528,14 @@ export default defineComponent({
       // 左右分开：1:2 的并排预览框，两个视频同时播放
       return <div class="flex flex-col items-center gap-1">
         <div class="flex gap-1 h-72 max-w-full" style={{ aspectRatio: '2 / 1' }}>
-          <video key={`L-${leftPreviewSrc.value}`} src={leftPreviewSrc.value} controls
+          <video key={`L-${leftPreviewSrc.value}`} src={leftPreviewSrc.value} controls muted
                  ref={(el) => { leftVideoEl = el as HTMLVideoElement | null; }}
                  class="h-full w-1/2 rounded bg-black object-contain"
                  onLoadedmetadata={(e: Event) => { leftMeta.value = readMeta(e); }}
                  onPlay={() => syncPlay(leftVideoEl, rightVideoEl)}
                  onPause={() => syncPlay(leftVideoEl, rightVideoEl)}
                  onSeeked={() => syncSeek(leftVideoEl, rightVideoEl)}/>
-          <video key={`R-${rightPreviewSrc.value}`} src={rightPreviewSrc.value} controls
+          <video key={`R-${rightPreviewSrc.value}`} src={rightPreviewSrc.value} controls muted
                  ref={(el) => { rightVideoEl = el as HTMLVideoElement | null; }}
                  class="h-full w-1/2 rounded bg-black object-contain"
                  onLoadedmetadata={(e: Event) => { rightMeta.value = readMeta(e); }}
@@ -529,6 +560,9 @@ export default defineComponent({
         <div class="ml-1 text-sm">{t('tools.fancy.preview')}</div>
         {renderIntroPreview()}
       </div>
+      {!!introAudioSrc.value &&
+        <audio key={introAudioSrc.value} src={introAudioSrc.value} class="hidden"
+               ref={(el) => { audioEl = el as HTMLAudioElement | null; }}/>}
       {(hasIntroMovie.value || introInfo.value?.hasAudio) &&
         <div class="text-xs op-50 px-1 text-center break-all">
           {introInfo.value?.hasAudio

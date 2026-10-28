@@ -1510,6 +1510,27 @@ export class Api<
      * No description
      *
      * @tags FancyTool
+     * @name GetIntroAudioFile
+     * @request GET:/MaiChartManagerServlet/GetIntroAudioFileApi
+     */
+    GetIntroAudioFile: (
+      query?: {
+        /** @format int32 */
+        id?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<void, any>({
+        path: `/MaiChartManagerServlet/GetIntroAudioFileApi`,
+        method: "GET",
+        query: query,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
      * @name SetIntroMovie
      * @request POST:/MaiChartManagerServlet/SetIntroMovieApi
      */

@@ -75,6 +75,57 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     }
 
     /// <summary>
+    /// 开场音频预览：把 Enter_&lt;id&gt;.acb/.awb 解成 wav 给前端播放（浏览器放不了 acb）。
+    /// 解码结果按 acb 的修改时间缓存在临时目录，避免每次 Range 请求都重新解码。
+    /// </summary>
+    [HttpGet]
+    public ActionResult GetIntroAudioFile(int id)
+    {
+        var acbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.acb");
+        var awbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.awb");
+        if (!System.IO.File.Exists(acbPath) || !System.IO.File.Exists(awbPath)) return NotFound();
+
+        var wavPath = GetCachedIntroAudio(acbPath, id);
+        if (wavPath is null) return NotFound();
+
+        return PhysicalFile(wavPath, "audio/wav", enableRangeProcessing: true);
+    }
+
+    private string? GetCachedIntroAudio(string acbPath, int id)
+    {
+        try
+        {
+            var cacheDir = Path.Combine(StaticSettings.tempPath, "IntroAudioPreview");
+            Directory.CreateDirectory(cacheDir);
+            var stamp = System.IO.File.GetLastWriteTimeUtc(acbPath).Ticks;
+            var wavPath = Path.Combine(cacheDir, $"Enter_{id}_{stamp}.wav");
+            if (System.IO.File.Exists(wavPath)) return wavPath;
+
+            // acb 换了就清掉同一首曲子旧的缓存
+            foreach (var old in Directory.EnumerateFiles(cacheDir, $"Enter_{id}_*.wav").ToList())
+            {
+                try
+                {
+                    System.IO.File.Delete(old);
+                }
+                catch
+                {
+                    // 忽略清理失败
+                }
+            }
+
+            var wavBytes = Audio.AcbToWav(acbPath);
+            System.IO.File.WriteAllBytes(wavPath, wavBytes);
+            return wavPath;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "开场音频预览解码失败: {id}", id);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// 上传并转换开场视频。side 为空表示左右屏播放同一个视频，L / R 表示只替换其中一侧。
     /// </summary>
     [HttpPost]
@@ -115,8 +166,8 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 Padding = 0,
                 ContentType = file.ContentType,
                 TaskbarProgress = false,
-                // 保留一份音轨，前端预览才听得到声音；游戏里 AquaMai 会把视频音轨静音，声音走 acb/awb
-                KeepAudio = true,
+                // 视频只留画面：游戏里由 acb/awb 出声，前端预览也是静音播放 + 单独播放音频
+                KeepAudio = false,
                 // 硬件编码器默认画质差别很大（h264_mf 默认很糊），这里按选中的编码器给画质参数
                 ExtraArgs = VideoConvert.H264QualityArgs(VideoConvert.H264Encoder),
             });
