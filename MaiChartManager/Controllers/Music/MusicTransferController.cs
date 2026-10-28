@@ -646,6 +646,7 @@ public partial class MusicTransferController(
 
         // 保存 XML
         music.Id = newId;
+        SyncUtageBaseId(music, newId);
         music.Save();
         Directory.CreateDirectory(Path.Combine(StaticSettings.StreamingAssets, assetDir, "music"));
         logger.LogInformation("Move music dir: {oldMusicDir} -> {newMusicDir}", oldMusicDir, newMusicDir);
@@ -654,6 +655,18 @@ public partial class MusicTransferController(
         // 重新扫描全部
         await settings.RescanAll();
         return null;
+    }
+
+    /// <summary>
+    /// 改完 ID 后同步宴会场用的原曲 ID 记录：新 ID 还是宴会场 ID 就跟着换后四位（保留 STD/DX），
+    /// 改回普通 ID 就清掉，避免以后切流派时还原到错误的 ID。
+    /// </summary>
+    private static void SyncUtageBaseId(MusicXmlWithABJacket music, int newId)
+    {
+        if (music.UtageBaseId is not { } utageBaseId) return;
+        music.UtageBaseId = UtageConverter.IsUtageId(newId)
+            ? newId % 10000 + (utageBaseId >= 10000 ? 10000 : 0)
+            : null;
     }
 
     /// <summary>
