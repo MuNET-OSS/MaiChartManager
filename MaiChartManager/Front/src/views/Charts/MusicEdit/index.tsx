@@ -177,6 +177,7 @@ const Component = defineComponent({
       'utage-id-not-restorable': 'music.edit.utageRevertNotRestorable',
       'license-required': 'music.edit.utageConvertLicenseRequired',
       'invalid-music-directory': 'music.edit.utageConvertInvalidMusicDir',
+      'id-change-failed': 'music.edit.utageConvertIdChangeFailed',
       'invalid-chart-path': 'music.edit.utageConvertInvalidChartPath',
       'chart-file-not-found': 'music.edit.utageConvertChartFileNotFound',
       'swap-failed': 'music.edit.utageConvertSwapFailed',

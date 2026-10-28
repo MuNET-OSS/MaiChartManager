@@ -145,6 +145,7 @@ music:
     utageConvertMusicNotFound: 找不到该乐曲，请刷新后重试
     utageConvertLicenseRequired: 需要有效的授权才能更改乐曲 ID
     utageConvertInvalidMusicDir: 乐曲目录不存在或不可访问
+    utageConvertIdChangeFailed: 修改乐曲 ID 失败，请查看日志
     utageConvertInvalidChartPath: 谱面路径不合法，请检查 Music.xml 里的谱面文件名
     utageConvertChartFileNotFound: 启用的难度找不到谱面文件，请先确认谱面文件完整
     utageConvertSwapFailed: 交换谱面文件失败，谱面未被修改

@@ -18,6 +18,7 @@ internal static class GenreChangeError
     public const string UtageIdNotRestorable = "utage-id-not-restorable";
     public const string LicenseRequired = "license-required";
     public const string InvalidMusicDirectory = "invalid-music-directory";
+    public const string IdChangeFailed = "id-change-failed";
     public const string InvalidChartPath = "invalid-chart-path";
     public const string ChartFileNotFound = "chart-file-not-found";
     public const string SwapFailed = "swap-failed";

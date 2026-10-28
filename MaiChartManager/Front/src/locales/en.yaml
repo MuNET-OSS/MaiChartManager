@@ -153,6 +153,7 @@ music:
     utageConvertMusicNotFound: Could not find this music. Please refresh and try again.
     utageConvertLicenseRequired: A valid license is required to change the music ID.
     utageConvertInvalidMusicDir: The music directory does not exist or is not accessible.
+    utageConvertIdChangeFailed: Failed to change the music ID. Please check the log.
     utageConvertInvalidChartPath: Invalid chart path. Please check the chart file names in Music.xml.
     utageConvertChartFileNotFound: The enabled difficulty has no chart file. Please make sure the chart files are complete.
     utageConvertSwapFailed: Failed to swap chart files. No chart was modified.

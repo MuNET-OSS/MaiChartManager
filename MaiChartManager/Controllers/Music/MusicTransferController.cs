@@ -743,7 +743,7 @@ public partial class MusicTransferController(
                 {
                     TryRollback();
                     logger.LogError("切换流派时改 ID 失败: {error}", error);
-                    return new GenreChangeResult(false, GenreChangeError.InvalidMusicDirectory, id);
+                    return new GenreChangeResult(false, GenreChangeError.IdChangeFailed, id);
                 }
                 targetId = newId;
             }
