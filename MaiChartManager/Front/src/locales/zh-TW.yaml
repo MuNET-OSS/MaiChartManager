@@ -417,44 +417,37 @@ mod:
     pathDesc: USB 序號或連接埠路徑，例如 2.2。請使用設定工具中顯示的識別。留空則使用第一個偵測到的設備作為 1P
 tools:
   fancy:
-    preview: 預覽
-    path: 檔案路徑
-    noPreview: 尚無檔案
-    existing: 已有
-    none: 暫無
-    load: 載入
-    delete: 刪除
-    introReplace: 更換影片
-    camoJacketShort: 含封面
     label: 開場影片與曲目偽裝
-    title: 開場影片與曲目偽裝
-    music: 樂曲
-    musicPlaceholder: 輸入 ID 或名稱搜尋
-    musicPick: 選擇樂曲
-    pickMusicFirst: 請先選擇一首樂曲
+    pickMusic: 選擇樂曲
+    filterPlaceholder: 過濾已有樂曲
+    noEntries: 還沒有做過開場影片或曲目偽裝的樂曲
+    noMatch: 沒有符合的樂曲
+    searchHint: 點擊任意一行即可編輯這首樂曲
+    restartHint: 修改後需重啟遊戲才會生效
+    badgeIntro: 有開場影片
+    badgeCamouflage: 有曲目偽裝
+    preview: 預覽
+    noPreview: 尚無檔案
+    none: 暫無
     introTab: 開場影片
     camouflageTab: 曲目偽裝
-    introHint: 在遊戲內開始樂曲前播放自訂影片（AquaMai 的 CustomIntroCinematic）。左右螢幕可以共用一個影片，也可以分開兩個。上傳後影片會轉成靜音 mp4，音軌自動擷取成 Enter_<id>.acb / .awb，由遊戲單獨播放。
-    introSingle: 單一檔案
-    introAudio: 音訊
-    introSide: 套用到
+    introHint: 在遊戲內開始樂曲前播放自訂影片（AquaMai 的 CustomIntroCinematic）。左右螢幕可以共用一個影片，也可以分開兩個。上傳後影片會轉成靜音 mp4，音軌自動編碼成 Enter_<id>.acb / .awb，由遊戲單獨播放。
     introSame: 左右螢幕使用同一影片
     introSameHint: 關閉後左右螢幕各用一個影片，預覽以 1:2 並排播放，可分別替換某一側；切換開關本身不會改動檔案，替換影片時才會寫入
-    introLeft: 更換左側影片（L）
-    introRight: 更換右側影片（R）
-    introAudioGenerated: 已儲存：音軌已產生 acb/awb，遊戲中由它發聲
-    introAudioSilent: 已儲存：影片沒有音軌，將靜音播放
-    introAudioReplace: 更換音訊
-    introAudioAdd: 新增音訊
-    introAudioRemove: 刪除音訊
-    introAudioRemoveConfirm: 確定要刪除樂曲 {id} 的開場音訊嗎？（左右螢幕共用一組 acb/awb）
-    introAudioShared: 左右螢幕共用
-    sideBoth: 左右螢幕同一影片
-    sideLeft: 僅左螢幕（L）
-    sideRight: 僅右螢幕（R）
+    introLeft: 替換左側影片（L）
+    introRight: 替換右側影片（R）
     introUpload: 選擇影片
+    introReplace: 更換影片
     introRemove: 刪除開場影片
     introRemoveConfirm: 確定要刪除樂曲 {id} 的開場影片嗎？
+    introAudio: 音訊
+    introAudioShared: 左右螢幕共用
+    introAudioAdd: 新增音訊
+    introAudioReplace: 更換音訊
+    introAudioRemove: 刪除音訊
+    introAudioRemoveConfirm: 確定要刪除樂曲 {id} 的開場音訊嗎？（左右螢幕共用一組 acb/awb）
+    introAudioGenerated: 已儲存：音軌已產生 acb/awb，遊戲中由它發聲
+    introAudioSilent: 已儲存：影片沒有音軌，將靜音播放
     camouflageHint: 在選曲與開始畫面把樂曲顯示成別的曲名、曲師與封面（AquaMai 的 TrackCamouflage），適合搭配開場影片使用。
     camoName: 偽裝後的曲名
     camoArtist: 偽裝後的曲師
@@ -462,8 +455,11 @@ tools:
     camoHideNoteDesigner: 隱藏譜師（顯示為 -）
     camoUnlockScore: 解除偽裝所需的達成率
     camoUnlockScoreHint: 0 表示有成績後就不再偽裝；填 102 可以永久偽裝
+    camoTextHint: 曲名與曲師必填；留空的欄位不會寫入設定檔
     camoJacketUpload: 選擇封面（jpg / png）
     camoJacketReplace: 更換封面
+    camoJacketRemove: 刪除封面
+    camoJacketRemoveConfirm: 確定要刪除樂曲 {id} 的偽裝封面嗎？（曲名等資訊會保留）
     camoRemove: 清除偽裝
     camoRemoveConfirm: 確定要清除樂曲 {id} 的偽裝資訊與封面嗎？
     save: 儲存
@@ -474,12 +470,11 @@ tools:
     errorInvalidSide: 影片位置無效
     errorInvalidText: 曲名與曲師不能為空
     errorInvalidImage: 只支援 jpg / png 圖片
-    errorLicense: 需要有效的授權才能轉換影片
+    errorInvalidAudio: 音訊檔案無法辨識或轉換失敗
     errorGamePath: 未設定遊戲目錄
     errorConvert: 影片轉換失敗
     errorWrite: 寫入檔案失敗
-    errorDeleteLocked: 刪除失敗：檔案仍被占用，請關閉預覽後重試
-    errorInvalidAudio: 音訊檔案無法辨識或轉換失敗
+    errorFileLocked: 檔案仍被占用，請關閉預覽後重試
   title: 工具
   audioConvert: 音訊轉換（ACB + AWB）
   videoConvert: 影片轉換（DAT）

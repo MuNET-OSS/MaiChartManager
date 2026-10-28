@@ -454,44 +454,37 @@ mod:
       Leave empty to use the first detected device as 1P
 tools:
   fancy:
+    label: Intro Movie & Camouflage
+    pickMusic: Choose a song
+    filterPlaceholder: Filter existing songs
+    noEntries: No song has an intro movie or camouflage yet
+    noMatch: No matching song
+    searchHint: Click any row to edit that song
+    restartHint: Restart the game for changes to take effect
+    badgeIntro: Has an intro movie
+    badgeCamouflage: Has camouflage
     preview: Preview
-    path: File path
     noPreview: No file yet
-    existing: Existing
     none: None
-    load: Load
-    delete: Delete
-    introReplace: Replace video
-    camoJacketShort: with jacket
-    label: Intro movie & camo
-    title: Intro movie & track camouflage
-    music: Music
-    musicPlaceholder: Search by ID or name
-    musicPick: Choose a song
-    pickMusicFirst: Select a song first
     introTab: Intro movie
     camouflageTab: Camouflage
-    introHint: "Play a custom video before a track starts (AquaMai's CustomIntroCinematic). Both screens can share one video or use separate ones. Uploads are converted to a silent mp4; the audio track is extracted into Enter_<id>.acb / .awb and played separately by the game."
-    introSingle: Single file
-    introAudio: Audio
-    introSide: Apply to
+    introHint: "Play a custom video before a track starts (AquaMai's CustomIntroCinematic). Both screens can share one video or use separate ones. Uploads are converted to a silent mp4; the audio track is encoded into Enter_<id>.acb / .awb and played separately by the game."
     introSame: Same video for both screens
     introSameHint: "When off, each screen has its own video and the preview plays both side by side at 1:2. Toggling the switch does not touch the files; they are only written when you replace a video."
     introLeft: Replace left video (L)
     introRight: Replace right video (R)
-    introAudioGenerated: "Saved: audio track extracted to acb/awb"
-    introAudioSilent: "Saved: no audio track, the intro will be silent"
-    introAudioReplace: Replace audio
-    introAudioAdd: Add audio
-    introAudioRemove: Remove audio
-    introAudioRemoveConfirm: "Remove the intro audio for song {id}? (both screens share one acb/awb)"
-    introAudioShared: shared by both screens
-    sideBoth: Same video on both screens
-    sideLeft: Left screen only (L)
-    sideRight: Right screen only (R)
     introUpload: Choose video
+    introReplace: Replace video
     introRemove: Delete intro movie
     introRemoveConfirm: Delete the intro movie of music {id}?
+    introAudio: Audio
+    introAudioShared: shared by both screens
+    introAudioAdd: Add audio
+    introAudioReplace: Replace audio
+    introAudioRemove: Remove audio
+    introAudioRemoveConfirm: "Remove the intro audio for song {id}? (both screens share one acb/awb)"
+    introAudioGenerated: "Saved: audio track encoded to acb/awb, the game plays it"
+    introAudioSilent: "Saved: no audio track, the intro will be silent"
     camouflageHint: Show another name, artist and jacket for this track in the music select and track start screens (AquaMai TrackCamouflage). Works well together with the intro movie.
     camoName: Disguised name
     camoArtist: Disguised artist
@@ -499,8 +492,11 @@ tools:
     camoHideNoteDesigner: Hide note designer (shows -)
     camoUnlockScore: Score required to remove camouflage
     camoUnlockScoreHint: 0 means the camouflage disappears once the player has any score; use 102 to keep it forever
+    camoTextHint: Name and artist are required; empty fields are not written to the config file
     camoJacketUpload: Choose jacket (jpg / png)
     camoJacketReplace: Replace jacket
+    camoJacketRemove: Remove jacket
+    camoJacketRemoveConfirm: Remove the camouflage jacket of music {id}? (name and other info are kept)
     camoRemove: Clear camouflage
     camoRemoveConfirm: Clear the camouflage info and jacket of music {id}?
     save: Save
@@ -511,12 +507,11 @@ tools:
     errorInvalidSide: Invalid video side
     errorInvalidText: Name and artist are required
     errorInvalidImage: Only jpg / png images are supported
-    errorLicense: A valid license is required to convert video
+    errorInvalidAudio: Unsupported or invalid audio file
     errorGamePath: Game directory is not configured
     errorConvert: Video conversion failed
     errorWrite: Failed to write file
-    errorDeleteLocked: "Delete failed: the file is still in use. Close the preview and try again."
-    errorInvalidAudio: "Unsupported or invalid audio file"
+    errorFileLocked: The file is still in use, close the preview and try again
   title: Tools
   audioConvert: Audio Convert (ACB + AWB)
   videoConvert: Video Convert (DAT)
