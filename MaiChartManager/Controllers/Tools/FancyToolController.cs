@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
@@ -21,6 +22,13 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
 
     private static string IntroMovieDir => Path.Combine(StaticSettings.GamePath, "LocalAssets", "IntroMovies");
     private static string CamouflageDir => Path.Combine(StaticSettings.GamePath, "LocalAssets", "Camouflages");
+
+    /// <summary>
+    /// 同一个曲目的开场文件操作串行化：避免两个请求交错提交，留下音画不匹配的文件。
+    /// </summary>
+    private static readonly ConcurrentDictionary<int, SemaphoreSlim> IntroFileGates = new();
+
+    private static SemaphoreSlim GetIntroFileGate(int id) => IntroFileGates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
 
     public record FancyToolResult(bool Success, string? Error);
 
@@ -132,6 +140,20 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     [HttpPost]
     [DisableRequestSizeLimit]
     public async Task<FancyToolResult> SetIntroMovie([FromForm] int id, [FromForm] string? side, IFormFile file)
+    {
+        var gate = GetIntroFileGate(id);
+        await gate.WaitAsync();
+        try
+        {
+            return await SetIntroMovieCore(id, side, file);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task<FancyToolResult> SetIntroMovieCore(int id, string? side, IFormFile file)
     {
         if (id <= 0) return new FancyToolResult(false, "invalid-id");
         var gamePathError = EnsureGamePath();
@@ -247,6 +269,20 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     [DisableRequestSizeLimit]
     public async Task<FancyToolResult> SetIntroAudio([FromForm] int id, IFormFile file)
     {
+        var gate = GetIntroFileGate(id);
+        await gate.WaitAsync();
+        try
+        {
+            return await SetIntroAudioCore(id, file);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task<FancyToolResult> SetIntroAudioCore(int id, IFormFile file)
+    {
         if (id <= 0) return new FancyToolResult(false, "invalid-id");
         var gamePathError = EnsureGamePath();
         if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
@@ -304,6 +340,20 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     /// </summary>
     [HttpPost]
     public FancyToolResult DeleteIntroAudio(int id)
+    {
+        var gate = GetIntroFileGate(id);
+        gate.Wait();
+        try
+        {
+            return DeleteIntroAudioCore(id);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private static FancyToolResult DeleteIntroAudioCore(int id)
     {
         var gamePathError = EnsureGamePath();
         if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
@@ -407,6 +457,20 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     }
     [HttpPost]
     public FancyToolResult DeleteIntroMovie(int id)
+    {
+        var gate = GetIntroFileGate(id);
+        gate.Wait();
+        try
+        {
+            return DeleteIntroMovieCore(id);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private static FancyToolResult DeleteIntroMovieCore(int id)
     {
         var gamePathError = EnsureGamePath();
         if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
@@ -687,6 +751,20 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
 
     [HttpPost]
     public FancyToolResult DeleteCamouflage(int id)
+    {
+        var gate = GetIntroFileGate(id);
+        gate.Wait();
+        try
+        {
+            return DeleteCamouflageCore(id);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private static FancyToolResult DeleteCamouflageCore(int id)
     {
         var gamePathError = EnsureGamePath();
         if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
