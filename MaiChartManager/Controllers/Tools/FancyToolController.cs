@@ -710,8 +710,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         try
         {
             Directory.CreateDirectory(CamouflageDir);
-            WriteAllTextAtomic(Path.Combine(CamouflageDir, $"{id}.toml"),
-                Toml.FromModel(model, TomlOptions));
+            WriteAllTextAtomic(Path.Combine(CamouflageDir, $"{id}.toml"), BuildCamouflageToml(model));
             return new FancyToolResult(true, null);
         }
         catch (Exception e)
@@ -719,6 +718,24 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             logger.LogError(e, "写入曲目伪装配置失败: {id}", id);
             return new FancyToolResult(false, "write-failed");
         }
+    }
+
+    /// <summary>
+    /// 只写真正有意义的字段。AquaMai 把缺失或空白的字段当作「不伪装」，
+    /// 但这是对方实现的细节；toml 是跨项目的文件契约，空值就不要写出去。
+    /// </summary>
+    private static string BuildCamouflageToml(CamouflageModel model)
+    {
+        var table = new TomlTable
+        {
+            ["Name"] = model.Name,
+            ["Artist"] = model.Artist,
+        };
+        if (!string.IsNullOrWhiteSpace(model.NoteDesigner)) table["NoteDesigner"] = model.NoteDesigner;
+        if (model.HideNoteDesigner) table["HideNoteDesigner"] = true;
+        if (model.UnlockScore != 0) table["UnlockScore"] = model.UnlockScore;
+
+        return Toml.FromModel(table, TomlOptions);
     }
 
     [HttpPost]
