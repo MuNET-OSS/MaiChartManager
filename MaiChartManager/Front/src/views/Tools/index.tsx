@@ -4,6 +4,7 @@ import { defineComponent, ref } from 'vue';
 import ImageToAbModal from '@/views/Tools/ImageToAbModal';
 import PvConvertDropMenu from '@/views/Tools/PvConvertDropMenu';
 import ResourceJunctionModal from '@/views/Tools/ResourceJunctionModal';
+import IntroCamouflageModal from '@/views/Tools/IntroCamouflageModal';
 import { useI18n } from 'vue-i18n';
 
 interface ToolCard {
@@ -17,6 +18,7 @@ export default defineComponent({
   setup() {
     const imageToAbRef = ref<{ trigger: () => void }>();
     const resourceJunctionRef = ref<{ trigger: () => void }>();
+    const fancyRef = ref<{ trigger: () => void }>();
     const { t } = useI18n();
 
     const handleAudioConvert = async () => {
@@ -48,6 +50,11 @@ export default defineComponent({
         labelKey: 'tools.resourceJunction.label',
         action: () => resourceJunctionRef.value?.trigger(),
       },
+      {
+        icon: 'i-mdi-movie-open-star',
+        labelKey: 'tools.fancy.label',
+        action: () => fancyRef.value?.trigger(),
+      },
     ];
 
     const renderToolCard = (tool: ToolCard) => (
@@ -75,9 +82,11 @@ export default defineComponent({
           <PvConvertDropMenu />
           {renderToolCard(tools[1])}
           {renderToolCard(tools[2])}
+          {renderToolCard(tools[3])}
         </div>
         <ImageToAbModal ref={imageToAbRef as any} />
         <ResourceJunctionModal ref={resourceJunctionRef as any} />
+        <IntroCamouflageModal ref={fancyRef as any} />
       </div>
     );
   },

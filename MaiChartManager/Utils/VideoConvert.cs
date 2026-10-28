@@ -41,7 +41,10 @@ public static class VideoConvert
     /// </summary>
     private static List<string> BuildPostArgs(VideoEncoderProfile p, VideoConvertOptions options, bool isImage)
     {
-        var post = new List<string> { $"-c:v {p.Codec}", "-map 0:0" };
+        // 只取输入的第一条视频流（-map 0:0 是「第 0 个流」，音频排在前面时会选错）：
+        // 音频一律不写进输出（IVF/USM 也放不下音频），
+        // 需要声音的场景（例如开场视频）由调用方另外生成 acb/awb。
+        var post = new List<string> { $"-c:v {p.Codec}", "-map 0:v:0" };
         if (isImage) post.Add("-r 1 -t 2");
         post.Add(MultiThreadArg);
         if (p.Kind == VideoCodecKind.Vp9 && !p.IsHardware)
@@ -50,6 +53,8 @@ public static class VideoConvert
             if (options.UseYuv420p) post.Add("-pix_fmt yuv420p");
         }
         post.AddRange(p.ExtraOutputArgs);
+        // 调用方指定的额外参数（画质等）放最后，可以覆盖前面的默认值
+        if (options.ExtraArgs is { Length: > 0 }) post.AddRange(options.ExtraArgs);
         return post;
     }
 
@@ -73,6 +78,22 @@ public static class VideoConvert
             : HardwareAccelerationStatus.Disabled;
     }
 
+    /// <summary>
+    /// 按当前选中的 H264 编码器给出画质参数。
+    /// 不同硬件编码器的默认画质差很多——例如 h264_mf 不指定 quality 时会用很低的默认值，转出来非常糊。
+    /// </summary>
+    public static string[] H264QualityArgs(string codec) => codec switch
+    {
+        "libx264" => ["-crf", "18", "-preset", "medium"],
+        "h264_mf" => ["-rate_control", "quality", "-quality", "90"],
+        "h264_nvenc" => ["-rc", "vbr", "-cq", "19", "-b:v", "0"],
+        "h264_qsv" => ["-global_quality", "20"],
+        "h264_amf" => ["-rc", "cqp", "-qp_i", "20", "-qp_p", "20"],
+        "h264_vaapi" => ["-qp", "20"],
+        "h264_vulkan" => ["-qp", "20"],
+        _ => [],
+    };
+
     public class VideoConvertOptions
     {
         /// <summary>
@@ -89,6 +110,11 @@ public static class VideoConvert
         /// 是否使用 YUV420p 颜色空间
         /// </summary>
         public bool UseYuv420p { get; set; }
+
+        /// <summary>
+        /// 额外的 ffmpeg 输出参数（例如画质），追加在编码参数的最后
+        /// </summary>
+        public string[] ExtraArgs { get; set; } = [];
 
         /// <summary>
         /// 视频 padding（秒），正数为前置空白，负数为裁剪开头
@@ -373,6 +399,8 @@ public static class VideoConvert
                 postArgs.Add("-pix_fmt yuv420p");
         }
         postArgs.AddRange(profile.ExtraOutputArgs);
+        // 调用方指定的额外参数（画质等）同样要带上，位置保持在默认参数之后
+        if (options.ExtraArgs is { Length: > 0 }) postArgs.AddRange(options.ExtraArgs);
 
 #if DEBUG
         Console.WriteLine($"[ffargs] concat profile={profile.Name} pre=[{string.Join(" ", profile.PreInputArgs)}] post=[{string.Join(" ", postArgs)}]");
