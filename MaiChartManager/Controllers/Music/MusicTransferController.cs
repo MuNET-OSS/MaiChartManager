@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using MaiChartManager.Models;
 using MaiChartManager.Platform;
+using MaiChartManager.Controllers.Music.Services;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
 using MuConvert.mai;

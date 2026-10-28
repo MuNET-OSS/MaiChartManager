@@ -2,7 +2,7 @@ using MaiChartManager.Models;
 using MaiChartManager.Platform;
 using MusicXml = MaiChartManager.Models.MusicXml;
 
-namespace MaiChartManager.Controllers.Music;
+namespace MaiChartManager.Controllers.Music.Services;
 
 /// <summary>
 /// 流派切换接口的错误码，前端据此显示本地化文案。
