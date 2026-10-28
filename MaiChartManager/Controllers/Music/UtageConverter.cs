@@ -44,6 +44,11 @@ internal static class UtageConverter
     /// </summary>
     public const int UtageMaxSeq = 99;
 
+    /// <summary>
+    /// 难度槽位数量（Basic ~ Re:Master）。Music.xml 里的第 6 个槽位不是难度，统计启用难度时要排除。
+    /// </summary>
+    public const int DifficultyCount = 5;
+
     /// <summary>是否为宴会场 ID（6 位，后四位是原曲 ID）</summary>
     public static bool IsUtageId(int id) => id is >= UtageIdStart and < 1_000_000;
 
@@ -76,12 +81,13 @@ internal static class UtageConverter
 
     /// <summary>
     /// 找出唯一启用的难度槽位。返回 null 表示通过，否则是错误码。
+    /// 只数 Basic~Re:Master 这前 5 个槽位，和前端展示的难度口径保持一致。
     /// </summary>
     public static string? FindSingleEnabledChart(MusicXmlWithABJacket music, out int index)
     {
         index = -1;
         var enabledIndexes = new List<int>();
-        for (var i = 0; i < music.Charts.Length; i++)
+        for (var i = 0; i < Math.Min(music.Charts.Length, DifficultyCount); i++)
         {
             if (music.Charts[i].Enable) enabledIndexes.Add(i);
         }
