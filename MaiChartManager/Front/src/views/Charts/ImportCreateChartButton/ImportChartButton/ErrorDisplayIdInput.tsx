@@ -34,9 +34,14 @@ export default defineComponent({
     watch([() => props.savedOptions.genreId, () => show.value], ([val]) => {
       for (const meta of props.meta) {
         const baseId = meta.id % 1e4;
-        // 已经在宴会场区间时沿用现有序号，避免把第二条宴会场谱面改成第一条
-        const seq = isUtageId(meta.id) ? Math.floor(meta.id / 1e4) : UTAGE_SEQ_START;
-        meta.id = val === UTAGE_GENRE ? seq * 1e4 + baseId : baseId + (meta.isDx ? 1e4 : 0);
+        if (val === UTAGE_GENRE) {
+          // 已经在宴会场区间时沿用现有序号，避免把第二条宴会场谱面改成第一条
+          const seq = isUtageId(meta.id) ? Math.floor(meta.id / 1e4) : UTAGE_SEQ_START;
+          meta.id = seq * 1e4 + baseId;
+        } else if (isUtageId(meta.id)) {
+          // 只在从宴会场 ID 还原时改写；本来就是普通 ID 的话保留用户手输的值
+          meta.id = baseId + (meta.isDx ? 1e4 : 0);
+        }
       }
     })
 
