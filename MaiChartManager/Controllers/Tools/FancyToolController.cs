@@ -193,8 +193,8 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 Padding = 0,
                 ContentType = file.ContentType,
                 TaskbarProgress = false,
-                // 硬件编码器默认画质差别很大（h264_mf 默认很糊），这里按选中的编码器给画质参数
-                ExtraArgs = VideoConvert.H264QualityArgs(VideoConvert.H264Encoder),
+                // 硬件编码器的默认画质差别很大（h264_mf 默认很糊），开场视频要按高质量转
+                Quality = VideoConvert.Quality.High,
             });
 
             if (!System.IO.File.Exists(tmpVideoPath)) return new FancyToolResult(false, "convert-failed");
