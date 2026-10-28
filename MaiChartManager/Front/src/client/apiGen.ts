@@ -125,6 +125,25 @@ export interface BatchSetPropsRequest {
   version?: number;
 }
 
+export interface CamouflageEntry {
+  /** @format int32 */
+  id?: number;
+  name?: string | null;
+  artist?: string | null;
+  hasJacket?: boolean;
+}
+
+export interface CamouflageInfoDto {
+  name?: string | null;
+  artist?: string | null;
+  noteDesigner?: string | null;
+  hideNoteDesigner?: boolean;
+  /** @format double */
+  unlockScore?: number;
+  hasJacket?: boolean;
+  jacketPath?: string | null;
+}
+
 export interface Chart {
   path?: string | null;
   /** @format int32 */
@@ -217,6 +236,11 @@ export interface EntryState {
   isDefault?: boolean;
   defaultValue?: any;
   value?: any;
+}
+
+export interface FancyToolResult {
+  success?: boolean;
+  error?: string | null;
 }
 
 export interface GameModInfo {
@@ -322,6 +346,25 @@ export interface InstallAquaMaiOnlineDto {
 
 export interface InstallMmlLibsDto {
   useLegacy?: boolean;
+}
+
+export interface IntroMovieEntry {
+  /** @format int32 */
+  id?: number;
+  hasSingle?: boolean;
+  hasLeft?: boolean;
+  hasRight?: boolean;
+  hasAudio?: boolean;
+}
+
+export interface IntroMovieInfo {
+  hasSingle?: boolean;
+  hasLeft?: boolean;
+  hasRight?: boolean;
+  hasAudio?: boolean;
+  singlePath?: string | null;
+  leftPath?: string | null;
+  rightPath?: string | null;
 }
 
 export interface MuModConfigDto {
@@ -769,7 +812,7 @@ export class HttpClient<SecurityDataType = unknown> {
 }
 
 /**
- * @title MaiChartManager.GenClient
+ * @title MaiChartManager
  * @version 1.0
  */
 export class Api<
@@ -1414,6 +1457,294 @@ export class Api<
     ) =>
       this.request<AudioPreviewTime, any>({
         path: `/MaiChartManagerServlet/GetAudioPreviewTimeApi/${assetDir}/${id}`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name GetIntroMovie
+     * @request GET:/MaiChartManagerServlet/GetIntroMovieApi
+     */
+    GetIntroMovie: (
+      query?: {
+        /** @format int32 */
+        id?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<IntroMovieInfo, any>({
+        path: `/MaiChartManagerServlet/GetIntroMovieApi`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name GetIntroMovieFile
+     * @request GET:/MaiChartManagerServlet/GetIntroMovieFileApi
+     */
+    GetIntroMovieFile: (
+      query?: {
+        /** @format int32 */
+        id?: number;
+        side?: string;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<void, any>({
+        path: `/MaiChartManagerServlet/GetIntroMovieFileApi`,
+        method: "GET",
+        query: query,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name SetIntroMovie
+     * @request POST:/MaiChartManagerServlet/SetIntroMovieApi
+     */
+    SetIntroMovie: (
+      data: {
+        /** @format int32 */
+        id?: number;
+        side?: string;
+        /** @format binary */
+        file?: File;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<FancyToolResult, any>({
+        path: `/MaiChartManagerServlet/SetIntroMovieApi`,
+        method: "POST",
+        body: data,
+        type: ContentType.FormData,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name SetIntroAudio
+     * @request POST:/MaiChartManagerServlet/SetIntroAudioApi
+     */
+    SetIntroAudio: (
+      data: {
+        /** @format int32 */
+        id?: number;
+        /** @format binary */
+        file?: File;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<FancyToolResult, any>({
+        path: `/MaiChartManagerServlet/SetIntroAudioApi`,
+        method: "POST",
+        body: data,
+        type: ContentType.FormData,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name DeleteIntroAudio
+     * @request POST:/MaiChartManagerServlet/DeleteIntroAudioApi
+     */
+    DeleteIntroAudio: (
+      query?: {
+        /** @format int32 */
+        id?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<FancyToolResult, any>({
+        path: `/MaiChartManagerServlet/DeleteIntroAudioApi`,
+        method: "POST",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name DeleteIntroMovie
+     * @request POST:/MaiChartManagerServlet/DeleteIntroMovieApi
+     */
+    DeleteIntroMovie: (
+      query?: {
+        /** @format int32 */
+        id?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<FancyToolResult, any>({
+        path: `/MaiChartManagerServlet/DeleteIntroMovieApi`,
+        method: "POST",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name GetIntroMovieList
+     * @request GET:/MaiChartManagerServlet/GetIntroMovieListApi
+     */
+    GetIntroMovieList: (params: RequestParams = {}) =>
+      this.request<IntroMovieEntry[], any>({
+        path: `/MaiChartManagerServlet/GetIntroMovieListApi`,
+        method: "GET",
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name GetCamouflage
+     * @request GET:/MaiChartManagerServlet/GetCamouflageApi
+     */
+    GetCamouflage: (
+      query?: {
+        /** @format int32 */
+        id?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<CamouflageInfoDto, any>({
+        path: `/MaiChartManagerServlet/GetCamouflageApi`,
+        method: "GET",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name GetCamouflageJacket
+     * @request GET:/MaiChartManagerServlet/GetCamouflageJacketApi
+     */
+    GetCamouflageJacket: (
+      query?: {
+        /** @format int32 */
+        id?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<void, any>({
+        path: `/MaiChartManagerServlet/GetCamouflageJacketApi`,
+        method: "GET",
+        query: query,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name SetCamouflage
+     * @request POST:/MaiChartManagerServlet/SetCamouflageApi
+     */
+    SetCamouflage: (
+      data: {
+        /** @format int32 */
+        id?: number;
+        name?: string;
+        artist?: string;
+        noteDesigner?: string;
+        hideNoteDesigner?: boolean;
+        /** @format double */
+        unlockScore?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<FancyToolResult, any>({
+        path: `/MaiChartManagerServlet/SetCamouflageApi`,
+        method: "POST",
+        body: data,
+        type: ContentType.FormData,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name SetCamouflageJacket
+     * @request POST:/MaiChartManagerServlet/SetCamouflageJacketApi
+     */
+    SetCamouflageJacket: (
+      data: {
+        /** @format int32 */
+        id?: number;
+        /** @format binary */
+        file?: File;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<FancyToolResult, any>({
+        path: `/MaiChartManagerServlet/SetCamouflageJacketApi`,
+        method: "POST",
+        body: data,
+        type: ContentType.FormData,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name DeleteCamouflage
+     * @request POST:/MaiChartManagerServlet/DeleteCamouflageApi
+     */
+    DeleteCamouflage: (
+      query?: {
+        /** @format int32 */
+        id?: number;
+      },
+      params: RequestParams = {},
+    ) =>
+      this.request<FancyToolResult, any>({
+        path: `/MaiChartManagerServlet/DeleteCamouflageApi`,
+        method: "POST",
+        query: query,
+        format: "json",
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags FancyTool
+     * @name GetCamouflageList
+     * @request GET:/MaiChartManagerServlet/GetCamouflageListApi
+     */
+    GetCamouflageList: (params: RequestParams = {}) =>
+      this.request<CamouflageEntry[], any>({
+        path: `/MaiChartManagerServlet/GetCamouflageListApi`,
         method: "GET",
         format: "json",
         ...params,
