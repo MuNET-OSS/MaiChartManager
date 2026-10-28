@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
@@ -24,11 +23,13 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     private static string CamouflageDir => Path.Combine(StaticSettings.GamePath, "LocalAssets", "Camouflages");
 
     /// <summary>
-    /// 同一个曲目的开场文件操作串行化：避免两个请求交错提交，留下音画不匹配的文件。
+    /// 同一个曲目的文件操作串行化：避免两个请求交错提交，留下音画 / 伪装不匹配的文件。
+    /// 用固定数量的「分段锁」而不是按 id 建字典，内存恒定（不同 id 偶尔落到同一段，可以接受）。
     /// </summary>
-    private static readonly ConcurrentDictionary<int, SemaphoreSlim> IntroFileGates = new();
+    private static readonly SemaphoreSlim[] FileGates =
+        Enumerable.Range(0, 64).Select(_ => new SemaphoreSlim(1, 1)).ToArray();
 
-    private static SemaphoreSlim GetIntroFileGate(int id) => IntroFileGates.GetOrAdd(id, _ => new SemaphoreSlim(1, 1));
+    private static SemaphoreSlim GetFileGate(int id) => FileGates[(uint)id % (uint)FileGates.Length];
 
     public record FancyToolResult(bool Success, string? Error);
 
@@ -141,7 +142,9 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     [DisableRequestSizeLimit]
     public async Task<FancyToolResult> SetIntroMovie([FromForm] int id, [FromForm] string? side, IFormFile file)
     {
-        var gate = GetIntroFileGate(id);
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
+
+        var gate = GetFileGate(id);
         await gate.WaitAsync();
         try
         {
@@ -269,7 +272,9 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     [DisableRequestSizeLimit]
     public async Task<FancyToolResult> SetIntroAudio([FromForm] int id, IFormFile file)
     {
-        var gate = GetIntroFileGate(id);
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
+
+        var gate = GetFileGate(id);
         await gate.WaitAsync();
         try
         {
@@ -339,10 +344,12 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     /// 只删掉开场音频，保留视频（左右屏共用的那一套 acb/awb）。
     /// </summary>
     [HttpPost]
-    public FancyToolResult DeleteIntroAudio(int id)
+    public async Task<FancyToolResult> DeleteIntroAudio(int id)
     {
-        var gate = GetIntroFileGate(id);
-        gate.Wait();
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
+
+        var gate = GetFileGate(id);
+        await gate.WaitAsync();
         try
         {
             return DeleteIntroAudioCore(id);
@@ -456,10 +463,12 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         }
     }
     [HttpPost]
-    public FancyToolResult DeleteIntroMovie(int id)
+    public async Task<FancyToolResult> DeleteIntroMovie(int id)
     {
-        var gate = GetIntroFileGate(id);
-        gate.Wait();
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
+
+        var gate = GetFileGate(id);
+        await gate.WaitAsync();
         try
         {
             return DeleteIntroMovieCore(id);
@@ -662,8 +671,25 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     }
 
     [HttpPost]
-    public FancyToolResult SetCamouflage([FromForm] int id, [FromForm] string? name, [FromForm] string? artist,
+    public async Task<FancyToolResult> SetCamouflage([FromForm] int id, [FromForm] string? name, [FromForm] string? artist,
         [FromForm] string? noteDesigner, [FromForm] bool hideNoteDesigner, [FromForm] double unlockScore)
+    {
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
+
+        var gate = GetFileGate(id);
+        await gate.WaitAsync();
+        try
+        {
+            return SetCamouflageCore(id, name, artist, noteDesigner, hideNoteDesigner, unlockScore);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private FancyToolResult SetCamouflageCore(int id, string? name, string? artist,
+        string? noteDesigner, bool hideNoteDesigner, double unlockScore)
     {
         if (id <= 0) return new FancyToolResult(false, "invalid-id");
         if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(artist))
@@ -698,6 +724,22 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     [HttpPost]
     [DisableRequestSizeLimit]
     public async Task<FancyToolResult> SetCamouflageJacket([FromForm] int id, IFormFile file)
+    {
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
+
+        var gate = GetFileGate(id);
+        await gate.WaitAsync();
+        try
+        {
+            return await SetCamouflageJacketCore(id, file);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task<FancyToolResult> SetCamouflageJacketCore(int id, IFormFile file)
     {
         if (id <= 0) return new FancyToolResult(false, "invalid-id");
 
@@ -750,10 +792,12 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     }
 
     [HttpPost]
-    public FancyToolResult DeleteCamouflage(int id)
+    public async Task<FancyToolResult> DeleteCamouflage(int id)
     {
-        var gate = GetIntroFileGate(id);
-        gate.Wait();
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
+
+        var gate = GetFileGate(id);
+        await gate.WaitAsync();
         try
         {
             return DeleteCamouflageCore(id);
