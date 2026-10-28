@@ -52,16 +52,14 @@ const Component = defineComponent({
 
     // 取消或失败时，把下拉框里的流派恢复原样
     const revertGenre = (value?: number) => {
-      if (!info.value) return;
-      disableSync.value = true;
+      if (!info.value || value === undefined) return;
       info.value.genreId = value;
-      // 让 watch 先忽略掉这次回滚，下一帧再恢复同步
-      setTimeout(() => disableSync.value = false);
     };
 
     // 宴会场只认 Basic（绿）谱面：切换到宴会场时顺带改 ID，并把唯一启用的难度谱面转成 Basic
     const changeGenreToUtage = async (oldGenreId?: number) => {
       if (!info.value) return;
+      info.value.genreId = UTAGE_GENRE;
       const enabledIndexes = enabledChartIndexes.value;
 
       if (enabledIndexes.length !== 1) {
@@ -121,6 +119,7 @@ const Component = defineComponent({
     // 从宴会场切回其他流派：宴会场 ID 需要减 100000
     const revertGenreFromUtage = async (newGenreId: number, oldGenreId?: number) => {
       if (!info.value) return;
+      info.value.genreId = newGenreId;
 
       // 含宴会场特有 L/R 双人谱的乐曲无法转成普通谱面
       if (info.value.utagePlayStyle === 1) {
@@ -213,23 +212,27 @@ const Component = defineComponent({
         await globalCapture(e, failMessage);
       }
     };
+    // 流派改动的唯一入口。不能靠 watch 拦截：换歌、刷新列表同样会改变 info.value.genreId，
+    // watch 会把「上一首曲子的流派」当成这次的旧值，误触发宴会场转换流程。
+    const onGenreChange = async (value: number) => {
+      if (!info.value || value === undefined || value === info.value.genreId) return;
+      const oldGenreId = info.value.genreId;
+      if (value === UTAGE_GENRE) {
+        await changeGenreToUtage(oldGenreId);
+        return;
+      }
+      if (oldGenreId === UTAGE_GENRE) {
+        await revertGenreFromUtage(value, oldGenreId);
+        return;
+      }
+      info.value.genreId = value;
+      info.value.modified = true;
+      await api.EditMusicGenre(info.value.id!, info.value.assetDir!, value);
+    };
     watch(() => info.value?.name, sync('name', api.EditMusicName));
     watch(() => info.value?.artist, sync('artist', api.EditMusicArtist));
     watch(() => info.value?.bpm, sync('bpm', api.EditMusicBpm));
     watch(() => info.value?.version, sync('version', api.EditMusicVersion));
-    watch(() => info.value?.genreId, async (value, oldValue) => {
-      if (disableSync.value || !info.value || value === undefined) return;
-      if (value === UTAGE_GENRE && oldValue !== UTAGE_GENRE) {
-        await changeGenreToUtage(oldValue);
-        return;
-      }
-      if (oldValue === UTAGE_GENRE && value !== UTAGE_GENRE) {
-        await revertGenreFromUtage(value, oldValue);
-        return;
-      }
-      info.value.modified = true;
-      await api.EditMusicGenre(info.value.id!, info.value.assetDir!, value);
-    });
     watch(() => info.value?.addVersionId, sync('addVersionId', api.EditMusicAddVersion));
     watch(() => info.value?.utageKanji, sync('utageKanji', api.EditMusicUtageKanji));
     watch(() => info.value?.comment, sync('comment', api.EditMusicComment));
@@ -287,7 +290,7 @@ const Component = defineComponent({
         <div class="flex gap-4">
           <div class="flex flex-col gap-2 w-0 grow">
             <div class="ml-1 text-sm">{t('music.edit.genre')}</div>
-            <GenreInput options={genreList.value} v-model:value={info.value.genreId}/>
+            <GenreInput options={genreList.value} value={info.value.genreId} onUpdate:value={onGenreChange}/>
           </div>
           <div class="flex flex-col gap-2 w-0 grow">
             <div class="ml-1 text-sm">{t('music.edit.versionCategory')}</div>
