@@ -681,6 +681,8 @@ public partial class MusicTransferController(
 
         var newId = id;
         var chartIndex = -1;
+        // 切到宴会场时记下的原 ID，宴会场 ID 里没有 STD/DX 信息，切回普通流派时只靠 ID 还原不回去
+        int? utageBaseId = null;
         if (toUtage)
         {
             // 宴会场只认 Basic 谱面，先确认只有一个启用的难度
@@ -698,6 +700,7 @@ public partial class MusicTransferController(
                     candidate => settings.GetMusic(candidate, assetDir) is not null);
                 if (freeId is null) return new GenreChangeResult(false, GenreChangeError.NoAvailableId, id);
                 newId = freeId.Value;
+                utageBaseId = id;
             }
         }
         else
@@ -708,7 +711,10 @@ public partial class MusicTransferController(
             // 流派是宴会场但 ID 不是宴会场 ID（历史数据、手动改过）时没有可恢复的 ID，保持 ID 不动
             if (UtageConverter.IsUtageId(id))
             {
-                var restored = UtageConverter.RestoreNormalId(id);
+                // 优先还原切到宴会场时记录的原 ID（能保住 STD/DX），推不出来时才按序号硬算
+                int? restored = music.UtageBaseId;
+                if (restored is null || UtageConverter.IsUtageId(restored.Value))
+                    restored = UtageConverter.RestoreNormalId(id);
                 if (restored is null)
                     return new GenreChangeResult(false, GenreChangeError.UtageIdNotRestorable, id);
                 newId = restored.Value;
@@ -739,6 +745,7 @@ public partial class MusicTransferController(
             var targetId = id;
             if (newId != id)
             {
+                if (utageBaseId is not null) music.UtageBaseId = utageBaseId;
                 var error = await ModifyIdCore(music, newId, assetDir);
                 if (error is not null)
                 {
@@ -757,6 +764,8 @@ public partial class MusicTransferController(
             }
 
             target.GenreId = genreId;
+            // 离开宴会场后原 ID 记录就没用了，清掉避免下次切回来时还原到错误的 ID
+            if (!toUtage) target.UtageBaseId = null;
             target.Save();
             return new GenreChangeResult(true, null, targetId);
         }

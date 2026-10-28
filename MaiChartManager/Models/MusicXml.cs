@@ -486,6 +486,28 @@ public partial class MusicXml
         }
     }
 
+    /// <summary>
+    /// 切到宴会场之前的乐曲 ID。宴会场 ID 是「序号 * 10000 + 原曲后四位」，不含 STD/DX 信息，
+    /// 所以切回普通流派时只靠 ID 无法还原成原来那一条，这里记下来供还原用。
+    /// 置 null 会删掉这个节点。
+    /// </summary>
+    public int? UtageBaseId
+    {
+        get => int.TryParse(RootNode.SelectSingleNode("X-MCM/utageBaseId")?.InnerText, out var result) ? result : null;
+        set
+        {
+            Modified = true;
+            if (value is null)
+            {
+                var node = RootNode.SelectSingleNode("X-MCM/utageBaseId");
+                node?.ParentNode?.RemoveChild(node);
+                return;
+            }
+
+            SelectSingleNodeOrCreate(RootNode, "X-MCM/utageBaseId").InnerText = value.Value.ToString();
+        }
+    }
+
     public class Chart
     {
         private readonly XmlNode _node;
