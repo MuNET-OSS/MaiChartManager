@@ -49,17 +49,21 @@ internal static class UtageConverter
     /// </summary>
     public const int DifficultyCount = 5;
 
+    /// <summary>普通曲 ID 的上限（不含）：0~9999 是 STD，10000~19999 是 DX。</summary>
+    public const int NormalIdLimit = 20_000;
+
     /// <summary>是否为宴会场 ID（6 位，后四位是原曲 ID）</summary>
     public static bool IsUtageId(int id) => id is >= UtageIdStart and < 1_000_000;
 
     /// <summary>
-    /// 宴会场 ID 对应的普通曲 ID（序号 10、11 分别对应 0、10000 号段）。
-    /// 返回 null 表示序号太大、推不出普通曲 ID，只能让用户手动指定。
+    /// 宴会场 ID 对应的普通曲 ID（序号 10、11 分别对应 STD、DX 号段）。
+    /// 返回 null 表示推不出普通曲 ID（序号更靠后的官方宴谱），只能让用户手动指定。
     /// </summary>
     public static int? RestoreNormalId(int utageId)
     {
         var restored = utageId - UtageIdStart;
-        return IsUtageId(restored) ? null : restored;
+        // 落在普通曲号段外的一律不认，避免算出 20005 这类不存在的 ID
+        return restored is >= 0 and < NormalIdLimit ? restored : null;
     }
 
     /// <summary>
