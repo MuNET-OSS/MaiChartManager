@@ -189,7 +189,7 @@ const Component = defineComponent({
                                        titleKey: string, failMessage: string) => {
       const oldId = info.value!.id!;
       try {
-        const result = (await api.ChangeMusicGenre(oldId, selectedADir.value, { genreId })).data;
+        const result = (await api.ChangeMusicGenre(oldId, info.value!.assetDir!, { genreId })).data;
         if (!result.success) {
           revertGenre(oldGenreId);
           const key = result.error ? genreChangeErrorKeys[result.error] : undefined;
