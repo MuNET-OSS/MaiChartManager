@@ -107,22 +107,28 @@ export default defineComponent({
     };
 
     const loadIntroMovie = async () => {
-      if (!musicId.value) {
+      const id = musicId.value;
+      if (!id) {
         introInfo.value = null;
         return;
       }
-      introInfo.value = (await api.GetIntroMovie({ id: musicId.value })).data;
-      const info = introInfo.value;
+      const data = (await api.GetIntroMovie({ id })).data;
+      // 切曲目后旧请求可能才回来，丢弃过期响应
+      if (id !== musicId.value) return;
+      introInfo.value = data;
+      const info = data;
       // 单文件优先；只有左右各一个文件时才进分屏模式
       introSame.value = !info || info.hasSingle || !(info.hasLeft && info.hasRight);
     };
 
     const loadCamouflage = async () => {
-      if (!musicId.value) {
+      const id = musicId.value;
+      if (!id) {
         camouflage.value = emptyCamouflage();
         return;
       }
-      const data: CamouflageInfoDto = (await api.GetCamouflage({ id: musicId.value })).data;
+      const data: CamouflageInfoDto = (await api.GetCamouflage({ id })).data;
+      if (id !== musicId.value) return;
       camouflage.value = {
         name: data.name ?? '',
         artist: data.artist ?? '',
@@ -141,8 +147,10 @@ export default defineComponent({
 
     // 只刷新封面状态，保留用户还在编辑、尚未保存的表单内容
     const refreshCamouflageJacket = async () => {
-      if (!musicId.value) return;
-      const data: CamouflageInfoDto = (await api.GetCamouflage({ id: musicId.value })).data;
+      const id = musicId.value;
+      if (!id) return;
+      const data: CamouflageInfoDto = (await api.GetCamouflage({ id })).data;
+      if (id !== musicId.value) return;
       camouflage.value.hasJacket = !!data.hasJacket;
       camouflage.value.jacketPath = data.jacketPath ?? '';
     };
@@ -231,6 +239,8 @@ export default defineComponent({
           fail(result.error);
           return;
         }
+        // 音频换了 URL 必须跟着变，否则 <audio> 可能还播浏览器缓存里的旧音频
+        previewToken.value = Date.now();
         await Promise.all([loadIntroMovie(), loadLists()]);
         addToast({ message: t('tools.fancy.introAudioGenerated'), type: 'success' });
       } catch (e) {

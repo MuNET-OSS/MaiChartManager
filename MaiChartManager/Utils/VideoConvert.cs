@@ -41,20 +41,9 @@ public static class VideoConvert
     /// </summary>
     private static List<string> BuildPostArgs(VideoEncoderProfile p, VideoConvertOptions options, bool isImage)
     {
-        var post = new List<string> { $"-c:v {p.Codec}" };
-        if (options.KeepAudio)
-        {
-            // 只保留第一条视频轨和（如果有）第一条音频轨；
-            // 音频单独转 AAC，保证浏览器（预览）和游戏都能读
-            post.Add("-map 0:v:0");
-            post.Add("-map 0:a:0?");
-            post.Add("-c:a aac");
-            post.Add("-b:a 192k");
-        }
-        else
-        {
-            post.Add("-map 0:0");
-        }
+        // 只取第一条视频流：音频一律不写进输出（IVF/USM 也放不下音频），
+        // 需要声音的场景（例如开场视频）由调用方另外生成 acb/awb。
+        var post = new List<string> { $"-c:v {p.Codec}", "-map 0:0" };
         if (isImage) post.Add("-r 1 -t 2");
         post.Add(MultiThreadArg);
         if (p.Kind == VideoCodecKind.Vp9 && !p.IsHardware)
@@ -120,11 +109,6 @@ public static class VideoConvert
         /// 是否使用 YUV420p 颜色空间
         /// </summary>
         public bool UseYuv420p { get; set; }
-
-        /// <summary>
-        /// 是否保留音轨（默认丢弃，只留视频流）
-        /// </summary>
-        public bool KeepAudio { get; set; }
 
         /// <summary>
         /// 额外的 ffmpeg 输出参数（例如画质），追加在编码参数的最后
@@ -414,6 +398,8 @@ public static class VideoConvert
                 postArgs.Add("-pix_fmt yuv420p");
         }
         postArgs.AddRange(profile.ExtraOutputArgs);
+        // 调用方指定的额外参数（画质等）同样要带上，位置保持在默认参数之后
+        if (options.ExtraArgs is { Length: > 0 }) postArgs.AddRange(options.ExtraArgs);
 
 #if DEBUG
         Console.WriteLine($"[ffargs] concat profile={profile.Name} pre=[{string.Join(" ", profile.PreInputArgs)}] post=[{string.Join(" ", postArgs)}]");

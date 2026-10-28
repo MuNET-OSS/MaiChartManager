@@ -166,8 +166,6 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 Padding = 0,
                 ContentType = file.ContentType,
                 TaskbarProgress = false,
-                // 视频只留画面：游戏里由 acb/awb 出声，前端预览也是静音播放 + 单独播放音频
-                KeepAudio = false,
                 // 硬件编码器默认画质差别很大（h264_mf 默认很糊），这里按选中的编码器给画质参数
                 ExtraArgs = VideoConvert.H264QualityArgs(VideoConvert.H264Encoder),
             });
@@ -178,18 +176,18 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             // 游戏里由 AquaMai 单独播放，这样视频静音、声音走 acb/awb。
             await CreateIntroAudio(inputPath, id, tmpDir.FullName);
 
+            // 先把与新布局冲突的旧文件清掉：清理失败就直接返回，避免单文件和 L/R 同时存在
+            var oldLayoutCleaned = normalizedSide is null
+                ? DeleteFilesWithRetry(
+                    Path.Combine(IntroMovieDir, VideoFileName(id, "L")),
+                    Path.Combine(IntroMovieDir, VideoFileName(id, "R")))
+                : DeleteFilesWithRetry(Path.Combine(IntroMovieDir, VideoFileName(id, null)));
+            if (!oldLayoutCleaned) return new FancyToolResult(false, "delete-failed");
+
             MoveFileWithRetry(tmpVideoPath, targetPath);
 
-            if (normalizedSide is null)
+            if (normalizedSide is not null)
             {
-                // 单文件与左右分开的写法不能共存
-                DeleteFilesWithRetry(
-                    Path.Combine(IntroMovieDir, VideoFileName(id, "L")),
-                    Path.Combine(IntroMovieDir, VideoFileName(id, "R")));
-            }
-            else
-            {
-                DeleteFilesWithRetry(Path.Combine(IntroMovieDir, VideoFileName(id, null)));
                 // 只替换一侧时，另一侧还没有的话先复制一份，保证左右都在
                 var otherSide = normalizedSide == "L" ? "R" : "L";
                 var otherPath = Path.Combine(IntroMovieDir, VideoFileName(id, otherSide));
@@ -216,11 +214,6 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         }
     }
 
-    /// <summary>
-    /// 从上传的文件里提取音轨，生成 Enter_&lt;id&gt;.acb / .awb。
-    /// 开场 mp4 本身是静音的，游戏里由 acb/awb 出声（AquaMai 的 CustomIntroCinematic 会调 SoundManager 播放）。
-    /// 没有音轨或转换失败时清掉旧的 acb/awb，避免出现「新视频配旧音频」。
-    /// </summary>
     /// <summary>
     /// 替换 / 新增开场音频。左右屏共用一套音频（Enter_&lt;id&gt;.acb / .awb），
     /// 任意 ffmpeg 能解码的音频都会先解成 wav，再封装成 acb/awb。
@@ -278,12 +271,20 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     [HttpPost]
     public FancyToolResult DeleteIntroAudio(int id)
     {
+        var gamePathError = EnsureGamePath();
+        if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
+
         var ok = DeleteFilesWithRetry(
             Path.Combine(IntroMovieDir, $"Enter_{id}.acb"),
             Path.Combine(IntroMovieDir, $"Enter_{id}.awb"));
         return new FancyToolResult(ok, ok ? null : "delete-failed");
     }
 
+    /// <summary>
+    /// 从上传的文件里提取音轨，生成 Enter_&lt;id&gt;.acb / .awb。
+    /// 开场 mp4 本身是静音的，游戏里由 acb/awb 出声（AquaMai 的 CustomIntroCinematic 会调 SoundManager 播放）。
+    /// acb/awb 成对替换：先备份旧文件，任一移动失败就回滚。
+    /// </summary>
     private async Task<bool> CreateIntroAudio(string inputPath, int id, string tmpDir, bool deleteOnFailure = true)
     {
         var acbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.acb");
@@ -292,6 +293,11 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         // 先在临时目录里生成，两个文件都成功后再搬过去
         var tmpAcbPath = Path.Combine(tmpDir, $"Enter_{id}.acb");
         var tmpAwbPath = Path.Combine(tmpDir, $"Enter_{id}.awb");
+        // 替换前先备份旧文件：任一移动失败就回滚，保证 acb/awb 始终配套
+        var bakAcbPath = Path.Combine(tmpDir, $"Enter_{id}.acb.bak");
+        var bakAwbPath = Path.Combine(tmpDir, $"Enter_{id}.awb.bak");
+        var hadAcb = System.IO.File.Exists(acbPath);
+        var hadAwb = System.IO.File.Exists(awbPath);
 
         try
         {
@@ -305,13 +311,27 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             if (!System.IO.File.Exists(tmpAcbPath) || !System.IO.File.Exists(tmpAwbPath))
                 throw new InvalidOperationException("acb/awb not generated");
 
+            if (hadAcb) System.IO.File.Copy(acbPath, bakAcbPath, true);
+            if (hadAwb) System.IO.File.Copy(awbPath, bakAwbPath, true);
+
             MoveFileWithRetry(tmpAcbPath, acbPath);
             MoveFileWithRetry(tmpAwbPath, awbPath);
             return true;
         }
         catch (Exception e)
         {
-            logger.LogWarning(e, "开场视频音频生成失败，按静音处理: {id}", id);
+            logger.LogWarning(e, "开场视频音频生成失败: {id}", id);
+            // 回滚成对音频：有备份就还原，本来没有的就删掉可能写进去的那一半
+            try
+            {
+                RestoreOrDelete(acbPath, bakAcbPath, hadAcb);
+                RestoreOrDelete(awbPath, bakAwbPath, hadAwb);
+            }
+            catch (Exception restoreError)
+            {
+                logger.LogWarning(restoreError, "开场音频回滚失败: {id}", id);
+            }
+
             // 换视频时音画必须配套，所以没音轨就清掉旧的；用户单独传音频失败则保留原来的
             if (deleteOnFailure)
             {
@@ -324,6 +344,9 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     [HttpPost]
     public FancyToolResult DeleteIntroMovie(int id)
     {
+        var gamePathError = EnsureGamePath();
+        if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
+
         var ok = DeleteFilesWithRetry(
             Path.Combine(IntroMovieDir, VideoFileName(id, null)),
             Path.Combine(IntroMovieDir, VideoFileName(id, "L")),
@@ -333,10 +356,6 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         return new FancyToolResult(ok, ok ? null : "delete-failed");
     }
 
-    /// <summary>
-    /// 删除文件（Windows 走回收站）。被占用时（例如前端还在预览这个视频、句柄没释放）重试几次，
-    /// 全部失败才返回 false，让前端提示「文件被占用」而不是静默失败。
-    /// </summary>
     /// <summary>
     /// 覆盖式移动文件：目标被占用（例如前端还在预览旧文件）时重试几次。
     /// </summary>
@@ -356,6 +375,24 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         }
     }
 
+    /// <summary>
+    /// 回滚成对音频：原来有文件就从备份还原，原来没有就把可能写进去的那一半删掉。
+    /// </summary>
+    private static void RestoreOrDelete(string path, string backupPath, bool hadOriginal)
+    {
+        if (hadOriginal)
+        {
+            if (System.IO.File.Exists(backupPath)) System.IO.File.Copy(backupPath, path, true);
+            return;
+        }
+
+        if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
+    }
+
+    /// <summary>
+    /// 删除文件（Windows 走回收站）。被占用时（例如前端还在预览这个视频、句柄没释放）重试几次，
+    /// 全部失败才返回 false，让前端提示「文件被占用」而不是静默失败。
+    /// </summary>
     private static bool DeleteFilesWithRetry(params string[] paths)
     {
         // 先等占用消失：这一步很便宜（只是尝试以独占方式打开文件），避免回收站删除在被占用时卡很久
@@ -556,20 +593,28 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         var gamePathError = EnsureGamePath();
         if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
 
+        var tmpPath = Path.Combine(CamouflageDir, $"{id}_jacket{ext}.tmp");
         try
         {
             Directory.CreateDirectory(CamouflageDir);
             var targetPath = Path.Combine(CamouflageDir, $"{id}_jacket{ext}");
-            // 同一首曲子只保留一张封面
+
+            // 先写临时文件再覆盖目标，避免写到一半把已有封面弄坏
+            await using (var stream = System.IO.File.Create(tmpPath))
+            {
+                await file.CopyToAsync(stream);
+            }
+            MoveFileWithRetry(tmpPath, targetPath);
+
+            // 同一首曲子只保留一张封面；清理失败不影响新封面，只记日志
             foreach (var otherExt in new[] { ".jpg", ".jpeg", ".png" })
             {
                 var otherPath = Path.Combine(CamouflageDir, $"{id}_jacket{otherExt}");
-                if (!string.Equals(otherPath, targetPath, StringComparison.OrdinalIgnoreCase))
-                    DeleteFilesWithRetry(otherPath);
+                if (!string.Equals(otherPath, targetPath, StringComparison.OrdinalIgnoreCase) &&
+                    !DeleteFilesWithRetry(otherPath))
+                    logger.LogWarning("旧封面清理失败: {path}", otherPath);
             }
 
-            await using var stream = System.IO.File.Create(targetPath);
-            await file.CopyToAsync(stream);
             return new FancyToolResult(true, null);
         }
         catch (Exception e)
@@ -577,11 +622,25 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             logger.LogError(e, "写入曲目伪装封面失败: {id}", id);
             return new FancyToolResult(false, "write-failed");
         }
+        finally
+        {
+            try
+            {
+                if (System.IO.File.Exists(tmpPath)) System.IO.File.Delete(tmpPath);
+            }
+            catch
+            {
+                // 忽略清理失败
+            }
+        }
     }
 
     [HttpPost]
     public FancyToolResult DeleteCamouflage(int id)
     {
+        var gamePathError = EnsureGamePath();
+        if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
+
         var ok = DeleteFilesWithRetry(
             [
                 Path.Combine(CamouflageDir, $"{id}.toml"),

@@ -445,7 +445,7 @@ tools:
     music: Music
     musicPlaceholder: Search by ID or name
     musicPick: Choose a song
-    pickMusicFirst: Select a music first
+    pickMusicFirst: Select a song first
     introTab: Intro movie
     camouflageTab: Camouflage
     introHint: "Play a custom video before a track starts (AquaMai's CustomIntroCinematic). Both screens can share one video or use separate ones. Uploads are converted to a silent mp4; the audio track is extracted into Enter_<id>.acb / .awb and played separately by the game."
@@ -474,7 +474,7 @@ tools:
     camoArtist: Disguised artist
     camoNoteDesigner: Disguised note designer
     camoHideNoteDesigner: Hide note designer (shows -)
-    camoUnlockScore: Achievement required to remove camouflage
+    camoUnlockScore: Score required to remove camouflage
     camoUnlockScoreHint: 0 means the camouflage disappears once the player has any score; use 102 to keep it forever
     camoJacketUpload: Choose jacket (jpg / png)
     camoJacketReplace: Replace jacket
