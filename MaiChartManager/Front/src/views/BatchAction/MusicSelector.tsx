@@ -7,6 +7,7 @@ import JacketBox from "@/components/JacketBox";
 import { GenreOption } from "@/components/GenreInput";
 import { LEVEL_COLOR, LEVELS } from "@/consts";
 import _ from "lodash";
+import { matchMusicKeyword } from "@/utils/musicSearch";
 import { watchDebounced } from "@vueuse/core";
 import { scrollToMusic } from "@/views/Charts/MusicList";
 import { useI18n } from 'vue-i18n';
@@ -24,16 +25,7 @@ export default defineComponent({
     const nameColumn = reactive({
       title: t('music.list.tableTitle'), key: 'name',
       filterOptionValue: null as string | null,
-      filter: (value, row) => {
-        if (!value) return true;
-        value = value.toString().toLowerCase();
-        return row.name!.toLowerCase().includes(value) ||
-          row.artist!.toLowerCase().includes(value) ||
-          row.charts!.some(chart => chart.designer?.toLowerCase().includes(value)) ||
-          row.id!.toString().includes(value) || // match by ID
-          false;
-
-      }
+      filter: (value, row) => matchMusicKeyword(row, value?.toString() ?? ''),
     } satisfies DataTableBaseColumn<MusicXmlWithABJacket>)
     const columns = computed(() => [
       { type: 'selection' },
