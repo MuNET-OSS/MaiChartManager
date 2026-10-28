@@ -468,9 +468,9 @@ tools:
     none: None
     introTab: Intro movie
     camouflageTab: Camouflage
-    introHint: "Play a custom video before a track starts (AquaMai's CustomIntroCinematic). Both screens can share one video or use separate ones. Uploads are converted to a silent mp4; the audio track is encoded into Enter_<id>.acb / .awb and played separately by the game."
+    introHint: "Plays a custom video before the track starts. Both screens can share one video or use separate ones. Uploads are converted to a silent mp4; the audio track is encoded into Enter_<id>.acb / .awb and played by the game. Requires Fancy.CustomIntroCinematic to be enabled in AquaMai."
+    introModDisabled: Fancy.CustomIntroCinematic is not enabled in AquaMai, so this has no effect in game. Enable it in the Mod settings first.
     introSame: Same video for both screens
-    introSameHint: "When off, each screen has its own video and the preview plays both side by side at 1:2. Toggling the switch does not touch the files; they are only written when you replace a video."
     introLeft: Replace left video (L)
     introRight: Replace right video (R)
     introUpload: Choose video
@@ -478,25 +478,27 @@ tools:
     introRemove: Delete intro movie
     introRemoveConfirm: Delete the intro movie of music {id}?
     introAudio: Audio
-    introAudioShared: shared by both screens
+    introAudioYes: Present
+    introAudioNo: None
     introAudioAdd: Add audio
     introAudioReplace: Replace audio
     introAudioRemove: Remove audio
-    introAudioRemoveConfirm: "Remove the intro audio for song {id}? (both screens share one acb/awb)"
-    introAudioGenerated: "Saved: audio track encoded to acb/awb, the game plays it"
-    introAudioSilent: "Saved: no audio track, the intro will be silent"
-    camouflageHint: Show another name, artist and jacket for this track in the music select and track start screens (AquaMai TrackCamouflage). Works well together with the intro movie.
+    introAudioRemoveConfirm: Remove the intro audio for song {id}?
+    introAudioGenerated: "Saved: the audio in acb/awb is what plays in game"
+    introAudioSilent: "Saved: no audio, the intro will be silent"
+    introEncodingAudio: Encoding audio…
+    camouflageHint: Shows another name, artist and jacket for this track in the music select and track start screens, best paired with an intro movie. Requires Fancy.TrackCamouflage to be enabled in AquaMai.
+    camoModDisabled: Fancy.TrackCamouflage is not enabled in AquaMai, so this has no effect in game. Enable it in the Mod settings first.
     camoName: Disguised name
     camoArtist: Disguised artist
     camoNoteDesigner: Disguised note designer
     camoHideNoteDesigner: Hide note designer (shows -)
     camoUnlockScore: Score required to remove camouflage
     camoUnlockScoreHint: 0 means the camouflage disappears once the player has any score; use 102 to keep it forever
-    camoTextHint: Name and artist are required; empty fields are not written to the config file
     camoJacketUpload: Choose jacket (jpg / png)
     camoJacketReplace: Replace jacket
     camoJacketRemove: Remove jacket
-    camoJacketRemoveConfirm: Remove the camouflage jacket of music {id}? (name and other info are kept)
+    camoJacketRemoveConfirm: Remove the camouflage jacket of music {id}? Name and other info are kept
     camoRemove: Clear camouflage
     camoRemoveConfirm: Clear the camouflage info and jacket of music {id}?
     save: Save

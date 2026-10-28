@@ -1,12 +1,14 @@
 import { computed, defineComponent, ref, watch } from 'vue';
-import { Button, CheckBox, addToast, showTransactionalDialog } from '@munet/ui';
+import { Button, CheckBox, Progress, addToast, showTransactionalDialog } from '@munet/ui';
 import { useI18n } from 'vue-i18n';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 import api, { getUrl } from '@/client/api';
 import type { IntroMovieInfo } from '@/client/apiGen';
 import { globalCapture } from '@/store/refs';
 import { pickFile } from '@/utils/pickFile';
-import { fileToken, refreshEntries, selectedId } from './refs';
-import { showFancyError } from './errors';
+import { handleSseOpen } from '@/utils/sseOpen';
+import { fileToken, modFlags, refreshEntries, selectedId } from './refs';
+import { isKnownErrorCode, showFancyError } from './errors';
 
 type Side = '' | 'L' | 'R';
 
@@ -15,6 +17,9 @@ export default defineComponent({
     const { t } = useI18n();
 
     const busy = ref(false);
+    // 上传后要转码，单独拿一个状态出来显示进度
+    const uploading = ref(false);
+    const progress = ref(0);
     const introInfo = ref<IntroMovieInfo | null>(null);
     // 左右屏共用一个视频 / 各用一个。切换开关本身不动文件，替换视频时才写入
     const introSame = ref(true);
@@ -23,8 +28,8 @@ export default defineComponent({
     const leftMeta = ref('');
     const rightMeta = ref('');
 
-    // 正在上传/删除时先不渲染预览：播放器还读着文件的话，Windows 会因占用删不掉
-    const suppressPreview = computed(() => busy.value);
+    // 上传/删除时先不渲染预览：播放器还读着文件的话，Windows 会因占用删不掉
+    const suppressPreview = computed(() => busy.value || uploading.value);
 
     const load = async () => {
       const id = selectedId.value;
@@ -76,21 +81,6 @@ export default defineComponent({
       const info = introInfo.value;
       if (!selectedId.value || !info) return '';
       return info.hasRight ? url('R') : (info.hasSingle ? url() : '');
-    });
-
-    const samePreviewPath = computed(() => {
-      const info = introInfo.value;
-      return info?.singlePath ?? info?.leftPath ?? info?.rightPath ?? '';
-    });
-
-    const leftPreviewPath = computed(() => {
-      const info = introInfo.value;
-      return info?.leftPath ?? info?.singlePath ?? '';
-    });
-
-    const rightPreviewPath = computed(() => {
-      const info = introInfo.value;
-      return info?.rightPath ?? info?.singlePath ?? '';
     });
 
     // 视频一律静音播放，声音单独播一份 acb 解码后的 wav（左右分屏也只有这一路声音，不会重声）
@@ -164,23 +154,58 @@ export default defineComponent({
       await Promise.all([load(), refreshEntries()]);
     };
 
+    /** 上传并转码：后端用 SSE 回报进度，Error 事件的 data 是错误码 */
     const uploadMovie = async (file: File, side: Side) => {
-      if (!selectedId.value) return;
-      busy.value = true;
-      releaseMedia();
-      try {
-        const result = (await api.SetIntroMovie({
-          id: selectedId.value,
-          // 注意：生成的 FormData 序列化会把 undefined 变成字符串 "undefined"，
-          // 所以这里必须传空字符串（后端会当成「单文件」）而不是 undefined。
-          side,
-          file,
-        })).data;
+      const id = selectedId.value;
+      if (!id) return;
 
-        if (!result.success) {
-          showFancyError(t, result.error);
-          return;
-        }
+      uploading.value = true;
+      progress.value = 0;
+      releaseMedia();
+
+      const body = new FormData();
+      body.append('id', String(id));
+      // 注意：生成的 FormData 会把 undefined 变成字符串 "undefined"，
+      // 所以这里必须传空字符串（后端会当成「单文件」）而不是 undefined。
+      body.append('side', side);
+      body.append('file', file);
+
+      const controller = new AbortController();
+      try {
+        await new Promise<void>((resolve, reject) => {
+          fetchEventSource(getUrl('SetIntroMovieApi'), {
+            signal: controller.signal,
+            method: 'POST',
+            body,
+            onopen: handleSseOpen,
+            onerror(e) {
+              reject(e);
+              controller.abort();
+              throw new Error('disable retry onerror');
+            },
+            onclose() {
+              reject(new Error('EventSource Close'));
+              controller.abort();
+              throw new Error('disable retry onclose');
+            },
+            openWhenHidden: true,
+            onmessage: (e) => {
+              switch (e.event) {
+                case 'Progress':
+                  progress.value = parseInt(e.data) || 0;
+                  break;
+                case 'Success':
+                  controller.abort();
+                  resolve();
+                  break;
+                case 'Error':
+                  controller.abort();
+                  reject(new Error(e.data));
+                  break;
+              }
+            },
+          });
+        });
 
         await afterChange();
         // mp4 是静音的，声音来自自动生成的 acb/awb
@@ -190,10 +215,12 @@ export default defineComponent({
             : t('tools.fancy.introAudioSilent'),
           type: 'success',
         });
-      } catch (e) {
-        globalCapture(e, t('tools.fancy.errorConvert'));
+      } catch (e: any) {
+        if (e?.name === 'AbortError') return;
+        if (isKnownErrorCode(e?.message)) showFancyError(t, e.message);
+        else globalCapture(e, t('tools.fancy.errorConvert'));
       } finally {
-        busy.value = false;
+        uploading.value = false;
       }
     };
 
@@ -274,6 +301,10 @@ export default defineComponent({
     };
 
     const renderPreview = () => {
+      // 转换期间播放器是停掉的（句柄要释放），别留一个黑框
+      if (uploading.value) {
+        return <div class="text-sm op-50 px-2 py-4">{t('tools.converting')}</div>;
+      }
       if (!hasIntroMovie.value) {
         return <div class="text-sm op-50 px-2 py-4">{t('tools.fancy.noPreview')}</div>;
       }
@@ -288,9 +319,7 @@ export default defineComponent({
                  onPlay={() => syncPlay(sameVideoEl, null)}
                  onPause={() => syncPlay(sameVideoEl, null)}
                  onSeeked={() => syncSeek(sameVideoEl, null)}/>
-          <div class="text-xs op-50 tabular-nums break-all">
-            {[sameMeta.value, samePreviewPath.value].filter(Boolean).join(' · ')}
-          </div>
+          {!!sameMeta.value && <div class="text-xs op-50 tabular-nums">{sameMeta.value}</div>}
         </div>;
       }
 
@@ -313,14 +342,18 @@ export default defineComponent({
                  onSeeked={() => syncSeek(rightVideoEl, leftVideoEl)}/>
         </div>
         <div class="text-xs op-50 tabular-nums">{`L ${leftMeta.value || '-'}   R ${rightMeta.value || '-'}`}</div>
-        <div class="text-xs op-50 break-all text-center flex flex-col">
-          <span>L: {leftPreviewPath.value || t('tools.fancy.none')}</span>
-          <span>R: {rightPreviewPath.value || t('tools.fancy.none')}</span>
-        </div>
       </div>;
     };
 
+    const renderWarning = () => modFlags.value.intro === false
+      ? <div class="flex items-start gap-2 rounded-md border-1 border-solid border-orange-500/30 bg-orange-500/10 px-3 py-2 text-sm text-orange-600">
+        <span class="i-mdi-alert mt-0.5 shrink-0"/>
+        <span class="ws-normal">{t('tools.fancy.introModDisabled')}</span>
+      </div>
+      : null;
+
     return () => <div class="flex flex-col gap-3 py">
+      {renderWarning()}
       <div class="text-sm op-70 ws-normal">{t('tools.fancy.introHint')}</div>
 
       <div>
@@ -331,42 +364,43 @@ export default defineComponent({
       {!!audioSrc.value &&
         <audio key={audioSrc.value} src={audioSrc.value} class="hidden"
                ref={(el) => { audioEl = el as HTMLAudioElement | null; }}/>}
-      {(hasIntroMovie.value || introInfo.value?.hasAudio) &&
-        <div class="text-xs op-50 px-1 text-center break-all">
-          {introInfo.value?.hasAudio
-            ? `${t('tools.fancy.introAudio')}${introSame.value ? '' : ` (${t('tools.fancy.introAudioShared')})`}: Enter_${selectedId.value}.acb + .awb`
-            : `${t('tools.fancy.introAudio')}: ${t('tools.fancy.none')}`}
+      {(hasIntroMovie.value || !!introInfo.value?.hasAudio) &&
+        <div class="text-xs op-50 px-1 text-center">
+          {`${t('tools.fancy.introAudio')}: ${introInfo.value?.hasAudio ? t('tools.fancy.introAudioYes') : t('tools.fancy.introAudioNo')}`}
         </div>}
 
-      <CheckBox v-model:value={introSame.value} class="px-1 text-sm" disabled={busy.value}>
+      <CheckBox v-model:value={introSame.value} class="px-1 text-sm" disabled={busy.value || uploading.value}>
         {t('tools.fancy.introSame')}
       </CheckBox>
-      {!introSame.value &&
-        <div class="text-xs op-60 px-1 ws-normal">{t('tools.fancy.introSameHint')}</div>}
+
+      {uploading.value &&
+        <Progress percentage={progress.value} showIndicator>
+          {progress.value >= 90 ? t('tools.fancy.introEncodingAudio') : `${progress.value}%`}
+        </Progress>}
 
       <div class="flex gap-2">
         {introSame.value
-          ? <Button class="w-0 grow" disabled={busy.value} ing={busy.value} onClick={() => chooseMovie()}>
+          ? <Button class="w-0 grow" disabled={busy.value || uploading.value} ing={uploading.value} onClick={() => chooseMovie()}>
               {hasIntroMovie.value ? t('tools.fancy.introReplace') : t('tools.fancy.introUpload')}
             </Button>
           : <>
-              <Button class="w-0 grow" disabled={busy.value} ing={busy.value} onClick={() => chooseMovie('L')}>
+              <Button class="w-0 grow" disabled={busy.value || uploading.value} ing={uploading.value} onClick={() => chooseMovie('L')}>
                 {t('tools.fancy.introLeft')}
               </Button>
-              <Button class="w-0 grow" disabled={busy.value} ing={busy.value} onClick={() => chooseMovie('R')}>
+              <Button class="w-0 grow" disabled={busy.value || uploading.value} ing={uploading.value} onClick={() => chooseMovie('R')}>
                 {t('tools.fancy.introRight')}
               </Button>
             </>}
-        <Button class="w-0 grow" disabled={busy.value || !hasIntroMovie.value} onClick={removeMovie}>
+        <Button class="w-0 grow" disabled={busy.value || uploading.value || !hasIntroMovie.value} onClick={removeMovie}>
           {t('tools.fancy.introRemove')}
         </Button>
       </div>
 
       <div class="flex gap-2">
-        <Button class="w-0 grow" disabled={busy.value} ing={busy.value} onClick={chooseAudio}>
+        <Button class="w-0 grow" disabled={busy.value || uploading.value} ing={busy.value} onClick={chooseAudio}>
           {introInfo.value?.hasAudio ? t('tools.fancy.introAudioReplace') : t('tools.fancy.introAudioAdd')}
         </Button>
-        <Button class="w-0 grow" disabled={busy.value || !introInfo.value?.hasAudio} onClick={removeAudio}>
+        <Button class="w-0 grow" disabled={busy.value || uploading.value || !introInfo.value?.hasAudio} onClick={removeAudio}>
           {t('tools.fancy.introAudioRemove')}
         </Button>
       </div>

@@ -425,9 +425,9 @@ tools:
     none: 暂无
     introTab: 开场视频
     camouflageTab: 曲目伪装
-    introHint: 在游戏内开始乐曲前播放自定义视频（AquaMai 的 CustomIntroCinematic）。左右屏可以共用一个视频，也可以分开两个。上传后视频会转成静音 mp4，音轨自动编码成 Enter_<id>.acb / .awb，由游戏单独播放。
+    introHint: 在游戏内开始乐曲前播放自定义视频。左右屏可以共用一个视频，也可以分开两个。上传后视频会转成静音 mp4，音轨自动编码成 Enter_<id>.acb / .awb，由游戏单独播放。需要在 AquaMai 里开启 Fancy.CustomIntroCinematic。
+    introModDisabled: AquaMai 的 Fancy.CustomIntroCinematic 没有开启，游戏里不会生效。去「Mod 配置」里打开后再来修改。
     introSame: 左右屏使用同一视频
-    introSameHint: 关闭后左右屏各用一个视频，预览按 1:2 并排播放，可分别替换某一侧；切换开关本身不改动文件，替换视频时才会写入
     introLeft: 替换左侧视频（L）
     introRight: 替换右侧视频（R）
     introUpload: 选择视频
@@ -435,25 +435,27 @@ tools:
     introRemove: 删除开场视频
     introRemoveConfirm: 确定要删除乐曲 {id} 的开场视频吗？
     introAudio: 音频
-    introAudioShared: 左右屏共用
+    introAudioYes: 有
+    introAudioNo: 无
     introAudioAdd: 添加音频
     introAudioReplace: 替换音频
     introAudioRemove: 删除音频
-    introAudioRemoveConfirm: 确定要删除乐曲 {id} 的开场音频吗？（左右屏共用一组 acb/awb）
-    introAudioGenerated: 已保存：音轨已生成 acb/awb，游戏里由它发声
-    introAudioSilent: 已保存：视频没有音轨，将静音播放
-    camouflageHint: 在选曲和开始界面把乐曲显示成别的曲名、曲师和封面（AquaMai 的 TrackCamouflage），适合配合开场视频做伪装演出。
+    introAudioRemoveConfirm: 确定要删除乐曲 {id} 的开场音频吗？
+    introAudioGenerated: 已保存：游戏里由 acb/awb 发声
+    introAudioSilent: 已保存：没有音频，将静音播放
+    introEncodingAudio: 正在生成音频…
+    camouflageHint: 在选曲和开始界面把乐曲显示成别的曲名、曲师和封面，适合配合开场视频做伪装演出。需要在 AquaMai 里开启 Fancy.TrackCamouflage。
+    camoModDisabled: AquaMai 的 Fancy.TrackCamouflage 没有开启，游戏里不会生效。去「Mod 配置」里打开后再来修改。
     camoName: 伪装后的曲名
     camoArtist: 伪装后的曲师
     camoNoteDesigner: 伪装后的谱师
     camoHideNoteDesigner: 隐藏谱师（显示为 -）
     camoUnlockScore: 解除伪装所需的达成率
     camoUnlockScoreHint: 0 表示打过一个成绩就不再伪装；填 102 可以永久伪装
-    camoTextHint: 曲名和曲师必填；留空的字段不会写进配置文件
     camoJacketUpload: 选择封面（jpg / png）
     camoJacketReplace: 更换封面
     camoJacketRemove: 删除封面
-    camoJacketRemoveConfirm: 确定要删除乐曲 {id} 的伪装封面吗？（曲名等信息会保留）
+    camoJacketRemoveConfirm: 确定要删除乐曲 {id} 的伪装封面吗？曲名等信息会保留
     camoRemove: 清除伪装
     camoRemoveConfirm: 确定要清除乐曲 {id} 的伪装信息和封面吗？
     save: 保存

@@ -32,13 +32,11 @@ export default defineComponent({
     const naviItems = computed(() => [
       {
         name: t('tools.fancy.introTab'),
-        icon: 'i-mdi-movie-open-play',
         selected: activeTab.value === FancyTab.Intro,
         onClick: () => { activeTab.value = FancyTab.Intro; },
       },
       {
         name: t('tools.fancy.camouflageTab'),
-        icon: 'i-mdi-incognito',
         selected: activeTab.value === FancyTab.Camouflage,
         onClick: () => { activeTab.value = FancyTab.Camouflage; },
       },

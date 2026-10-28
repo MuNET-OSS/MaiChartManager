@@ -5,7 +5,7 @@ import api, { getUrl } from '@/client/api';
 import type { CamouflageInfoDto } from '@/client/apiGen';
 import { globalCapture } from '@/store/refs';
 import { pickFile } from '@/utils/pickFile';
-import { fileToken, refreshEntries, selectedId } from './refs';
+import { fileToken, modFlags, refreshEntries, selectedId } from './refs';
 import { showFancyError } from './errors';
 
 const emptyCamouflage = () => ({
@@ -173,7 +173,15 @@ export default defineComponent({
 
     const hasAny = computed(() => !!camouflage.value.name || camouflage.value.hasJacket);
 
+    const renderWarning = () => modFlags.value.camouflage === false
+      ? <div class="flex items-start gap-2 rounded-md border-1 border-solid border-orange-500/30 bg-orange-500/10 px-3 py-2 text-sm text-orange-600">
+        <span class="i-mdi-alert mt-0.5 shrink-0"/>
+        <span class="ws-normal">{t('tools.fancy.camoModDisabled')}</span>
+      </div>
+      : null;
+
     return () => <div class="flex flex-col gap-3 py">
+      {renderWarning()}
       <div class="text-sm op-70 ws-normal">{t('tools.fancy.camouflageHint')}</div>
 
       <div class="flex gap-4">
@@ -193,8 +201,6 @@ export default defineComponent({
                 {t('tools.fancy.camoJacketRemove')}
               </Button>}
           </div>
-          {!!camouflage.value.jacketPath &&
-            <div class="text-xs op-50 select-text break-all max-w-40 text-center">{camouflage.value.jacketPath}</div>}
         </div>
 
         <div class="grow-1 flex flex-col gap-3 min-w-0">
@@ -221,8 +227,6 @@ export default defineComponent({
           </div>
         </div>
       </div>
-
-      <div class="text-xs op-60 ws-normal">{t('tools.fancy.camoTextHint')}</div>
 
       <div class="flex gap-2">
         <Button class="w-0 grow" disabled={busy.value || textMissing.value} ing={busy.value} onClick={save}>

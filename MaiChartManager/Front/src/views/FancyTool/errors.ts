@@ -16,6 +16,9 @@ const errorKeys: Record<string, string> = {
   'delete-failed': 'tools.fancy.errorFileLocked',
 };
 
+/** SSE 的 Error 事件把错误码当消息传过来，用它区分「后端返回的错误码」和「网络/其它异常」 */
+export const isKnownErrorCode = (code?: string | null): boolean => !!code && code in errorKeys;
+
 export const showFancyError = (t: Translate, code?: string | null) => {
   const key = code ? errorKeys[code] : undefined;
   addToast({

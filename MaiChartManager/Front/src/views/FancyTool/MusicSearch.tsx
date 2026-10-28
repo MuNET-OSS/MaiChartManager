@@ -44,6 +44,12 @@ export default defineComponent({
       </div>;
     };
 
+    const kindOptions = computed(() => [
+      { label: t('music.list.filterStandard'), value: 'standard' },
+      { label: t('music.list.filterDX'), value: 'dx' },
+      { label: t('music.list.filterUtage'), value: 'utage' },
+    ]);
+
     const columns = computed(() => [
       {
         title: t('music.list.tableCover'),
@@ -51,7 +57,19 @@ export default defineComponent({
         width: '6rem',
         render: (row: MusicXmlWithABJacket) => <JacketBox info={row} upload={false} class="h-14"/>,
       },
-      { title: 'ID', key: 'id', width: '6em', sorter: 'default' },
+      {
+        title: 'ID',
+        key: 'id',
+        width: '8em',
+        sorter: 'default',
+        filterOptions: kindOptions.value,
+        filter: (value: any, row: MusicXmlWithABJacket) => {
+          const id = row.id ?? 0;
+          if (value === 'standard') return id < 1e4;
+          if (value === 'dx') return id >= 1e4 && id < 1e5;
+          return id >= 1e5;
+        },
+      },
       {
         title: t('music.list.tableTitle'),
         key: 'name',
@@ -64,12 +82,16 @@ export default defineComponent({
         title: t('music.list.tableVersion'),
         key: 'addVersionId',
         width: '11em',
+        filterOptions: addVersionList.value.map(it => ({ label: it.genreName!, value: it.id! })),
+        filter: (value: any, row: MusicXmlWithABJacket) => row.addVersionId === value,
         render: (row: MusicXmlWithABJacket) => <GenreOption genre={addVersionList.value.find(it => it.id === row.addVersionId)}/>,
       },
       {
         title: t('music.list.tableGenre'),
         key: 'genreId',
         width: '13em',
+        filterOptions: genreList.value.map(it => ({ label: it.genreName!, value: it.id! })),
+        filter: (value: any, row: MusicXmlWithABJacket) => row.genreId === value,
         render: (row: MusicXmlWithABJacket) => <GenreOption genre={genreList.value.find(it => it.id === row.genreId)}/>,
       },
       { title: '', key: 'status', width: '4em', render: renderStatus },
@@ -79,26 +101,29 @@ export default defineComponent({
       if (row.id !== undefined) selectMusic(row.id);
     };
 
-    return () => <div class="flex flex-col gap-3 h-full p-xy">
+    return () => <div class="flex flex-col gap-2 h-full p-4">
       <div class="flex items-center gap-2">
         <TextInput class="grow-1" v-model:value={keyword.value} placeholder={t('music.list.searchPlaceholder')} typeFocus/>
         {!!selectedId.value &&
           <Button variant="secondary" onClick={() => showSearch.value = false}>{t('common.cancel')}</Button>}
       </div>
       <div class="text-xs op-50">{t('tools.fancy.searchHint')}</div>
-      <NDataTable
-        class="grow-1"
-        columns={columns.value}
-        data={rows.value}
-        virtualScroll
-        maxHeight="calc(100dvh - 8rem)"
-        minRowHeight={72}
-        rowKey={(row: MusicXmlWithABJacket) => row.id!}
-        rowProps={(row: MusicXmlWithABJacket) => ({
-          style: 'cursor: pointer',
-          onClick: () => pick(row),
-        })}
-      />
+      {/* 父级给死高度，表格才不会把底部的分页/表体挤出可视区 */}
+      <div class="grow-1 h-0">
+        <NDataTable
+          flexHeight
+          style="height: 100%"
+          columns={columns.value}
+          data={rows.value}
+          virtualScroll
+          minRowHeight={72}
+          rowKey={(row: MusicXmlWithABJacket) => row.id!}
+          rowProps={(row: MusicXmlWithABJacket) => ({
+            style: 'cursor: pointer',
+            onClick: () => pick(row),
+          })}
+        />
+      </div>
     </div>;
   },
 });

@@ -822,7 +822,7 @@ export class HttpClient<SecurityDataType = unknown> {
 }
 
 /**
- * @title MaiChartManager.GenClient
+ * @title MaiChartManager
  * @version 1.0
  */
 export class Api<
@@ -1569,12 +1569,11 @@ export class Api<
       },
       params: RequestParams = {},
     ) =>
-      this.request<FancyToolResult, any>({
+      this.request<void, any>({
         path: `/MaiChartManagerServlet/SetIntroMovieApi`,
         method: "POST",
         body: data,
         type: ContentType.FormData,
-        format: "json",
         ...params,
       }),
 
