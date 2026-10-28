@@ -129,14 +129,14 @@ music:
     includeB15: 計入 B15
     utageConvertTitle: 樂曲流派更改為宴會場
     utageConvertConfirmPlain: 樂曲流派將更改為宴會場。是否繼續？
-    utageConvertConfirmIdOnly: 樂曲流派將更改為宴會場，並把樂曲 ID 從 {oldId} 改為 {newId}。是否繼續？
+    utageConvertConfirmIdOnly: 樂曲流派將更改為宴會場，樂曲 ID 將改為該曲的宴會場 ID（末尾四位仍為 {last4}）。是否繼續？
     utageConvertConfirmChartOnly: 樂曲流派將更改為宴會場，並把已啟用的 {difficulty} 譜面轉換為 Basic 譜面。是否繼續？
-    utageConvertConfirmBoth: 樂曲流派將更改為宴會場，把樂曲 ID 從 {oldId} 改為 {newId}，並把已啟用的 {difficulty} 譜面轉換為 Basic 譜面。是否繼續？
+    utageConvertConfirmBoth: 樂曲流派將更改為宴會場，樂曲 ID 將改為該曲的宴會場 ID（末尾四位仍為 {last4}），並把已啟用的 {difficulty} 譜面轉換為 Basic 譜面。是否繼續？
     utageConvertMultipleCharts: 譜面有多個難度，請只保留一個啟用的難度再進行轉換
     utageConvertNoChart: 目前沒有啟用的譜面，請先啟用一個難度再進行轉換
     utageConvertDoublePlayerChart: 該譜面包含宴會場特有的 L 譜面和 R 譜面，不支援自動轉換，請手動處理後再操作
-    utageConvertIdExists: ID {newId} 已被佔用，請先刪除該 ID 上的樂曲
-    utageConvertOverwrite: ID {newId} 已被佔用，是否覆蓋 ID {newId} 的樂曲？
+    utageConvertIdExists: ID {newId} 已被佔用，請先處理該 ID 上的樂曲
+    utageConvertNoAvailableId: 該曲可用的宴會場 ID 已全部被佔用，無法轉換為宴會場
     utageConvertFailed: 變更為宴會場失敗
     utageRevertTitle: 樂曲流派變更
     utageRevertConfirm: 樂曲流派將從宴會場變更為 {genreName}，並把樂曲 ID 從 {oldId} 改為 {newId}。是否繼續？

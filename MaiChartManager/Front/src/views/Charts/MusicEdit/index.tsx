@@ -1,5 +1,5 @@
 import { computed, defineComponent, onMounted, PropType, provide, ref, watch } from "vue";
-import { addVersionList, genreList, globalCapture, musicList, selectedADir, selectedMusic as info, selectMusicId, updateAddVersionList, updateGenreList, updateMusicList, selectedLevel, disableSync, gameVersion, b15ver } from "@/store/refs";
+import { addVersionList, genreList, globalCapture, selectedADir, selectedMusic as info, selectMusicId, updateAddVersionList, updateGenreList, updateMusicList, selectedLevel, disableSync, gameVersion, b15ver } from "@/store/refs";
 import type { Chart, MusicXmlWithABJacket } from "@/client/apiGen";
 import api from "@/client/api";
 
@@ -86,14 +86,8 @@ const Component = defineComponent({
       }
 
       const oldId = info.value.id!;
-      const newId = oldId < 1e5 ? oldId + 1e5 : oldId;
-      const needChangeId = newId !== oldId;
-      const needOverwrite = needChangeId && hasIdConflict(newId);
-
-      if (needOverwrite && !(await confirmOverwrite(newId, 'music.edit.utageConvertTitle'))) {
-        revertGenre(oldGenreId);
-        return;
-      }
+      // 宴会场 ID 由后端挑选（后四位固定、序号顺延），前端只用来生成文案
+      const needChangeId = oldId < 1e5;
 
       const enabledIndex = enabledIndexes[0];
       const difficulty = DIFFICULTY[enabledIndex];
@@ -104,7 +98,11 @@ const Component = defineComponent({
         : (needConvertChart ? 'utageConvertConfirmChartOnly' : 'utageConvertConfirmPlain');
       const confirmed = await showTransactionalDialog(
         t('music.edit.utageConvertTitle'),
-        t(`music.edit.${messageKey}`, { oldId, newId, difficulty }),
+        t(`music.edit.${messageKey}`, {
+          oldId,
+          last4: String(oldId % 1e4).padStart(4, '0'),
+          difficulty,
+        }),
         [{ text: t('common.cancel'), action: false }, { text: t('common.confirm'), action: true }]
       );
       if (!confirmed) {
@@ -112,8 +110,8 @@ const Component = defineComponent({
         return;
       }
 
-      await requestGenreChange(UTAGE_GENRE, newId, oldGenreId, needOverwrite,
-        'music.edit.utageConvertTitle', t('music.edit.utageConvertFailed'));
+      await requestGenreChange(UTAGE_GENRE, oldGenreId, 'music.edit.utageConvertTitle',
+        t('music.edit.utageConvertFailed'));
     };
 
     // 从宴会场切回其他流派：宴会场 ID 需要减 100000
@@ -142,12 +140,6 @@ const Component = defineComponent({
         return;
       }
 
-      const needOverwrite = hasIdConflict(newId);
-      if (needOverwrite && !(await confirmOverwrite(newId, 'music.edit.utageRevertTitle'))) {
-        revertGenre(oldGenreId);
-        return;
-      }
-
       const genreName = genreList.value.find(genre => genre.id === newGenreId)?.genreName ?? '';
       const confirmed = await showTransactionalDialog(
         t('music.edit.utageRevertTitle'),
@@ -159,18 +151,9 @@ const Component = defineComponent({
         return;
       }
 
-      await requestGenreChange(newGenreId, newId, oldGenreId, needOverwrite,
-        'music.edit.utageRevertTitle', t('music.edit.utageRevertFailed'));
+      await requestGenreChange(newGenreId, oldGenreId, 'music.edit.utageRevertTitle',
+        t('music.edit.utageRevertFailed'));
     };
-
-    // 目标 ID 在当前资源目录里已有乐曲时询问是否覆盖（其他目录/包里的同 ID 不受影响）
-    const hasIdConflict = (id: number) => musicList.value.some(music => music.id === id);
-
-    const confirmOverwrite = async (id: number, titleKey: string) => showTransactionalDialog(
-      t(titleKey),
-      t('music.edit.utageConvertOverwrite', { newId: id }),
-      [{ text: t('common.cancel'), action: false }, { text: t('copy.overwrite'), action: true, danger: true }]
-    );
 
     // 后端返回的错误码 → 文案
     const genreChangeErrorKeys: Record<string, string> = {
@@ -179,6 +162,7 @@ const Component = defineComponent({
       'multiple-enabled-charts': 'music.edit.utageConvertMultipleCharts',
       'double-player-chart': 'music.edit.utageConvertDoublePlayerChart',
       'target-id-exists': 'music.edit.utageConvertIdExists',
+      'no-available-id': 'music.edit.utageConvertNoAvailableId',
       'license-required': 'music.edit.utageConvertLicenseRequired',
       'invalid-music-directory': 'music.edit.utageConvertInvalidMusicDir',
       'invalid-chart-path': 'music.edit.utageConvertInvalidChartPath',
@@ -188,18 +172,18 @@ const Component = defineComponent({
     };
 
     // 谱面转换 + ID 变更 + 流派变更都由后端一次做完，前端只负责刷新
-    const requestGenreChange = async (genreId: number, targetId: number, oldGenreId: number | undefined,
-                                       overwrite: boolean, titleKey: string, failMessage: string) => {
+    const requestGenreChange = async (genreId: number, oldGenreId: number | undefined,
+                                       titleKey: string, failMessage: string) => {
       const oldId = info.value!.id!;
       try {
-        const result = (await api.ChangeMusicGenre(oldId, selectedADir.value, { genreId, overwrite })).data;
+        const result = (await api.ChangeMusicGenre(oldId, selectedADir.value, { genreId })).data;
         if (!result.success) {
           revertGenre(oldGenreId);
           const key = result.error ? genreChangeErrorKeys[result.error] : undefined;
           await showTransactionalDialog(
             t(titleKey),
             key
-              ? t(key, { newId: targetId })
+              ? t(key, { newId: oldId - 1e5 })
               : `${failMessage}${result.error ? ` (${result.error})` : ''}`,
             undefined, true
           );

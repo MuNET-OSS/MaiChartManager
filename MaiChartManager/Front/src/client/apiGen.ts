@@ -244,7 +244,6 @@ export interface GenreAddRequest {
 export interface GenreChangeRequest {
   /** @format int32 */
   genreId?: number;
-  overwrite?: boolean;
 }
 
 export interface GenreChangeResult {

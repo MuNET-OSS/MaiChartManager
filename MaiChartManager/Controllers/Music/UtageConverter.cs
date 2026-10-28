@@ -14,6 +14,7 @@ internal static class GenreChangeError
     public const string MultipleEnabledCharts = "multiple-enabled-charts";
     public const string DoublePlayerChart = "double-player-chart";
     public const string TargetIdExists = "target-id-exists";
+    public const string NoAvailableId = "no-available-id";
     public const string LicenseRequired = "license-required";
     public const string InvalidMusicDirectory = "invalid-music-directory";
     public const string InvalidChartPath = "invalid-chart-path";
@@ -29,7 +30,37 @@ internal static class GenreChangeError
 internal static class UtageConverter
 {
     public const int UtageGenreId = 107;
-    public const int UtageIdOffset = 100000;
+
+    /// <summary>
+    /// 宴会场 ID 的起点。宴会场 ID 的规则是 `序号 * 10000 + 原曲 ID 的后四位`，序号从 10 开始，
+    /// 所以同一首歌可以同时拥有 100xxx / 110xxx / 120xxx…… 多条宴会场谱面。
+    /// </summary>
+    public const int UtageIdStart = 100_000;
+
+    /// <summary>
+    /// 宴会场序号的最后一个。再往后就进 OocMod 的 7 位自定义曲目命名空间了，不算宴会场。
+    /// </summary>
+    public const int UtageMaxSeq = 99;
+
+    /// <summary>是否为宴会场 ID（6 位，后四位是原曲 ID）</summary>
+    public static bool IsUtageId(int id) => id is >= UtageIdStart and < 1_000_000;
+
+    /// <summary>
+    /// 找出该曲下一个可用的宴会场 ID（后四位保持不变，只顺延序号）。
+    /// 用来避开「目标 ID 已被别的宴会场谱面占用」，这样就不需要覆盖掉已有乐曲。
+    /// 返回 null 表示序号已经用完。
+    /// </summary>
+    public static int? FindFreeUtageId(int musicId, Func<int, bool> isOccupied)
+    {
+        var baseId = musicId % 10000;
+        for (var seq = UtageIdStart / 10000; seq <= UtageMaxSeq; seq++)
+        {
+            var candidate = seq * 10000 + baseId;
+            if (!isOccupied(candidate)) return candidate;
+        }
+
+        return null;
+    }
 
     /// <summary>
     /// 找出唯一启用的难度槽位。返回 null 表示通过，否则是错误码。

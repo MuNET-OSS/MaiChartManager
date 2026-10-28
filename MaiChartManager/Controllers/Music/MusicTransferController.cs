@@ -23,7 +23,7 @@ public partial class MusicTransferController(
 {
     public record RequestCopyToRequest(MusicBatchController.MusicIdAndAssetDirPair[] music, bool removeEvents, bool legacyFormat);
     public record GenreChangeResult(bool Success, string? Error, int NewId);
-    public record GenreChangeRequest(int GenreId, bool Overwrite = false);
+    public record GenreChangeRequest(int GenreId);
 
     public enum MaidataSubdirMode
     {
@@ -656,8 +656,9 @@ public partial class MusicTransferController(
     }
 
     /// <summary>
-    /// 切换乐曲流派。切到/切回宴会场时，ID 变更（±100000）和谱面转换都在这个接口里一次做完，
-    /// 避免前端分步调用留下半改状态。返回 Error 为 null 表示成功，NewId 是处理后的乐曲 ID。
+    /// 切换乐曲流派。切到/切回宴会场时，ID 变更（宴会场 ID 固定后四位、顺延序号）和谱面转换
+    /// 都在这个接口里一次做完，避免前端分步调用留下半改状态。
+    /// 返回 Error 为 null 表示成功，NewId 是处理后的乐曲 ID。
     /// </summary>
     [HttpPost]
     public async Task<GenreChangeResult> ChangeMusicGenre(int id, [FromBody] GenreChangeRequest request, string assetDir)
@@ -684,14 +685,26 @@ public partial class MusicTransferController(
             // 宴会场只认 Basic 谱面，先确认只有一个启用的难度
             var error = UtageConverter.FindSingleEnabledChart(music, out chartIndex);
             if (error is not null) return new GenreChangeResult(false, error, id);
-            newId = id < UtageConverter.UtageIdOffset ? id + UtageConverter.UtageIdOffset : id;
+            if (UtageConverter.IsUtageId(id))
+            {
+                // 已经是宴会场 ID 了，只改流派
+                newId = id;
+            }
+            else
+            {
+                // 目标 ID 被占用时顺延一个序号（后四位不变），而不是覆盖掉已有的宴会场谱面
+                var freeId = UtageConverter.FindFreeUtageId(id,
+                    candidate => settings.GetMusic(candidate, assetDir) is not null);
+                if (freeId is null) return new GenreChangeResult(false, GenreChangeError.NoAvailableId, id);
+                newId = freeId.Value;
+            }
         }
         else
         {
             // 含宴会场特有 L/R 双人谱的乐曲无法转成普通谱面
             if (UtageConverter.HasSideCharts(music))
                 return new GenreChangeResult(false, GenreChangeError.DoublePlayerChart, id);
-            newId = id > UtageConverter.UtageIdOffset ? id - UtageConverter.UtageIdOffset : id;
+            newId = id > UtageConverter.UtageIdStart ? id - UtageConverter.UtageIdStart : id;
         }
 
         if (newId != id)
@@ -700,8 +713,8 @@ public partial class MusicTransferController(
             if (IapManager.License != IapManager.LicenseStatus.Active)
                 return new GenreChangeResult(false, GenreChangeError.LicenseRequired, id);
 #endif
-            // 只检查当前资源目录；其他目录（其他包）里同 ID 的乐曲互不影响
-            if (!request.Overwrite && settings.GetMusic(newId, assetDir) is not null)
+            // 切到宴会场时挑的本来就是空闲 ID，只有切回普通流派时目标 ID 可能已被占用
+            if (settings.GetMusic(newId, assetDir) is not null)
                 return new GenreChangeResult(false, GenreChangeError.TargetIdExists, id);
         }
 
