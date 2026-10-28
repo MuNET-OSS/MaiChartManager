@@ -711,10 +711,14 @@ public partial class MusicTransferController(
             // 流派是宴会场但 ID 不是宴会场 ID（历史数据、手动改过）时没有可恢复的 ID，保持 ID 不动
             if (UtageConverter.IsUtageId(id))
             {
-                // 优先还原切到宴会场时记录的原 ID（能保住 STD/DX），推不出来时才按序号硬算
-                int? restored = music.UtageBaseId;
-                if (restored is null || UtageConverter.IsUtageId(restored.Value))
-                    restored = UtageConverter.RestoreNormalId(id);
+                // 优先还原切到宴会场时记录的原 ID（能保住 STD/DX）。
+                // 记录值的后四位必须和当前宴会场 ID 对得上，否则说明中途改过 ID，记录已经不可信了。
+                int? restored = null;
+                if (music.UtageBaseId is { } recorded
+                    && !UtageConverter.IsUtageId(recorded)
+                    && recorded % 10000 == id % 10000)
+                    restored = recorded;
+                restored ??= UtageConverter.RestoreNormalId(id);
                 if (restored is null)
                     return new GenreChangeResult(false, GenreChangeError.UtageIdNotRestorable, id);
                 newId = restored.Value;
