@@ -12,6 +12,7 @@ namespace MaiChartManager.Controllers.Tools;
 /// <item>开场视频 CustomIntroCinematic：LocalAssets/IntroMovies/Enter_&lt;id&gt;.mp4（或 Enter_&lt;id&gt;_L/_R.mp4 左右分开）</item>
 /// <item>曲目伪装 TrackCamouflage：LocalAssets/Camouflages/&lt;id&gt;.toml + &lt;id&gt;_jacket.jpg/png</item>
 /// </list>
+/// 授权校验放在前端打开工具窗口时做，这里不再逐个接口判断。
 /// </summary>
 [ApiController]
 [Route("MaiChartManagerServlet/[action]Api")]
@@ -161,10 +162,6 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         if (id <= 0) return new FancyToolResult(false, "invalid-id");
         var gamePathError = EnsureGamePath();
         if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
-#if WINDOWS
-        if (IapManager.License != IapManager.LicenseStatus.Active)
-            return new FancyToolResult(false, "license-required");
-#endif
 
         var normalizedSide = string.IsNullOrWhiteSpace(side) ? null : side.ToUpperInvariant();
         if (normalizedSide is not (null or "L" or "R")) return new FancyToolResult(false, "invalid-side");
@@ -291,10 +288,6 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         if (id <= 0) return new FancyToolResult(false, "invalid-id");
         var gamePathError = EnsureGamePath();
         if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
-#if WINDOWS
-        if (IapManager.License != IapManager.LicenseStatus.Active)
-            return new FancyToolResult(false, "license-required");
-#endif
         if (file is null || file.Length <= 0) return new FancyToolResult(false, "invalid-audio");
 
         var tmpDir = Directory.CreateTempSubdirectory();
