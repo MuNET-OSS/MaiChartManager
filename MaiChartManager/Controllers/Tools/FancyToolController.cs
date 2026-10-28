@@ -40,6 +40,13 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     public record CamouflageInfoDto(string? Name, string? Artist, string? NoteDesigner, bool HideNoteDesigner,
         double UnlockScore, bool HasJacket, string? JacketPath);
 
+    /// <summary>
+    /// 开场视频与曲目伪装的并集，供左侧列表一屏展示。
+    /// 两个功能本来就是一套演出（视频 + 伪装 + 解锁门槛），分开列会让用户看不出哪首歌配了哪一半。
+    /// </summary>
+    public record FancyEntry(int Id, bool HasSingle, bool HasLeft, bool HasRight, bool HasAudio,
+        bool HasCamouflage, string? CamouflageName, string? CamouflageArtist, bool HasJacket);
+
     public class CamouflageModel
     {
         public string Name { get; set; } = "";
@@ -48,6 +55,98 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         public bool HideNoteDesigner { get; set; }
         public double UnlockScore { get; set; }
     }
+
+    #region 列表
+
+    /// <summary>
+    /// 列出所有做过开场视频 / 曲目伪装的曲目（并集）。
+    /// </summary>
+    [HttpGet]
+    public IEnumerable<FancyEntry> GetFancyList()
+    {
+        var introMovies = ReadIntroMovieEntries().ToDictionary(entry => entry.Id);
+        var camouflages = ReadCamouflageEntries().ToDictionary(entry => entry.Id);
+
+        return introMovies.Keys.Union(camouflages.Keys)
+            .OrderBy(id => id)
+            .Select(id =>
+            {
+                introMovies.TryGetValue(id, out var movie);
+                camouflages.TryGetValue(id, out var camouflage);
+                return new FancyEntry(
+                    id,
+                    movie?.HasSingle ?? false,
+                    movie?.HasLeft ?? false,
+                    movie?.HasRight ?? false,
+                    movie?.HasAudio ?? false,
+                    camouflage is not null,
+                    camouflage?.Name,
+                    camouflage?.Artist,
+                    camouflage?.HasJacket ?? false);
+            })
+            .ToList();
+    }
+
+    private sealed record IntroMovieRow(int Id, bool HasSingle, bool HasLeft, bool HasRight, bool HasAudio);
+
+    private sealed record CamouflageRow(int Id, string? Name, string? Artist, bool HasJacket);
+
+    /// <summary>
+    /// 扫描 IntroMovies 目录。文件名规则与 AquaMai 侧一致：Enter_&lt;id&gt;.mp4 或 Enter_&lt;id&gt;_L/_R.mp4。
+    /// </summary>
+    private IEnumerable<IntroMovieRow> ReadIntroMovieEntries()
+    {
+        if (!Directory.Exists(IntroMovieDir)) return [];
+
+        var ids = new HashSet<int>();
+        foreach (var file in Directory.EnumerateFiles(IntroMovieDir, "*.mp4"))
+        {
+            var name = Path.GetFileNameWithoutExtension(file);
+            if (!name.StartsWith("Enter_", StringComparison.OrdinalIgnoreCase)) continue;
+
+            var parts = name[6..].Split('_');
+            if (parts.Length is < 1 or > 2) continue;
+            // 第三段只允许 L / R，其它（例如手工留下的 .tmp 中间产物）都不算数
+            if (parts.Length == 2 && !parts[1].Equals("L", StringComparison.OrdinalIgnoreCase)
+                                  && !parts[1].Equals("R", StringComparison.OrdinalIgnoreCase)) continue;
+            if (int.TryParse(parts[0], out var id) && id > 0) ids.Add(id);
+        }
+
+        return ids.Select(id => new IntroMovieRow(
+            id,
+            System.IO.File.Exists(Path.Combine(IntroMovieDir, VideoFileName(id, null))),
+            System.IO.File.Exists(Path.Combine(IntroMovieDir, VideoFileName(id, "L"))),
+            System.IO.File.Exists(Path.Combine(IntroMovieDir, VideoFileName(id, "R"))),
+            HasIntroAudio(id)));
+    }
+
+    private IEnumerable<CamouflageRow> ReadCamouflageEntries()
+    {
+        if (!Directory.Exists(CamouflageDir)) return [];
+
+        var result = new List<CamouflageRow>();
+        foreach (var file in Directory.EnumerateFiles(CamouflageDir, "*.toml"))
+        {
+            if (!int.TryParse(Path.GetFileNameWithoutExtension(file), out var id) || id <= 0) continue;
+
+            CamouflageModel? model;
+            try
+            {
+                model = Toml.ToModel<CamouflageModel>(System.IO.File.ReadAllText(file), options: TomlOptions);
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "解析曲目伪装配置失败: {path}", file);
+                model = null;
+            }
+
+            result.Add(new CamouflageRow(id, model?.Name, model?.Artist, FindJacket(id) is not null));
+        }
+
+        return result;
+    }
+
+    #endregion
 
     #region 开场视频
 
@@ -58,10 +157,12 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         var leftPath = ExistingPath(VideoFileName(id, "L"));
         var rightPath = ExistingPath(VideoFileName(id, "R"));
         return new IntroMovieInfo(singlePath is not null, leftPath is not null, rightPath is not null,
-            System.IO.File.Exists(Path.Combine(IntroMovieDir, $"Enter_{id}.acb"))
-            && System.IO.File.Exists(Path.Combine(IntroMovieDir, $"Enter_{id}.awb")),
-            singlePath, leftPath, rightPath);
+            HasIntroAudio(id), singlePath, leftPath, rightPath);
     }
+
+    private static bool HasIntroAudio(int id)
+        => System.IO.File.Exists(Path.Combine(IntroMovieDir, $"Enter_{id}.acb"))
+           && System.IO.File.Exists(Path.Combine(IntroMovieDir, $"Enter_{id}.awb"));
 
     /// <summary>
     /// 取开场视频文件供前端预览。未指定 side 时依次取单文件 / 左 / 右。
@@ -92,8 +193,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     public ActionResult GetIntroAudioFile(int id)
     {
         var acbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.acb");
-        var awbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.awb");
-        if (!System.IO.File.Exists(acbPath) || !System.IO.File.Exists(awbPath)) return NotFound();
+        if (!HasIntroAudio(id)) return NotFound();
 
         var wavPath = GetCachedIntroAudio(acbPath, id);
         if (wavPath is null) return NotFound();
@@ -143,8 +243,6 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     [DisableRequestSizeLimit]
     public async Task<FancyToolResult> SetIntroMovie([FromForm] int id, [FromForm] string? side, IFormFile file)
     {
-        if (id <= 0) return new FancyToolResult(false, "invalid-id");
-
         var gate = GetFileGate(id);
         await gate.WaitAsync();
         try
@@ -166,25 +264,27 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         var normalizedSide = string.IsNullOrWhiteSpace(side) ? null : side.ToUpperInvariant();
         if (normalizedSide is not (null or "L" or "R")) return new FancyToolResult(false, "invalid-side");
 
-        var tmpDir = Directory.CreateTempSubdirectory();
-        var tx = new IntroFileTransaction(Path.Combine(tmpDir.FullName, "backup"));
+        // 上传的原始文件只给 ffmpeg 读，不参与 rename，放在系统临时目录就行
+        var uploadDir = Directory.CreateTempSubdirectory();
+        Directory.CreateDirectory(IntroMovieDir);
+        using var tx = new FancyFileTransaction(IntroMovieDir, logger);
         try
         {
-            var inputPath = Path.Combine(tmpDir.FullName, "input" + Path.GetExtension(file.FileName));
+            var inputPath = Path.Combine(uploadDir.FullName, "input" + Path.GetExtension(file.FileName));
             await using (var stream = System.IO.File.Create(inputPath))
             {
                 await file.CopyToAsync(stream);
             }
 
-            Directory.CreateDirectory(IntroMovieDir);
-            var targetPath = Path.Combine(IntroMovieDir, VideoFileName(id, normalizedSide));
-            var tmpVideoPath = Path.Combine(tmpDir.FullName, "output.mp4");
+            // 转码输出直接写进事务的 stage 目录（在 IntroMovies 里面），
+            // 最后只是一次同目录 rename，跨盘也不会退化成几百 MB 的整文件复制
+            var stagedVideoPath = tx.StagePath($"Enter_{id}.mp4");
 
             // 统一转成 H.264 MP4：游戏里的 VideoPlayer 只保证能播这种编码
             await VideoConvert.ConvertVideo(new VideoConvert.VideoConvertOptions
             {
                 InputPath = inputPath,
-                OutputPath = tmpVideoPath,
+                OutputPath = stagedVideoPath,
                 UseH264 = true,
                 NoScale = true, // 保持原分辨率，游戏里按比例缩放
                 Padding = 0,
@@ -194,65 +294,47 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 Quality = VideoConvert.Quality.High,
             });
 
-            if (!System.IO.File.Exists(tmpVideoPath)) return new FancyToolResult(false, "convert-failed");
+            if (!System.IO.File.Exists(stagedVideoPath)) return new FancyToolResult(false, "convert-failed");
 
-            // 音轨只生成到临时目录，等视频布局确定后和视频一起提交
-            var audio = await BuildIntroAudio(inputPath, id, tmpDir.FullName);
+            var audio = await BuildIntroAudio(inputPath, id, tx.StageDirPath);
 
-            // 这次会动到的文件先全部备份，失败时整体回滚
-            foreach (var path in IntroFilePaths(id)) tx.Track(path);
-
-            // 清理与新布局冲突的旧视频（单文件与 L/R 不能共存）
-            string[] conflictingFiles = normalizedSide is null
-                ?
-                [
-                    Path.Combine(IntroMovieDir, VideoFileName(id, "L")),
-                    Path.Combine(IntroMovieDir, VideoFileName(id, "R")),
-                ]
-                : [Path.Combine(IntroMovieDir, VideoFileName(id, null))];
-            if (!DeleteFilesWithRetry(conflictingFiles))
+            // 这次会动到的文件先全部挪进 stage 备份，失败时整体还原
+            foreach (var path in IntroFilePaths(id))
             {
-                tx.Rollback();
-                return new FancyToolResult(false, "delete-failed");
+                if (!tx.Backup(path)) return new FancyToolResult(false, "file-locked");
             }
 
-            MoveFileWithRetry(tmpVideoPath, targetPath);
+            var targetPath = Path.Combine(IntroMovieDir, VideoFileName(id, normalizedSide));
+            tx.Place(stagedVideoPath, targetPath);
 
             if (normalizedSide is not null)
             {
-                // 只替换一侧时，另一侧还没有的话先复制一份，保证左右都在
+                // 只替换一侧时，另一侧还没有的话先复制一份，保证左右都在（游戏要求 L、R 同时存在）
                 var otherSide = normalizedSide == "L" ? "R" : "L";
                 var otherPath = Path.Combine(IntroMovieDir, VideoFileName(id, otherSide));
                 if (!System.IO.File.Exists(otherPath)) PlatformFile.CopyFile(targetPath, otherPath);
             }
 
             // 音频必须和视频配套：这次没有音轨就把旧的 acb/awb 一起清掉
-            var acbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.acb");
-            var awbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.awb");
             if (audio is not null)
             {
-                MoveFileWithRetry(audio.AcbPath, acbPath);
-                MoveFileWithRetry(audio.AwbPath, awbPath);
-            }
-            else if (!DeleteFilesWithRetry(acbPath, awbPath))
-            {
-                tx.Rollback();
-                return new FancyToolResult(false, "delete-failed");
+                tx.Place(audio.AcbPath, Path.Combine(IntroMovieDir, $"Enter_{id}.acb"));
+                tx.Place(audio.AwbPath, Path.Combine(IntroMovieDir, $"Enter_{id}.awb"));
             }
 
+            tx.Commit();
             return new FancyToolResult(true, null);
         }
         catch (Exception e)
         {
             logger.LogError(e, "转换开场视频失败: {id}", id);
-            tx.Rollback();
-            return new FancyToolResult(false, "convert-failed");
+            return new FancyToolResult(false, e is IOException ? "file-locked" : "convert-failed");
         }
         finally
         {
             try
             {
-                tmpDir.Delete(true);
+                uploadDir.Delete(true);
             }
             catch
             {
@@ -269,8 +351,6 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     [DisableRequestSizeLimit]
     public async Task<FancyToolResult> SetIntroAudio([FromForm] int id, IFormFile file)
     {
-        if (id <= 0) return new FancyToolResult(false, "invalid-id");
-
         var gate = GetFileGate(id);
         await gate.WaitAsync();
         try
@@ -290,41 +370,40 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
         if (file is null || file.Length <= 0) return new FancyToolResult(false, "invalid-audio");
 
-        var tmpDir = Directory.CreateTempSubdirectory();
-        var tx = new IntroFileTransaction(Path.Combine(tmpDir.FullName, "backup"));
+        var uploadDir = Directory.CreateTempSubdirectory();
+        Directory.CreateDirectory(IntroMovieDir);
+        using var tx = new FancyFileTransaction(IntroMovieDir, logger);
         try
         {
-            Directory.CreateDirectory(IntroMovieDir);
-            var inputPath = Path.Combine(tmpDir.FullName, "input" + Path.GetExtension(file.FileName));
+            var inputPath = Path.Combine(uploadDir.FullName, "input" + Path.GetExtension(file.FileName));
             await using (var stream = System.IO.File.Create(inputPath))
             {
                 await file.CopyToAsync(stream);
             }
 
-            var audio = await BuildIntroAudio(inputPath, id, tmpDir.FullName);
+            var audio = await BuildIntroAudio(inputPath, id, tx.StageDirPath);
             if (audio is null) return new FancyToolResult(false, "invalid-audio");
 
             var acbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.acb");
             var awbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.awb");
-            tx.Track(acbPath);
-            tx.Track(awbPath);
+            if (!tx.Backup(acbPath) || !tx.Backup(awbPath)) return new FancyToolResult(false, "file-locked");
 
-            MoveFileWithRetry(audio.AcbPath, acbPath);
-            MoveFileWithRetry(audio.AwbPath, awbPath);
+            tx.Place(audio.AcbPath, acbPath);
+            tx.Place(audio.AwbPath, awbPath);
 
+            tx.Commit();
             return new FancyToolResult(true, null);
         }
         catch (Exception e)
         {
             logger.LogError(e, "写入开场音频失败: {id}", id);
-            tx.Rollback();
-            return new FancyToolResult(false, "write-failed");
+            return new FancyToolResult(false, e is IOException ? "file-locked" : "write-failed");
         }
         finally
         {
             try
             {
-                tmpDir.Delete(true);
+                uploadDir.Delete(true);
             }
             catch
             {
@@ -339,8 +418,6 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     [HttpPost]
     public async Task<FancyToolResult> DeleteIntroAudio(int id)
     {
-        if (id <= 0) return new FancyToolResult(false, "invalid-id");
-
         var gate = GetFileGate(id);
         await gate.WaitAsync();
         try
@@ -353,28 +430,58 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         }
     }
 
-    private static FancyToolResult DeleteIntroAudioCore(int id)
+    private FancyToolResult DeleteIntroAudioCore(int id)
     {
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
         var gamePathError = EnsureGamePath();
         if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
 
         var ok = DeleteFilesWithRetry(
             Path.Combine(IntroMovieDir, $"Enter_{id}.acb"),
             Path.Combine(IntroMovieDir, $"Enter_{id}.awb"));
+        if (ok) DropCachedIntroAudio(id);
         return new FancyToolResult(ok, ok ? null : "delete-failed");
+    }
+
+    /// <summary>
+    /// 删掉 acb 解码出来的预览缓存：不然 temp 里会一直留着几十 MB 没人用的 wav。
+    /// </summary>
+    private void DropCachedIntroAudio(int id)
+    {
+        var cacheDir = Path.Combine(StaticSettings.tempPath, "IntroAudioPreview");
+        if (!Directory.Exists(cacheDir)) return;
+
+        try
+        {
+            foreach (var old in Directory.EnumerateFiles(cacheDir, $"Enter_{id}_*.wav"))
+            {
+                try
+                {
+                    System.IO.File.Delete(old);
+                }
+                catch
+                {
+                    // 还在被别人读着就下次再说
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "清理开场音频预览缓存失败: {id}", id);
+        }
     }
 
     private sealed record IntroAudioFiles(string AcbPath, string AwbPath);
 
     /// <summary>
-    /// 从上传的文件里提取音轨，生成到临时目录（acb/awb 成对）。
+    /// 从上传的文件里提取音轨，生成到指定目录（acb/awb 成对）。
     /// 没有音轨或转换失败返回 null，由调用方决定是否清掉旧的 acb/awb。
     /// </summary>
-    private async Task<IntroAudioFiles?> BuildIntroAudio(string inputPath, int id, string tmpDir)
+    private async Task<IntroAudioFiles?> BuildIntroAudio(string inputPath, int id, string outputDir)
     {
-        var wavPath = Path.Combine(tmpDir, "audio.wav");
-        var tmpAcbPath = Path.Combine(tmpDir, $"Enter_{id}.acb");
-        var tmpAwbPath = Path.Combine(tmpDir, $"Enter_{id}.awb");
+        var wavPath = Path.Combine(outputDir, "audio.wav");
+        var tmpAcbPath = Path.Combine(outputDir, $"Enter_{id}.acb");
+        var tmpAwbPath = Path.Combine(outputDir, $"Enter_{id}.awb");
 
         try
         {
@@ -395,6 +502,17 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             logger.LogWarning(e, "开场音频生成失败，按静音处理: {id}", id);
             return null;
         }
+        finally
+        {
+            try
+            {
+                if (System.IO.File.Exists(wavPath)) System.IO.File.Delete(wavPath);
+            }
+            catch
+            {
+                // 忽略清理失败
+            }
+        }
     }
 
     private static string[] IntroFilePaths(int id) =>
@@ -406,60 +524,9 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         Path.Combine(IntroMovieDir, $"Enter_{id}.awb"),
     ];
 
-    /// <summary>
-    /// 开场文件事务：先把这次会改动/删除的文件备份到临时目录，
-    /// 失败时整体回滚（原本有的还原，原本没有的删掉），避免留下半套文件。
-    /// </summary>
-    private sealed class IntroFileTransaction(string backupDir)
-    {
-        private readonly List<(string Path, string BackupPath, bool Existed)> _entries = [];
-        private bool _rolledBack;
-
-        public void Track(string path)
-        {
-            if (_entries.Any(entry => string.Equals(entry.Path, path, StringComparison.OrdinalIgnoreCase))) return;
-
-            var existed = System.IO.File.Exists(path);
-            var backupPath = Path.Combine(backupDir, Guid.NewGuid().ToString("N"));
-            if (existed)
-            {
-                Directory.CreateDirectory(backupDir);
-                System.IO.File.Copy(path, backupPath, true);
-            }
-
-            _entries.Add((path, backupPath, existed));
-        }
-
-        public void Rollback()
-        {
-            if (_rolledBack) return;
-            _rolledBack = true;
-
-            foreach (var (path, backupPath, existed) in _entries)
-            {
-                try
-                {
-                    if (existed)
-                    {
-                        if (System.IO.File.Exists(backupPath)) System.IO.File.Copy(backupPath, path, true);
-                    }
-                    else if (System.IO.File.Exists(path))
-                    {
-                        System.IO.File.Delete(path);
-                    }
-                }
-                catch (Exception)
-                {
-                    // 尽力回滚，单个文件失败不影响其它文件
-                }
-            }
-        }
-    }
     [HttpPost]
     public async Task<FancyToolResult> DeleteIntroMovie(int id)
     {
-        if (id <= 0) return new FancyToolResult(false, "invalid-id");
-
         var gate = GetFileGate(id);
         await gate.WaitAsync();
         try
@@ -472,35 +539,429 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         }
     }
 
-    private static FancyToolResult DeleteIntroMovieCore(int id)
+    private FancyToolResult DeleteIntroMovieCore(int id)
     {
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
+        var gamePathError = EnsureGamePath();
+        if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
+
+        var ok = DeleteFilesWithRetry(IntroFilePaths(id));
+        if (ok) DropCachedIntroAudio(id);
+        return new FancyToolResult(ok, ok ? null : "delete-failed");
+    }
+
+    private static string VideoFileName(int id, string? side) => side is null ? $"Enter_{id}.mp4" : $"Enter_{id}_{side}.mp4";
+
+    private static string? ExistingPath(string fileName)
+    {
+        var path = Path.Combine(IntroMovieDir, fileName);
+        return System.IO.File.Exists(path) ? path : null;
+    }
+
+    #endregion
+
+    #region 曲目伪装
+
+    [HttpGet]
+    public CamouflageInfoDto GetCamouflage(int id)
+    {
+        var path = Path.Combine(CamouflageDir, $"{id}.toml");
+        var model = new CamouflageModel();
+        if (System.IO.File.Exists(path))
+        {
+            try
+            {
+                model = Toml.ToModel<CamouflageModel>(System.IO.File.ReadAllText(path), options: TomlOptions)
+                        ?? new CamouflageModel();
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "解析曲目伪装配置失败: {path}", path);
+            }
+        }
+
+        var jacketPath = id > 0 ? FindJacket(id) : null;
+        return new CamouflageInfoDto(model.Name, model.Artist, model.NoteDesigner, model.HideNoteDesigner,
+            model.UnlockScore, jacketPath is not null, jacketPath);
+    }
+
+    /// <summary>
+    /// 取伪装封面供前端预览。
+    /// </summary>
+    [HttpGet]
+    public ActionResult GetCamouflageJacket(int id)
+    {
+        var path = id > 0 ? FindJacket(id) : null;
+        if (path is null) return NotFound();
+
+        var contentType = Path.GetExtension(path).ToLowerInvariant() == ".png" ? "image/png" : "image/jpeg";
+        return PhysicalFile(path, contentType, enableRangeProcessing: true);
+    }
+
+    [HttpPost]
+    public async Task<FancyToolResult> SetCamouflage([FromForm] int id, [FromForm] string? name, [FromForm] string? artist,
+        [FromForm] string? noteDesigner, [FromForm] bool hideNoteDesigner, [FromForm] double unlockScore)
+    {
+        var gate = GetFileGate(id);
+        await gate.WaitAsync();
+        try
+        {
+            return SetCamouflageCore(id, name, artist, noteDesigner, hideNoteDesigner, unlockScore);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private FancyToolResult SetCamouflageCore(int id, string? name, string? artist,
+        string? noteDesigner, bool hideNoteDesigner, double unlockScore)
+    {
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
+        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(artist))
+            return new FancyToolResult(false, "invalid-text");
+
+        var gamePathError = EnsureGamePath();
+        if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
+
+        var model = new CamouflageModel
+        {
+            Name = name.Trim(),
+            Artist = artist.Trim(),
+            NoteDesigner = noteDesigner?.Trim() ?? "",
+            HideNoteDesigner = hideNoteDesigner,
+            UnlockScore = unlockScore,
+        };
+
+        try
+        {
+            Directory.CreateDirectory(CamouflageDir);
+            WriteAllTextAtomic(Path.Combine(CamouflageDir, $"{id}.toml"), BuildCamouflageToml(model));
+            return new FancyToolResult(true, null);
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "写入曲目伪装配置失败: {id}", id);
+            return new FancyToolResult(false, "write-failed");
+        }
+    }
+
+    /// <summary>
+    /// 只写真正有意义的字段。AQMai 把缺失或空白的字段当作「不伪装」，
+    /// 但这是对方实现的细节；toml 是跨项目的文件契约，空值就不要写出去。
+    /// </summary>
+    private static string BuildCamouflageToml(CamouflageModel model)
+    {
+        var table = new TomlTable
+        {
+            ["Name"] = model.Name,
+            ["Artist"] = model.Artist,
+        };
+        if (!string.IsNullOrWhiteSpace(model.NoteDesigner)) table["NoteDesigner"] = model.NoteDesigner;
+        if (model.HideNoteDesigner) table["HideNoteDesigner"] = true;
+        if (model.UnlockScore != 0) table["UnlockScore"] = model.UnlockScore;
+
+        return Toml.FromModel(table, TomlOptions);
+    }
+
+    [HttpPost]
+    [DisableRequestSizeLimit]
+    public async Task<FancyToolResult> SetCamouflageJacket([FromForm] int id, IFormFile file)
+    {
+        var gate = GetFileGate(id);
+        await gate.WaitAsync();
+        try
+        {
+            return await SetCamouflageJacketCore(id, file);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private async Task<FancyToolResult> SetCamouflageJacketCore(int id, IFormFile file)
+    {
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
+
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (ext is not (".jpg" or ".jpeg" or ".png")) return new FancyToolResult(false, "invalid-image");
+
+        var gamePathError = EnsureGamePath();
+        if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
+
+        Directory.CreateDirectory(CamouflageDir);
+        using var tx = new FancyFileTransaction(CamouflageDir, logger);
+        try
+        {
+            var stagedPath = tx.StagePath($"jacket{ext}");
+            await using (var stream = System.IO.File.Create(stagedPath))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            // 同一首曲子只保留一张封面：其它后缀的旧封面也一起备份掉（提交时进回收站）
+            foreach (var otherExt in JacketExts)
+            {
+                if (!tx.Backup(Path.Combine(CamouflageDir, $"{id}_jacket{otherExt}")))
+                    return new FancyToolResult(false, "file-locked");
+            }
+
+            tx.Place(stagedPath, Path.Combine(CamouflageDir, $"{id}_jacket{ext}"));
+
+            tx.Commit();
+            return new FancyToolResult(true, null);
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "写入曲目伪装封面失败: {id}", id);
+            return new FancyToolResult(false, e is IOException ? "file-locked" : "write-failed");
+        }
+    }
+
+    /// <summary>
+    /// 只删封面，保留 toml。游戏侧在没有封面时显示默认的空封面，是合法状态。
+    /// </summary>
+    [HttpPost]
+    public async Task<FancyToolResult> DeleteCamouflageJacket(int id)
+    {
+        var gate = GetFileGate(id);
+        await gate.WaitAsync();
+        try
+        {
+            if (id <= 0) return new FancyToolResult(false, "invalid-id");
+            var gamePathError = EnsureGamePath();
+            if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
+
+            var ok = DeleteFilesWithRetry(JacketExts.Select(ext => Path.Combine(CamouflageDir, $"{id}_jacket{ext}")).ToArray());
+            return new FancyToolResult(ok, ok ? null : "delete-failed");
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    [HttpPost]
+    public async Task<FancyToolResult> DeleteCamouflage(int id)
+    {
+        var gate = GetFileGate(id);
+        await gate.WaitAsync();
+        try
+        {
+            return DeleteCamouflageCore(id);
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    private static FancyToolResult DeleteCamouflageCore(int id)
+    {
+        if (id <= 0) return new FancyToolResult(false, "invalid-id");
         var gamePathError = EnsureGamePath();
         if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
 
         var ok = DeleteFilesWithRetry(
-            Path.Combine(IntroMovieDir, VideoFileName(id, null)),
-            Path.Combine(IntroMovieDir, VideoFileName(id, "L")),
-            Path.Combine(IntroMovieDir, VideoFileName(id, "R")),
-            Path.Combine(IntroMovieDir, $"Enter_{id}.acb"),
-            Path.Combine(IntroMovieDir, $"Enter_{id}.awb"));
+            [
+                Path.Combine(CamouflageDir, $"{id}.toml"),
+                .. JacketExts.Select(ext => Path.Combine(CamouflageDir, $"{id}_jacket{ext}")),
+            ]);
         return new FancyToolResult(ok, ok ? null : "delete-failed");
     }
 
-    /// <summary>
-    /// 覆盖式移动文件：目标被占用（例如前端还在预览旧文件）时重试几次。
-    /// </summary>
-    private static void MoveFileWithRetry(string source, string dest)
+    private static readonly string[] JacketExts = [".jpg", ".jpeg", ".png"];
+
+    private static string? FindJacket(int id)
     {
-        for (var attempt = 0; ; attempt++)
+        foreach (var ext in JacketExts)
+        {
+            var path = Path.Combine(CamouflageDir, $"{id}_jacket{ext}");
+            if (System.IO.File.Exists(path)) return path;
+        }
+
+        return null;
+    }
+
+    private static void WriteAllTextAtomic(string path, string content)
+    {
+        var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            System.IO.File.WriteAllText(tempPath, content);
+            System.IO.File.Move(tempPath, path, true);
+        }
+        finally
+        {
+            if (System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath);
+        }
+    }
+
+    #endregion
+
+    #region 文件事务
+
+    /// <summary>
+    /// 文件事务：stage 目录就建在目标目录里面，所以所有搬迁都是一次同卷 rename
+    /// —— 既不会因为临时目录在别的盘而退化成整文件复制，也不会像「复制备份」那样
+    /// 让峰值占用变成两三倍。用法：Stage 出新文件 → Backup 掉会被覆盖的旧文件 →
+    /// Place 生效 → Commit 成功（旧文件进回收站）或 Dispose 时回滚。
+    /// </summary>
+    private sealed class FancyFileTransaction : IDisposable
+    {
+        private const string StageDirName = ".mcm-tmp";
+
+        private readonly string _targetDir;
+        private readonly ILogger _logger;
+        private readonly List<(string Target, string Backup)> _backups = [];
+        private readonly List<string> _placedTargets = [];
+        private bool _finished;
+
+        public FancyFileTransaction(string targetDir, ILogger logger)
+        {
+            _targetDir = targetDir;
+            _logger = logger;
+            StageDirPath = Path.Combine(targetDir, StageDirName, Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(StageDirPath);
+        }
+
+        public string StageDirPath { get; }
+
+        /// <summary>新文件的暂存路径（和最终目标同卷）。</summary>
+        public string StagePath(string fileName) => Path.Combine(StageDirPath, fileName);
+
+        /// <summary>
+        /// 把旧文件 rename 进 stage 当备份。文件不存在时什么都不做。
+        /// 被占用（前端还在预览）时重试，最终失败返回 false，调用方应整体放弃。
+        /// </summary>
+        public bool Backup(string path)
+        {
+            if (_backups.Any(entry => string.Equals(entry.Target, path, StringComparison.OrdinalIgnoreCase))) return true;
+            if (!System.IO.File.Exists(path)) return true;
+
+            var backupPath = StagePath($"bak_{Guid.NewGuid():N}");
+            if (!MoveWithRetry(path, backupPath)) return false;
+
+            _backups.Add((path, backupPath));
+            return true;
+        }
+
+        /// <summary>把 stage 里的新文件放到目标位置（同卷 rename）。</summary>
+        public void Place(string stagedPath, string targetPath)
+        {
+            if (!MoveWithRetry(stagedPath, targetPath))
+                throw new IOException($"无法写入 {targetPath}");
+            _placedTargets.Add(targetPath);
+        }
+
+        /// <summary>
+        /// 提交：备份的旧文件送回收站（和项目里其它删除操作一致，用户还能捞回来），清掉 stage。
+        /// 备份删不掉只是留垃圾，不能因此报失败——新文件此时已经就位了。
+        /// </summary>
+        public void Commit()
+        {
+            _finished = true;
+
+            foreach (var (_, backupPath) in _backups)
+            {
+                try
+                {
+                    if (System.IO.File.Exists(backupPath) && !TryDeleteFile(backupPath))
+                        _logger.LogWarning("旧文件清理失败: {path}", backupPath);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogWarning(e, "旧文件清理失败: {path}", backupPath);
+                }
+            }
+
+            DropStageDir();
+        }
+
+        /// <summary>
+        /// 回滚：先把已经生效的新文件删掉，再把备份原样搬回去。
+        /// </summary>
+        public void Rollback()
+        {
+            if (_finished) return;
+            _finished = true;
+
+            foreach (var target in _placedTargets)
+            {
+                try
+                {
+                    if (System.IO.File.Exists(target)) System.IO.File.Delete(target);
+                }
+                catch (Exception)
+                {
+                    // 尽力回滚，单个文件失败不影响其它文件
+                }
+            }
+
+            foreach (var (target, backupPath) in _backups)
+            {
+                try
+                {
+                    if (!System.IO.File.Exists(backupPath)) continue;
+                    if (!MoveWithRetry(backupPath, target)) PlatformFile.CopyFile(backupPath, target);
+                }
+                catch (Exception)
+                {
+                    // 尽力回滚
+                }
+            }
+
+            DropStageDir();
+        }
+
+        public void Dispose()
+        {
+            if (!_finished) Rollback();
+            DropStageDir();
+        }
+
+        private void DropStageDir()
+        {
+            try
+            {
+                if (Directory.Exists(StageDirPath)) Directory.Delete(StageDirPath, true);
+                // 顺手把空的 .mcm-tmp 父目录也收掉
+                var parent = Path.Combine(_targetDir, StageDirName);
+                if (Directory.Exists(parent) && !Directory.EnumerateFileSystemEntries(parent).Any())
+                    Directory.Delete(parent);
+            }
+            catch
+            {
+                // 忽略清理失败
+            }
+        }
+    }
+
+    #endregion
+
+    #region 文件工具
+
+    /// <summary>
+    /// 覆盖式移动文件。目标被占用（例如前端还在预览旧文件）时等一会儿再试，最终失败返回 false。
+    /// </summary>
+    private static bool MoveWithRetry(string source, string dest)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(3);
+        while (true)
         {
             try
             {
                 PlatformFile.MoveFile(source, dest);
-                return;
+                return true;
             }
-            catch (Exception) when (attempt < 10)
+            catch (Exception) when (DateTime.UtcNow < deadline)
             {
-                Thread.Sleep(150);
+                Thread.Sleep(100);
+            }
+            catch (Exception)
+            {
+                return false;
             }
         }
     }
@@ -582,309 +1043,6 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         catch (Exception)
         {
             return false;
-        }
-    }
-
-    private static string VideoFileName(int id, string? side) => side is null ? $"Enter_{id}.mp4" : $"Enter_{id}_{side}.mp4";
-
-    private static string? ExistingPath(string fileName)
-    {
-        var path = Path.Combine(IntroMovieDir, fileName);
-        return System.IO.File.Exists(path) ? path : null;
-    }
-
-    public record IntroMovieEntry(int Id, bool HasSingle, bool HasLeft, bool HasRight, bool HasAudio);
-
-    /// <summary>
-    /// 列出 IntroMovies 目录里已有的开场视频。
-    /// </summary>
-    [HttpGet]
-    public IEnumerable<IntroMovieEntry> GetIntroMovieList()
-    {
-        if (!Directory.Exists(IntroMovieDir)) return [];
-
-        var ids = new HashSet<int>();
-        foreach (var file in Directory.EnumerateFiles(IntroMovieDir, "*.mp4"))
-        {
-            var name = Path.GetFileNameWithoutExtension(file);
-            if (!name.StartsWith("Enter_", StringComparison.OrdinalIgnoreCase)) continue;
-
-            var parts = name[6..].Split('_');
-            if (parts.Length is < 1 or > 2) continue;
-            if (int.TryParse(parts[0], out var id) && id > 0) ids.Add(id);
-        }
-
-        return ids.OrderBy(id => id).Select(id => new IntroMovieEntry(
-            id,
-            System.IO.File.Exists(Path.Combine(IntroMovieDir, VideoFileName(id, null))),
-            System.IO.File.Exists(Path.Combine(IntroMovieDir, VideoFileName(id, "L"))),
-            System.IO.File.Exists(Path.Combine(IntroMovieDir, VideoFileName(id, "R"))),
-            System.IO.File.Exists(Path.Combine(IntroMovieDir, $"Enter_{id}.acb"))
-            && System.IO.File.Exists(Path.Combine(IntroMovieDir, $"Enter_{id}.awb")))).ToList();
-    }
-
-    #endregion
-
-    #region 曲目伪装
-
-    [HttpGet]
-    public CamouflageInfoDto GetCamouflage(int id)
-    {
-        var path = Path.Combine(CamouflageDir, $"{id}.toml");
-        var model = new CamouflageModel();
-        if (System.IO.File.Exists(path))
-        {
-            try
-            {
-                model = Toml.ToModel<CamouflageModel>(System.IO.File.ReadAllText(path), options: TomlOptions)
-                        ?? new CamouflageModel();
-            }
-            catch (Exception e)
-            {
-                logger.LogWarning(e, "解析曲目伪装配置失败: {path}", path);
-            }
-        }
-
-        var jacketPath = FindJacket(id);
-        return new CamouflageInfoDto(model.Name, model.Artist, model.NoteDesigner, model.HideNoteDesigner,
-            model.UnlockScore, jacketPath is not null, jacketPath);
-    }
-
-    /// <summary>
-    /// 取伪装封面供前端预览。
-    /// </summary>
-    [HttpGet]
-    public ActionResult GetCamouflageJacket(int id)
-    {
-        var path = FindJacket(id);
-        if (path is null) return NotFound();
-
-        var contentType = Path.GetExtension(path).ToLowerInvariant() == ".png" ? "image/png" : "image/jpeg";
-        return PhysicalFile(path, contentType, enableRangeProcessing: true);
-    }
-
-    [HttpPost]
-    public async Task<FancyToolResult> SetCamouflage([FromForm] int id, [FromForm] string? name, [FromForm] string? artist,
-        [FromForm] string? noteDesigner, [FromForm] bool hideNoteDesigner, [FromForm] double unlockScore)
-    {
-        if (id <= 0) return new FancyToolResult(false, "invalid-id");
-
-        var gate = GetFileGate(id);
-        await gate.WaitAsync();
-        try
-        {
-            return SetCamouflageCore(id, name, artist, noteDesigner, hideNoteDesigner, unlockScore);
-        }
-        finally
-        {
-            gate.Release();
-        }
-    }
-
-    private FancyToolResult SetCamouflageCore(int id, string? name, string? artist,
-        string? noteDesigner, bool hideNoteDesigner, double unlockScore)
-    {
-        if (id <= 0) return new FancyToolResult(false, "invalid-id");
-        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(artist))
-            return new FancyToolResult(false, "invalid-text");
-
-        var gamePathError = EnsureGamePath();
-        if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
-
-        var model = new CamouflageModel
-        {
-            Name = name.Trim(),
-            Artist = artist.Trim(),
-            NoteDesigner = noteDesigner?.Trim() ?? "",
-            HideNoteDesigner = hideNoteDesigner,
-            UnlockScore = unlockScore,
-        };
-
-        try
-        {
-            Directory.CreateDirectory(CamouflageDir);
-            WriteAllTextAtomic(Path.Combine(CamouflageDir, $"{id}.toml"), BuildCamouflageToml(model));
-            return new FancyToolResult(true, null);
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "写入曲目伪装配置失败: {id}", id);
-            return new FancyToolResult(false, "write-failed");
-        }
-    }
-
-    /// <summary>
-    /// 只写真正有意义的字段。AquaMai 把缺失或空白的字段当作「不伪装」，
-    /// 但这是对方实现的细节；toml 是跨项目的文件契约，空值就不要写出去。
-    /// </summary>
-    private static string BuildCamouflageToml(CamouflageModel model)
-    {
-        var table = new TomlTable
-        {
-            ["Name"] = model.Name,
-            ["Artist"] = model.Artist,
-        };
-        if (!string.IsNullOrWhiteSpace(model.NoteDesigner)) table["NoteDesigner"] = model.NoteDesigner;
-        if (model.HideNoteDesigner) table["HideNoteDesigner"] = true;
-        if (model.UnlockScore != 0) table["UnlockScore"] = model.UnlockScore;
-
-        return Toml.FromModel(table, TomlOptions);
-    }
-
-    [HttpPost]
-    [DisableRequestSizeLimit]
-    public async Task<FancyToolResult> SetCamouflageJacket([FromForm] int id, IFormFile file)
-    {
-        if (id <= 0) return new FancyToolResult(false, "invalid-id");
-
-        var gate = GetFileGate(id);
-        await gate.WaitAsync();
-        try
-        {
-            return await SetCamouflageJacketCore(id, file);
-        }
-        finally
-        {
-            gate.Release();
-        }
-    }
-
-    private async Task<FancyToolResult> SetCamouflageJacketCore(int id, IFormFile file)
-    {
-        if (id <= 0) return new FancyToolResult(false, "invalid-id");
-
-        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
-        if (ext is not (".jpg" or ".jpeg" or ".png")) return new FancyToolResult(false, "invalid-image");
-
-        var gamePathError = EnsureGamePath();
-        if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
-
-        var tmpPath = Path.Combine(CamouflageDir, $"{id}_jacket{ext}.tmp");
-        try
-        {
-            Directory.CreateDirectory(CamouflageDir);
-            var targetPath = Path.Combine(CamouflageDir, $"{id}_jacket{ext}");
-
-            // 先写临时文件再覆盖目标，避免写到一半把已有封面弄坏
-            await using (var stream = System.IO.File.Create(tmpPath))
-            {
-                await file.CopyToAsync(stream);
-            }
-            MoveFileWithRetry(tmpPath, targetPath);
-
-            // 同一首曲子只保留一张封面；清理失败不影响新封面，只记日志
-            foreach (var otherExt in new[] { ".jpg", ".jpeg", ".png" })
-            {
-                var otherPath = Path.Combine(CamouflageDir, $"{id}_jacket{otherExt}");
-                if (!string.Equals(otherPath, targetPath, StringComparison.OrdinalIgnoreCase) &&
-                    !DeleteFilesWithRetry(otherPath))
-                    logger.LogWarning("旧封面清理失败: {path}", otherPath);
-            }
-
-            return new FancyToolResult(true, null);
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "写入曲目伪装封面失败: {id}", id);
-            return new FancyToolResult(false, "write-failed");
-        }
-        finally
-        {
-            try
-            {
-                if (System.IO.File.Exists(tmpPath)) System.IO.File.Delete(tmpPath);
-            }
-            catch
-            {
-                // 忽略清理失败
-            }
-        }
-    }
-
-    [HttpPost]
-    public async Task<FancyToolResult> DeleteCamouflage(int id)
-    {
-        if (id <= 0) return new FancyToolResult(false, "invalid-id");
-
-        var gate = GetFileGate(id);
-        await gate.WaitAsync();
-        try
-        {
-            return DeleteCamouflageCore(id);
-        }
-        finally
-        {
-            gate.Release();
-        }
-    }
-
-    private static FancyToolResult DeleteCamouflageCore(int id)
-    {
-        var gamePathError = EnsureGamePath();
-        if (gamePathError is not null) return new FancyToolResult(false, gamePathError);
-
-        var ok = DeleteFilesWithRetry(
-            [
-                Path.Combine(CamouflageDir, $"{id}.toml"),
-                .. new[] { ".jpg", ".jpeg", ".png" }.Select(ext => Path.Combine(CamouflageDir, $"{id}_jacket{ext}")),
-            ]);
-        return new FancyToolResult(ok, ok ? null : "delete-failed");
-    }
-
-    private static string? FindJacket(int id)
-    {
-        foreach (var ext in new[] { ".jpg", ".jpeg", ".png" })
-        {
-            var path = Path.Combine(CamouflageDir, $"{id}_jacket{ext}");
-            if (System.IO.File.Exists(path)) return path;
-        }
-
-        return null;
-    }
-
-    public record CamouflageEntry(int Id, string? Name, string? Artist, bool HasJacket);
-
-    /// <summary>
-    /// 列出 Camouflages 目录里已有的曲目伪装。
-    /// </summary>
-    [HttpGet]
-    public IEnumerable<CamouflageEntry> GetCamouflageList()
-    {
-        if (!Directory.Exists(CamouflageDir)) return [];
-
-        var result = new List<CamouflageEntry>();
-        foreach (var file in Directory.EnumerateFiles(CamouflageDir, "*.toml"))
-        {
-            if (!int.TryParse(Path.GetFileNameWithoutExtension(file), out var id) || id <= 0) continue;
-
-            var model = new CamouflageModel();
-            try
-            {
-                model = Toml.ToModel<CamouflageModel>(System.IO.File.ReadAllText(file), options: TomlOptions)
-                        ?? new CamouflageModel();
-            }
-            catch (Exception e)
-            {
-                logger.LogWarning(e, "解析曲目伪装配置失败: {path}", file);
-            }
-
-            result.Add(new CamouflageEntry(id, model.Name, model.Artist, FindJacket(id) is not null));
-        }
-
-        return result.OrderBy(entry => entry.Id).ToList();
-    }
-
-    private static void WriteAllTextAtomic(string path, string content)
-    {
-        var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
-        try
-        {
-            System.IO.File.WriteAllText(tempPath, content);
-            System.IO.File.Move(tempPath, path, true);
-        }
-        finally
-        {
-            if (System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath);
         }
     }
 
