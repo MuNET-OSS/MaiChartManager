@@ -192,11 +192,14 @@ const Component = defineComponent({
         if (!result.success) {
           revertGenre(oldGenreId);
           const key = result.error ? genreChangeErrorKeys[result.error] : undefined;
+          // 没有对应文案的错误码（unexpected 等后端异常）走全局错误弹窗并上报 Sentry
+          if (!key) {
+            await globalCapture(new Error(`${failMessage}: ${result.error ?? 'no error code'}`), failMessage);
+            return;
+          }
           await showTransactionalDialog(
             t(titleKey),
-            key
-              ? t(key, { newId: oldId - UTAGE_ID_START, oldId })
-              : `${failMessage}${result.error ? ` (${result.error})` : ''}`,
+            t(key, { newId: oldId - UTAGE_ID_START, oldId }),
             undefined, true
           );
           return;
