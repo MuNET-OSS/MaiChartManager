@@ -238,16 +238,27 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     /// <summary>
     /// 上传并转换开场视频。side 为空表示左右屏播放同一个视频，L / R 表示只替换其中一侧。
     /// 视频、音频、旧布局清理作为整体提交：任一步失败都会回滚到操作前的状态。
+    /// 转码要几十秒到几分钟，所以走 SSE 回报进度（Progress / Success / Error，Error 的 data 是错误码）。
     /// </summary>
     [HttpPost]
     [DisableRequestSizeLimit]
-    public async Task<FancyToolResult> SetIntroMovie([FromForm] int id, [FromForm] string? side, IFormFile file)
+    public async Task SetIntroMovie([FromForm] int id, [FromForm] string? side, IFormFile file)
     {
+        Response.Headers.Append("Content-Type", "text/event-stream");
+
         var gate = GetFileGate(id);
         await gate.WaitAsync();
         try
         {
-            return await SetIntroMovieCore(id, side, file);
+            // 转码占 0-90%，剩下的留给出音频（HCA 编码没有进度回调）
+            var result = await SetIntroMovieCore(id, side, file,
+                percent => SendEvent("Progress", (percent * 9 / 10).ToString()));
+            await SendEvent(result.Success ? "Success" : "Error", result.Success ? "ok" : result.Error ?? "write-failed");
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "转换开场视频失败: {id}", id);
+            await SendEvent("Error", "convert-failed");
         }
         finally
         {
@@ -255,7 +266,21 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         }
     }
 
-    private async Task<FancyToolResult> SetIntroMovieCore(int id, string? side, IFormFile file)
+    private async Task SendEvent(string eventName, string data)
+    {
+        // 客户端可能中途断开（关窗口），写失败不用管
+        try
+        {
+            await Response.WriteAsync($"event: {eventName}\ndata: {data}\n\n");
+            await Response.Body.FlushAsync();
+        }
+        catch (Exception)
+        {
+            // 忽略
+        }
+    }
+
+    private async Task<FancyToolResult> SetIntroMovieCore(int id, string? side, IFormFile file, Action<int> onProgress)
     {
         if (id <= 0) return new FancyToolResult(false, "invalid-id");
         var gamePathError = EnsureGamePath();
@@ -292,16 +317,29 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 TaskbarProgress = false,
                 // 硬件编码器的默认画质差别很大（h264_mf 默认很糊），开场视频要按高质量转
                 Quality = VideoConvert.Quality.High,
+                OnProgress = onProgress,
             });
 
             if (!System.IO.File.Exists(stagedVideoPath)) return new FancyToolResult(false, "convert-failed");
 
             var audio = await BuildIntroAudio(inputPath, id, tx.StageDirPath);
 
-            // 这次会动到的文件先全部挪进 stage 备份，失败时整体还原
-            foreach (var path in IntroFilePaths(id))
+            // 从单文件切到分屏时，旧单文件一会儿要给另一侧用，先复制一份进 stage（同卷，很便宜）
+            var previousSingle = normalizedSide is null ? null : SnapshotSingleMovie(id, tx);
+
+            // 这次会动到的文件先全部挪进 stage 备份，失败时整体还原。
+            // 只换一侧时音频是两边共用的：新视频没有音轨就保留原来的 acb/awb，不跟着视频一起清掉
+            foreach (var path in VideoFilePaths(id))
             {
                 if (!tx.Backup(path)) return new FancyToolResult(false, "file-locked");
+            }
+
+            if (normalizedSide is null || audio is not null)
+            {
+                foreach (var path in AudioFilePaths(id))
+                {
+                    if (!tx.Backup(path)) return new FancyToolResult(false, "file-locked");
+                }
             }
 
             var targetPath = Path.Combine(IntroMovieDir, VideoFileName(id, normalizedSide));
@@ -309,13 +347,14 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
 
             if (normalizedSide is not null)
             {
-                // 只替换一侧时，另一侧还没有的话先复制一份，保证左右都在（游戏要求 L、R 同时存在）
+                // 只替换一侧时，另一侧还没有就先补一份，保证左右都在（游戏要求 L、R 同时存在）。
+                // 从单文件切到分屏时，另一侧要用原来那个单文件——否则两边都会变成这次上传的视频。
                 var otherSide = normalizedSide == "L" ? "R" : "L";
                 var otherPath = Path.Combine(IntroMovieDir, VideoFileName(id, otherSide));
-                if (!System.IO.File.Exists(otherPath)) PlatformFile.CopyFile(targetPath, otherPath);
+                if (!System.IO.File.Exists(otherPath)) PlatformFile.CopyFile(previousSingle ?? targetPath, otherPath);
             }
 
-            // 音频必须和视频配套：这次没有音轨就把旧的 acb/awb 一起清掉
+            // 整段替换视频时音频必须和视频配套（旧的已经被备份走，提交即删除）；只换一侧时音频保留
             if (audio is not null)
             {
                 tx.Place(audio.AcbPath, Path.Combine(IntroMovieDir, $"Enter_{id}.acb"));
@@ -341,6 +380,19 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 // 忽略清理失败
             }
         }
+    }
+
+    /// <summary>
+    /// 把当前的「左右屏同一个视频」复制一份到 stage，供分屏补齐另一侧时使用。
+    /// </summary>
+    private static string? SnapshotSingleMovie(int id, FancyFileTransaction tx)
+    {
+        var singlePath = Path.Combine(IntroMovieDir, VideoFileName(id, null));
+        if (!System.IO.File.Exists(singlePath)) return null;
+
+        var snapshotPath = tx.StagePath("previous-single.mp4");
+        PlatformFile.CopyFile(singlePath, snapshotPath);
+        return snapshotPath;
     }
 
     /// <summary>
@@ -515,14 +567,20 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         }
     }
 
-    private static string[] IntroFilePaths(int id) =>
+    private static string[] VideoFilePaths(int id) =>
     [
         Path.Combine(IntroMovieDir, VideoFileName(id, null)),
         Path.Combine(IntroMovieDir, VideoFileName(id, "L")),
         Path.Combine(IntroMovieDir, VideoFileName(id, "R")),
+    ];
+
+    private static string[] AudioFilePaths(int id) =>
+    [
         Path.Combine(IntroMovieDir, $"Enter_{id}.acb"),
         Path.Combine(IntroMovieDir, $"Enter_{id}.awb"),
     ];
+
+    private static string[] IntroFilePaths(int id) => [.. VideoFilePaths(id), .. AudioFilePaths(id)];
 
     [HttpPost]
     public async Task<FancyToolResult> DeleteIntroMovie(int id)
