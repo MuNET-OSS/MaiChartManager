@@ -41,9 +41,10 @@ public static class VideoConvert
     /// </summary>
     private static List<string> BuildPostArgs(VideoEncoderProfile p, VideoConvertOptions options, bool isImage)
     {
-        // 只取第一条视频流：音频一律不写进输出（IVF/USM 也放不下音频），
+        // 只取输入的第一条视频流（-map 0:0 是「第 0 个流」，音频排在前面时会选错）：
+        // 音频一律不写进输出（IVF/USM 也放不下音频），
         // 需要声音的场景（例如开场视频）由调用方另外生成 acb/awb。
-        var post = new List<string> { $"-c:v {p.Codec}", "-map 0:0" };
+        var post = new List<string> { $"-c:v {p.Codec}", "-map 0:v:0" };
         if (isImage) post.Add("-r 1 -t 2");
         post.Add(MultiThreadArg);
         if (p.Kind == VideoCodecKind.Vp9 && !p.IsHardware)

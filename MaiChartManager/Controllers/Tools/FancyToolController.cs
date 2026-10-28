@@ -127,6 +127,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
 
     /// <summary>
     /// 上传并转换开场视频。side 为空表示左右屏播放同一个视频，L / R 表示只替换其中一侧。
+    /// 视频、音频、旧布局清理作为整体提交：任一步失败都会回滚到操作前的状态。
     /// </summary>
     [HttpPost]
     [DisableRequestSizeLimit]
@@ -144,6 +145,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         if (normalizedSide is not (null or "L" or "R")) return new FancyToolResult(false, "invalid-side");
 
         var tmpDir = Directory.CreateTempSubdirectory();
+        var tx = new IntroFileTransaction(Path.Combine(tmpDir.FullName, "backup"));
         try
         {
             var inputPath = Path.Combine(tmpDir.FullName, "input" + Path.GetExtension(file.FileName));
@@ -172,17 +174,25 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
 
             if (!System.IO.File.Exists(tmpVideoPath)) return new FancyToolResult(false, "convert-failed");
 
-            // mp4 只保留画面（VideoConvert 用 -map 0:0 丢掉了音轨）；音轨另外提取成 Enter_<id>.acb/.awb，
-            // 游戏里由 AquaMai 单独播放，这样视频静音、声音走 acb/awb。
-            await CreateIntroAudio(inputPath, id, tmpDir.FullName);
+            // 音轨只生成到临时目录，等视频布局确定后和视频一起提交
+            var audio = await BuildIntroAudio(inputPath, id, tmpDir.FullName);
 
-            // 先把与新布局冲突的旧文件清掉：清理失败就直接返回，避免单文件和 L/R 同时存在
-            var oldLayoutCleaned = normalizedSide is null
-                ? DeleteFilesWithRetry(
+            // 这次会动到的文件先全部备份，失败时整体回滚
+            foreach (var path in IntroFilePaths(id)) tx.Track(path);
+
+            // 清理与新布局冲突的旧视频（单文件与 L/R 不能共存）
+            string[] conflictingFiles = normalizedSide is null
+                ?
+                [
                     Path.Combine(IntroMovieDir, VideoFileName(id, "L")),
-                    Path.Combine(IntroMovieDir, VideoFileName(id, "R")))
-                : DeleteFilesWithRetry(Path.Combine(IntroMovieDir, VideoFileName(id, null)));
-            if (!oldLayoutCleaned) return new FancyToolResult(false, "delete-failed");
+                    Path.Combine(IntroMovieDir, VideoFileName(id, "R")),
+                ]
+                : [Path.Combine(IntroMovieDir, VideoFileName(id, null))];
+            if (!DeleteFilesWithRetry(conflictingFiles))
+            {
+                tx.Rollback();
+                return new FancyToolResult(false, "delete-failed");
+            }
 
             MoveFileWithRetry(tmpVideoPath, targetPath);
 
@@ -194,11 +204,26 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 if (!System.IO.File.Exists(otherPath)) PlatformFile.CopyFile(targetPath, otherPath);
             }
 
+            // 音频必须和视频配套：这次没有音轨就把旧的 acb/awb 一起清掉
+            var acbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.acb");
+            var awbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.awb");
+            if (audio is not null)
+            {
+                MoveFileWithRetry(audio.AcbPath, acbPath);
+                MoveFileWithRetry(audio.AwbPath, awbPath);
+            }
+            else if (!DeleteFilesWithRetry(acbPath, awbPath))
+            {
+                tx.Rollback();
+                return new FancyToolResult(false, "delete-failed");
+            }
+
             return new FancyToolResult(true, null);
         }
         catch (Exception e)
         {
             logger.LogError(e, "转换开场视频失败: {id}", id);
+            tx.Rollback();
             return new FancyToolResult(false, "convert-failed");
         }
         finally
@@ -232,6 +257,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         if (file is null || file.Length <= 0) return new FancyToolResult(false, "invalid-audio");
 
         var tmpDir = Directory.CreateTempSubdirectory();
+        var tx = new IntroFileTransaction(Path.Combine(tmpDir.FullName, "backup"));
         try
         {
             Directory.CreateDirectory(IntroMovieDir);
@@ -241,15 +267,23 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 await file.CopyToAsync(stream);
             }
 
-            // CreateIntroAudio 内部已做「先转临时文件再搬过去」，失败时返回 false
-            if (!await CreateIntroAudio(inputPath, id, tmpDir.FullName, deleteOnFailure: false))
-                return new FancyToolResult(false, "invalid-audio");
+            var audio = await BuildIntroAudio(inputPath, id, tmpDir.FullName);
+            if (audio is null) return new FancyToolResult(false, "invalid-audio");
+
+            var acbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.acb");
+            var awbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.awb");
+            tx.Track(acbPath);
+            tx.Track(awbPath);
+
+            MoveFileWithRetry(audio.AcbPath, acbPath);
+            MoveFileWithRetry(audio.AwbPath, awbPath);
 
             return new FancyToolResult(true, null);
         }
         catch (Exception e)
         {
             logger.LogError(e, "写入开场音频失败: {id}", id);
+            tx.Rollback();
             return new FancyToolResult(false, "write-failed");
         }
         finally
@@ -280,24 +314,17 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         return new FancyToolResult(ok, ok ? null : "delete-failed");
     }
 
+    private sealed record IntroAudioFiles(string AcbPath, string AwbPath);
+
     /// <summary>
-    /// 从上传的文件里提取音轨，生成 Enter_&lt;id&gt;.acb / .awb。
-    /// 开场 mp4 本身是静音的，游戏里由 acb/awb 出声（AquaMai 的 CustomIntroCinematic 会调 SoundManager 播放）。
-    /// acb/awb 成对替换：先备份旧文件，任一移动失败就回滚。
+    /// 从上传的文件里提取音轨，生成到临时目录（acb/awb 成对）。
+    /// 没有音轨或转换失败返回 null，由调用方决定是否清掉旧的 acb/awb。
     /// </summary>
-    private async Task<bool> CreateIntroAudio(string inputPath, int id, string tmpDir, bool deleteOnFailure = true)
+    private async Task<IntroAudioFiles?> BuildIntroAudio(string inputPath, int id, string tmpDir)
     {
-        var acbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.acb");
-        var awbPath = Path.Combine(IntroMovieDir, $"Enter_{id}.awb");
         var wavPath = Path.Combine(tmpDir, "audio.wav");
-        // 先在临时目录里生成，两个文件都成功后再搬过去
         var tmpAcbPath = Path.Combine(tmpDir, $"Enter_{id}.acb");
         var tmpAwbPath = Path.Combine(tmpDir, $"Enter_{id}.awb");
-        // 替换前先备份旧文件：任一移动失败就回滚，保证 acb/awb 始终配套
-        var bakAcbPath = Path.Combine(tmpDir, $"Enter_{id}.acb.bak");
-        var bakAwbPath = Path.Combine(tmpDir, $"Enter_{id}.awb.bak");
-        var hadAcb = System.IO.File.Exists(acbPath);
-        var hadAwb = System.IO.File.Exists(awbPath);
 
         try
         {
@@ -311,36 +338,73 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             if (!System.IO.File.Exists(tmpAcbPath) || !System.IO.File.Exists(tmpAwbPath))
                 throw new InvalidOperationException("acb/awb not generated");
 
-            if (hadAcb) System.IO.File.Copy(acbPath, bakAcbPath, true);
-            if (hadAwb) System.IO.File.Copy(awbPath, bakAwbPath, true);
-
-            MoveFileWithRetry(tmpAcbPath, acbPath);
-            MoveFileWithRetry(tmpAwbPath, awbPath);
-            return true;
+            return new IntroAudioFiles(tmpAcbPath, tmpAwbPath);
         }
         catch (Exception e)
         {
-            logger.LogWarning(e, "开场视频音频生成失败: {id}", id);
-            // 回滚成对音频：有备份就还原，本来没有的就删掉可能写进去的那一半
-            try
-            {
-                RestoreOrDelete(acbPath, bakAcbPath, hadAcb);
-                RestoreOrDelete(awbPath, bakAwbPath, hadAwb);
-            }
-            catch (Exception restoreError)
-            {
-                logger.LogWarning(restoreError, "开场音频回滚失败: {id}", id);
-            }
-
-            // 换视频时音画必须配套，所以没音轨就清掉旧的；用户单独传音频失败则保留原来的
-            if (deleteOnFailure)
-            {
-                DeleteFilesWithRetry(acbPath, awbPath);
-            }
-            return false;
+            logger.LogWarning(e, "开场音频生成失败，按静音处理: {id}", id);
+            return null;
         }
     }
 
+    private static string[] IntroFilePaths(int id) =>
+    [
+        Path.Combine(IntroMovieDir, VideoFileName(id, null)),
+        Path.Combine(IntroMovieDir, VideoFileName(id, "L")),
+        Path.Combine(IntroMovieDir, VideoFileName(id, "R")),
+        Path.Combine(IntroMovieDir, $"Enter_{id}.acb"),
+        Path.Combine(IntroMovieDir, $"Enter_{id}.awb"),
+    ];
+
+    /// <summary>
+    /// 开场文件事务：先把这次会改动/删除的文件备份到临时目录，
+    /// 失败时整体回滚（原本有的还原，原本没有的删掉），避免留下半套文件。
+    /// </summary>
+    private sealed class IntroFileTransaction(string backupDir)
+    {
+        private readonly List<(string Path, string BackupPath, bool Existed)> _entries = [];
+        private bool _rolledBack;
+
+        public void Track(string path)
+        {
+            if (_entries.Any(entry => string.Equals(entry.Path, path, StringComparison.OrdinalIgnoreCase))) return;
+
+            var existed = System.IO.File.Exists(path);
+            var backupPath = Path.Combine(backupDir, Guid.NewGuid().ToString("N"));
+            if (existed)
+            {
+                Directory.CreateDirectory(backupDir);
+                System.IO.File.Copy(path, backupPath, true);
+            }
+
+            _entries.Add((path, backupPath, existed));
+        }
+
+        public void Rollback()
+        {
+            if (_rolledBack) return;
+            _rolledBack = true;
+
+            foreach (var (path, backupPath, existed) in _entries)
+            {
+                try
+                {
+                    if (existed)
+                    {
+                        if (System.IO.File.Exists(backupPath)) System.IO.File.Copy(backupPath, path, true);
+                    }
+                    else if (System.IO.File.Exists(path))
+                    {
+                        System.IO.File.Delete(path);
+                    }
+                }
+                catch (Exception)
+                {
+                    // 尽力回滚，单个文件失败不影响其它文件
+                }
+            }
+        }
+    }
     [HttpPost]
     public FancyToolResult DeleteIntroMovie(int id)
     {
@@ -373,20 +437,6 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 Thread.Sleep(150);
             }
         }
-    }
-
-    /// <summary>
-    /// 回滚成对音频：原来有文件就从备份还原，原来没有就把可能写进去的那一半删掉。
-    /// </summary>
-    private static void RestoreOrDelete(string path, string backupPath, bool hadOriginal)
-    {
-        if (hadOriginal)
-        {
-            if (System.IO.File.Exists(backupPath)) System.IO.File.Copy(backupPath, path, true);
-            return;
-        }
-
-        if (System.IO.File.Exists(path)) System.IO.File.Delete(path);
     }
 
     /// <summary>
