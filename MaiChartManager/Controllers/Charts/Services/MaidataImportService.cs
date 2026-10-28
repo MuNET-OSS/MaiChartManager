@@ -306,6 +306,11 @@ public class MaidataImportService : IMaidataImportService
                 File.Delete(basePath.Replace(".ma2", "_L.ma2"));
                 File.Delete(basePath.Replace(".ma2", "_R.ma2"));
             }
+
+            // 谱面都写完了再记原曲 ID：宴会场 ID 里只有后四位、没有 STD/DX 信息，
+            // 把谱面类型补上，以后切回普通流派时才能还原成原来那一条。
+            // 放在这里而不是前面的 if (isUtage) 里，是为了半路 Fatal 时不会把缓存实例里的记录改脏。
+            music.UtageBaseId = id % 10000 + (validCharts.Any(chart => chart.IsDxChart) ? 10000 : 0);
         }
 
         if (!isReplacement)

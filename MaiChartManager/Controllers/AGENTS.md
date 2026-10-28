@@ -15,6 +15,7 @@ ASP.NET Core REST API 控制器，按业务领域分 7 个子目录。所有控�
 | `Charts/Services/` | 谱面导入业务逻辑（领域内私有服务） | IMaidataImportService, MaidataImportService, LegacyMaidataImportService |
 | `Mod/` | AquaMai mod 配置、安装、路径管理 | ConfigurationController, InstallationController, ManualInstallController, MuModController |
 | `Music/` | 音乐 CRUD、音频/视频转换、批量操作、迁移、VRC 处理 | MusicController, MusicBatchController, CueConvertController, MovieConvertController, MusicTransferController, VrcProcessController |
+| `Music/Services/` | 音乐领域内私有逻辑（宴会场谱面转换等） | UtageConverter |
 | `Tools/` | 独立音频/视频/图片转换工具接口 | AudioConvertToolController, VideoConvertToolController, ImageToAbToolController |
 
 ## WHERE TO LOOK
@@ -52,6 +53,6 @@ ASP.NET Core REST API 控制器，按业务领域分 7 个子目录。所有控�
 - `Catagory/` 是历史 typo（正确拼写应为 Category），已是既定命名，保持一致，勿重命名
 - 前端 API client（`Front/src/client/apiGen.ts`）由 `genClient.ts` 从这些控制器自动生成，修改接口后需重新运行 `pnpm genClient`
 - `Mod/ModPaths.cs` 不是控制器，是 Mod 子目录的路径常量辅助类
-- `Charts/Services/` 是领域内私有服务层（非全局 `Services/`），仅 Charts 控制器使用
+- `Charts/Services/`、`Music/Services/` 是领域内私有服务层（非全局 `Services/`），仅各自的控制器使用
 - 控制器通过构造注入获取服务，返回强类型 DTO（非统一包装），部分 action 自行 try/catch 转业务结果
 - `ChartController.ReplaceChart()` 根据 `StaticSettings.Config.UseLegacyMaiLib` 在新旧导入实现间切换

@@ -127,6 +127,29 @@ music:
     audioPreviewEnd: 终点时间（秒）
     includeB35: 计入 B35
     includeB15: 计入 B15
+    utageConvertTitle: 乐曲流派更改为宴会场
+    utageConvertConfirmPlain: 乐曲流派将更改为宴会场。是否继续？
+    utageConvertConfirmIdOnly: 乐曲流派将更改为宴会场，乐曲 ID 将改为该曲的宴会场 ID（末尾四位仍为 {last4}）。是否继续？
+    utageConvertConfirmChartOnly: 乐曲流派将更改为宴会场，并把已启用的 {difficulty} 谱面转换为 Basic 谱面。是否继续？
+    utageConvertConfirmBoth: 乐曲流派将更改为宴会场，乐曲 ID 将改为该曲的宴会场 ID（末尾四位仍为 {last4}），并把已启用的 {difficulty} 谱面转换为 Basic 谱面。是否继续？
+    utageConvertMultipleCharts: 谱面有多个难度，请只保留一个启用的难度再进行转换
+    utageConvertNoChart: 当前没有启用的谱面，请先启用一个难度再进行转换
+    utageConvertDoublePlayerChart: 该谱面包含宴会场特有的 L 谱面和 R 谱面，不支持自动转换，请手动处理后再操作
+    utageConvertIdExists: ID {newId} 已被占用，请先处理该 ID 上的乐曲
+    utageConvertNoAvailableId: 该曲可用的宴会场 ID 已全部被占用，无法转换为宴会场
+    utageConvertFailed: 更改为宴会场失败
+    utageRevertTitle: 乐曲流派更改
+    utageRevertConfirm: 乐曲流派将从宴会场更改为 {genreName}，并把乐曲 ID 从 {oldId} 改为 {newId}。是否继续？
+    utageRevertFailed: 从宴会场更改流派失败
+    utageRevertNotRestorable: 无法从宴会场 ID {oldId} 推回普通曲 ID，请先手动把乐曲 ID 改回普通曲 ID 再切换流派
+    utageConvertMusicNotFound: 找不到该乐曲，请刷新后重试
+    utageConvertLicenseRequired: 需要有效的授权才能更改乐曲 ID
+    utageConvertInvalidMusicDir: 乐曲目录不存在或不可访问
+    utageConvertIdChangeFailed: 修改乐曲 ID 失败，请查看日志
+    utageConvertInvalidChartPath: 谱面路径不合法，请检查 Music.xml 里的谱面文件名
+    utageConvertChartFileNotFound: 启用的难度找不到谱面文件，请先确认谱面文件完整
+    utageConvertSwapFailed: 交换谱面文件失败，谱面未被修改
+    utageConvertUnexpected: 切换流派失败，请查看日志
     versionHint: >-
       如果游戏版本是 1.{gameVersion} 的话，这里的数字大于等于 {b15ver} 就会让歌出现在 B15 里面，否则就会出现在 B35
       里面。这个值还会控制按上线时间排序时的顺序

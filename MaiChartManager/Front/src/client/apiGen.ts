@@ -241,6 +241,18 @@ export interface GenreAddRequest {
   assetDir?: string | null;
 }
 
+export interface GenreChangeRequest {
+  /** @format int32 */
+  genreId?: number;
+}
+
+export interface GenreChangeResult {
+  success?: boolean;
+  error?: string | null;
+  /** @format int32 */
+  newId?: number;
+}
+
 export interface GenreEditRequest {
   name?: string | null;
   nameTwoLine?: string | null;
@@ -2478,6 +2490,28 @@ export class Api<
         method: "POST",
         body: data,
         type: ContentType.Json,
+        ...params,
+      }),
+
+    /**
+     * No description
+     *
+     * @tags MusicTransfer
+     * @name ChangeMusicGenre
+     * @request POST:/MaiChartManagerServlet/ChangeMusicGenreApi/{assetDir}/{id}
+     */
+    ChangeMusicGenre: (
+      id: number,
+      assetDir: string,
+      data: GenreChangeRequest,
+      params: RequestParams = {},
+    ) =>
+      this.request<GenreChangeResult, any>({
+        path: `/MaiChartManagerServlet/ChangeMusicGenreApi/${assetDir}/${id}`,
+        method: "POST",
+        body: data,
+        type: ContentType.Json,
+        format: "json",
         ...params,
       }),
 

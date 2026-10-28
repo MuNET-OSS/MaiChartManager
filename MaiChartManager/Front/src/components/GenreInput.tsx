@@ -7,6 +7,8 @@ export default defineComponent({
     options: {type: Array as PropType<GenreXml[]>, required: true},
     value: Number
   },
+  // 声明 emits 才能在 TSX 里用 onUpdate:value 精确拦截用户的选择
+  emits: ['update:value'],
   setup(props, {emit}) {
     const options = computed(() => props.options.map(genre => ({label: ()=><GenreOption genre={props.options.find(it => it.id === genre.id)!}/>, value: genre.id})));
     const value = computed({

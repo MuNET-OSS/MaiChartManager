@@ -135,6 +135,29 @@ music:
     audioPreviewEnd: End Time (s)
     includeB35: Include in B35
     includeB15: Include in B15
+    utageConvertTitle: Change genre to Utage
+    utageConvertConfirmPlain: The genre will be changed to Utage. Continue?
+    utageConvertConfirmIdOnly: The genre will be changed to Utage, and the music ID will be changed to this song's Utage ID (the last four digits stay {last4}). Continue?
+    utageConvertConfirmChartOnly: The genre will be changed to Utage, and the enabled {difficulty} chart will be converted to a Basic chart. Continue?
+    utageConvertConfirmBoth: The genre will be changed to Utage, the music ID will be changed to this song's Utage ID (the last four digits stay {last4}), and the enabled {difficulty} chart will be converted to a Basic chart. Continue?
+    utageConvertMultipleCharts: Multiple difficulties are enabled. Please keep only one enabled difficulty before converting.
+    utageConvertNoChart: No chart is enabled. Please enable one before converting.
+    utageConvertDoublePlayerChart: This chart contains Utage-only L and R charts and cannot be converted automatically. Please handle it manually first.
+    utageConvertIdExists: ID {newId} is already taken. Please deal with the music with this ID first.
+    utageConvertNoAvailableId: All Utage IDs of this song are taken, so it cannot be converted to Utage.
+    utageConvertFailed: Failed to change to Utage
+    utageRevertTitle: Change music genre
+    utageRevertConfirm: The genre will be changed from Utage to {genreName}, and the music ID will be changed from {oldId} to {newId}. Continue?
+    utageRevertFailed: Failed to change genre from Utage
+    utageRevertNotRestorable: Cannot derive a normal music ID from Utage ID {oldId}. Please change the music ID manually first.
+    utageConvertMusicNotFound: Could not find this music. Please refresh and try again.
+    utageConvertLicenseRequired: A valid license is required to change the music ID.
+    utageConvertInvalidMusicDir: The music directory does not exist or is not accessible.
+    utageConvertIdChangeFailed: Failed to change the music ID. Please check the log.
+    utageConvertInvalidChartPath: Invalid chart path. Please check the chart file names in Music.xml.
+    utageConvertChartFileNotFound: The enabled difficulty has no chart file. Please make sure the chart files are complete.
+    utageConvertSwapFailed: Failed to swap chart files. No chart was modified.
+    utageConvertUnexpected: Failed to change the genre. Please check the log.
     versionHint: >-
       If game version is 1.{gameVersion}, numbers >= {b15ver} will appear in
       B15, otherwise in B35. This value also controls the order when sorting by
