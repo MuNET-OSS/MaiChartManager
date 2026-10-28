@@ -5,7 +5,7 @@ import noJacket from '@/assets/noJacket.webp';
 import { addVersionList, genreList, showNeedPurchaseDialog, version } from "@/store/refs";
 import GenreInput from "@/components/GenreInput";
 import VersionInput from "@/components/VersionInput";
-import { UTAGE_GENRE } from "@/consts";
+import { isUtageId, UTAGE_GENRE, UTAGE_ID_START, UTAGE_SEQ_START } from "@/consts";
 import MusicIdConflictNotifier from "@/components/MusicIdConflictNotifier";
 import { useI18n } from 'vue-i18n';
 import ImportAlert from "@/views/Charts/ImportCreateChartButton/ImportChartButton/ImportAlert";
@@ -29,14 +29,19 @@ export default defineComponent({
       set: (val) => props.closeModal()
     })
 
+    // 宴会场 ID = 序号 * 10000 + 原曲 ID 后四位，序号从 10 开始。
+    // 宴会场 ID 本身不区分 STD/DX，所以切流派时要按 isDx 补上/去掉那 10000。
     watch([() => props.savedOptions.genreId, () => show.value], ([val]) => {
       for (const meta of props.meta) {
-        meta.id = meta.id % 1e5 + (val === UTAGE_GENRE ? 1e5 : 0);
+        const baseId = meta.id % 1e4;
+        // 已经在宴会场区间时沿用现有序号，避免把第二条宴会场谱面改成第一条
+        const seq = isUtageId(meta.id) ? Math.floor(meta.id / 1e4) : UTAGE_SEQ_START;
+        meta.id = val === UTAGE_GENRE ? seq * 1e4 + baseId : baseId + (meta.isDx ? 1e4 : 0);
       }
     })
 
     const hasInvalidUtageMapping = computed(() => props.meta.some(item => {
-      const isUtage = props.savedOptions.genreId === UTAGE_GENRE || item.id >= 1e5;
+      const isUtage = props.savedOptions.genreId === UTAGE_GENRE || isUtageId(item.id);
       if (!isUtage || item.maidataLevels.length < 2) return false;
       const mapping = item.utageMapping;
       return !mapping || mapping.isDoublePlayer && mapping.leftLevel === mapping.rightLevel;
@@ -104,12 +109,12 @@ const MusicIdInput = defineComponent({
   setup(props) {
     const { t } = useI18n();
     const dxBase = computed(() => {
-      const dx = props.meta.isDx ? 1e4 : 0
-      const utage = props.utage ? 1e5 : 0
-      return dx + utage;
+      // 宴会场 ID 里不区分 STD/DX，序号从 10 起，所以下限就是宴会场 ID 的起点
+      if (props.utage) return UTAGE_ID_START;
+      return props.meta.isDx ? 1e4 : 0
     });
     const img = computed(() => props.meta.bg ? URL.createObjectURL(props.meta.bg) : noJacket);
-    const isUtage = computed(() => props.utage || props.meta.id >= 1e5);
+    const isUtage = computed(() => props.utage || isUtageId(props.meta.id));
     const levelOptions = computed(() => props.meta.maidataLevels.map(level => ({
       label: `inote_${level}`,
       value: level,
