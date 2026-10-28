@@ -241,6 +241,9 @@ public class MaidataImportService : IMaidataImportService
         {
             music.UtagePlayStyle = utageLevelMap?.Values.Any(side => side is not null) == true ? 1 : 0;
             music.Charts[0].MaxNotes = 0;
+            // 宴会场 ID 里只有原曲 ID 的后四位，没有 STD/DX 信息，这里把 import 的谱面类型补上，
+            // 以后切回普通流派时才能还原成原来那一条
+            music.UtageBaseId = id % 10000 + (validCharts.Any(chart => chart.IsDxChart) ? 10000 : 0);
         }
         
         float lastChartBpm = 0; // 最后一个谱面的bpm，当没有指定wholebpm时用作fallback
