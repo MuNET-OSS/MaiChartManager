@@ -913,6 +913,10 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     {
         private const string StageDirName = ".mcm-tmp";
         private const string BackupPrefix = "bak_";
+        private const string JournalFileName = "journal";
+        private const string BackupEntry = "bak:";
+        private const string PlacedEntry = "placed:";
+        private const string CommitMarker = "commit";
 
         /// <summary>正在跑的事务的 stage 目录，恢复遗留备份时要跳过它们</summary>
         private static readonly ConcurrentDictionary<string, byte> ActiveStageDirs = new(StringComparer.OrdinalIgnoreCase);
@@ -940,9 +944,11 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         /// <summary>新文件的暂存路径（和最终目标同卷）。</summary>
         public string StagePath(string fileName) => Path.Combine(StageDirPath, fileName);
 
+        private string JournalPath => Path.Combine(StageDirPath, JournalFileName);
+
         /// <summary>
-        /// 进程被强杀 / 断电时，旧文件可能还留在上一次事务的 stage 目录里（正式路径上是空的）。
-        /// 备份文件名带着原文件名，这里趁机搬回去——否则用户的开场视频就这么无声无息地没了。
+        /// 进程被强杀 / 断电后，上一次事务可能停在「备份搬走了但还没提交」或者「新文件已生效但还没提交」的半路上。
+        /// 这里扫一遍遗留的 stage 目录，没提交的整体撤回、已提交的清掉残留。
         /// </summary>
         private void RecoverStaleBackups()
         {
@@ -954,31 +960,73 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             {
                 if (ActiveStageDirs.ContainsKey(stageDir)) continue;
 
-                foreach (var backupPath in Directory.EnumerateFiles(stageDir, $"{BackupPrefix}*").ToList())
-                {
-                    var target = Path.Combine(_targetDir, Path.GetFileName(backupPath)[BackupPrefix.Length..]);
-                    try
-                    {
-                        // 正式路径上已经有文件，说明那次中断没有造成损失，备份留着不覆盖
-                        if (System.IO.File.Exists(target)) continue;
-                        if (MoveWithRetry(backupPath, target) is null)
-                            _logger.LogWarning("从上次中断的事务里恢复了 {target}", target);
-                    }
-                    catch (Exception e)
-                    {
-                        _logger.LogWarning(e, "恢复上次中断的事务失败: {backup}", backupPath);
-                    }
-                }
-
                 try
                 {
-                    if (!Directory.EnumerateFileSystemEntries(stageDir).Any()) Directory.Delete(stageDir);
+                    RecoverStageDir(stageDir);
                 }
-                catch
+                catch (Exception e)
                 {
-                    // 忽略清理失败
+                    _logger.LogWarning(e, "恢复上次中断的事务失败: {dir}", stageDir);
                 }
             }
+        }
+
+        private void RecoverStageDir(string stageDir)
+        {
+            var journalPath = Path.Combine(stageDir, JournalFileName);
+            var journal = System.IO.File.Exists(journalPath) ? System.IO.File.ReadAllLines(journalPath) : [];
+
+            if (journal.Contains(CommitMarker))
+            {
+                // 已经提交过了：正式路径上的新文件就是用户要的结果，剩下的只是没来得及清掉的备份
+                Directory.Delete(stageDir, true);
+                return;
+            }
+
+            var entriesOf = (string prefix) => journal
+                .Where(line => line.StartsWith(prefix, StringComparison.Ordinal))
+                .Select(line => line[prefix.Length..])
+                .ToList();
+
+            // 先撤掉已经生效的新文件，再把备份搬回去——顺序反过来的话，
+            // 中途再挂一次就会留下「备份已还原、新文件还在」的混合状态
+            foreach (var fileName in entriesOf(PlacedEntry))
+            {
+                var target = Path.Combine(_targetDir, fileName);
+                try
+                {
+                    if (System.IO.File.Exists(target)) System.IO.File.Delete(target);
+                }
+                catch (Exception e)
+                {
+                    _logger.LogWarning(e, "清理未完成的事务文件失败: {path}", target);
+                }
+            }
+
+            var hasJournal = journal.Length > 0;
+            var backups = entriesOf(BackupEntry);
+            if (!hasJournal)
+            {
+                // 没有事务日志（旧版本留下的目录）：只能按「正式路径上缺什么就补什么」尽力恢复
+                backups = Directory.EnumerateFiles(stageDir, $"{BackupPrefix}*")
+                    .Select(Path.GetFileName)
+                    .Select(name => name![BackupPrefix.Length..])
+                    .ToList();
+            }
+
+            foreach (var fileName in backups)
+            {
+                var backupPath = Path.Combine(stageDir, BackupPrefix + fileName);
+                var target = Path.Combine(_targetDir, fileName);
+                if (!System.IO.File.Exists(backupPath)) continue;
+                if (!hasJournal && System.IO.File.Exists(target)) continue;
+
+                if (MoveWithRetry(backupPath, target) is null)
+                    _logger.LogWarning("从上次中断的事务里恢复了 {target}", target);
+            }
+
+            // 备份搬走之后，没来得及启用的新文件和事务日志都成了垃圾，一起清掉
+            Directory.Delete(stageDir, true);
         }
 
         /// <summary>
@@ -995,7 +1043,43 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             if (MoveWithRetry(path, backupPath) is not null) return false;
 
             _backups.Add((path, backupPath));
+            AppendJournal(BackupEntry + Path.GetFileName(path));
             return true;
+        }
+
+        /// <summary>
+        /// 把事务进度记到 stage 里的日志上。进程被强杀后只有靠它才知道哪些文件已经生效、
+        /// 哪些还躺在备份里——光看正式路径上有没有文件是判断不出来的（已生效的新文件也在那儿）。
+        /// </summary>
+        private void AppendJournal(string line)
+        {
+            try
+            {
+                System.IO.File.AppendAllText(JournalPath, line + Environment.NewLine);
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "写入事务日志失败: {path}", JournalPath);
+            }
+        }
+
+        /// <summary>重写事务日志，只留还没处理完的条目。</summary>
+        private void RewriteJournal(IReadOnlyCollection<string> lines)
+        {
+            try
+            {
+                if (lines.Count == 0)
+                {
+                    if (System.IO.File.Exists(JournalPath)) System.IO.File.Delete(JournalPath);
+                    return;
+                }
+
+                System.IO.File.WriteAllLines(JournalPath, lines);
+            }
+            catch (Exception e)
+            {
+                _logger.LogWarning(e, "重写事务日志失败: {path}", JournalPath);
+            }
         }
 
         /// <summary>把 stage 里的新文件放到目标位置（同卷 rename）。</summary>
@@ -1005,6 +1089,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             if (error is null)
             {
                 _placedTargets.Add(targetPath);
+                AppendJournal(PlacedEntry + Path.GetFileName(targetPath));
                 return;
             }
 
@@ -1021,6 +1106,9 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         /// </summary>
         public void Commit()
         {
+            // 先落提交标记再删备份：反过来的话，标记没写成而备份已经没了，
+            // 恢复逻辑会把这次成功写入的新文件当成半成品删掉
+            AppendJournal(CommitMarker);
             _finished = true;
 
             foreach (var (_, backupPath) in _backups)
@@ -1047,6 +1135,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             if (_finished) return;
             _finished = true;
 
+            var failedDeletes = new List<string>();
             foreach (var target in _placedTargets)
             {
                 try
@@ -1056,6 +1145,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 catch (Exception)
                 {
                     // 尽力回滚，单个文件失败不影响其它文件
+                    failedDeletes.Add(target);
                 }
             }
 
@@ -1074,10 +1164,24 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 }
             }
 
-            // 还原失败的备份可能就是原文件唯一的副本，这种情况下绝不能把 stage 目录清掉
-            if (failedRestores.Count > 0)
+            // 没撤干净：还原失败的备份可能就是原文件唯一的副本，绝不能把 stage 目录清掉。
+            // 把还没处理完的部分留在事务日志里，下次开事务时接着撤——
+            // 已经处理掉的行必须去掉，否则下次会去删刚刚还原好的文件
+            if (failedDeletes.Count > 0 || failedRestores.Count > 0)
             {
                 _keepStageDir = true;
+                var restoredTargets = _backups
+                    .Where(entry => failedRestores.All(failed => failed.Target != entry.Target))
+                    .Select(entry => entry.Target)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                RewriteJournal(
+                [
+                    .. failedDeletes.Where(target => !restoredTargets.Contains(target))
+                        .Select(target => PlacedEntry + Path.GetFileName(target)),
+                    .. failedRestores.Select(entry => BackupEntry + Path.GetFileName(entry.Target)),
+                ]);
+
                 foreach (var (target, backupPath) in failedRestores)
                     _logger.LogError("回滚失败，原文件仍在 {backup}，需要还原到 {target}", backupPath, target);
                 return;
