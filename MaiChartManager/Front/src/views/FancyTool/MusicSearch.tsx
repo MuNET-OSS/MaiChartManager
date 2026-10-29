@@ -6,7 +6,7 @@ import { MusicXmlWithABJacket } from '@/client/apiGen';
 import JacketBox from '@/components/JacketBox';
 import { GenreOption } from '@/components/GenreInput';
 import { addVersionList, genreList, musicListAll } from '@/store/refs';
-import { matchMusicKeyword } from '@/utils/musicSearch';
+import { matchMusicKeyword, MusicIdKind, musicIdKind } from '@/utils/musicSearch';
 import { fancyEntries, selectMusic, showSearch, selectedId } from './refs';
 
 export default defineComponent({
@@ -45,9 +45,9 @@ export default defineComponent({
     };
 
     const kindOptions = computed(() => [
-      { label: t('music.list.filterStandard'), value: 'standard' },
-      { label: t('music.list.filterDX'), value: 'dx' },
-      { label: t('music.list.filterUtage'), value: 'utage' },
+      { label: t('music.list.filterStandard'), value: MusicIdKind.Standard },
+      { label: t('music.list.filterDX'), value: MusicIdKind.DX },
+      { label: t('music.list.filterUtage'), value: MusicIdKind.Utage },
     ]);
 
     const columns = computed(() => [
@@ -63,12 +63,7 @@ export default defineComponent({
         width: '8em',
         sorter: 'default',
         filterOptions: kindOptions.value,
-        filter: (value: any, row: MusicXmlWithABJacket) => {
-          const id = row.id ?? 0;
-          if (value === 'standard') return id < 1e4;
-          if (value === 'dx') return id >= 1e4 && id < 1e5;
-          return id >= 1e5;
-        },
+        filter: (value: any, row: MusicXmlWithABJacket) => musicIdKind(row.id) === value,
       },
       {
         title: t('music.list.tableTitle'),
