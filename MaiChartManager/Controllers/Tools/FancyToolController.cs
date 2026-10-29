@@ -890,6 +890,8 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         private readonly List<(string Target, string Backup)> _backups = [];
         private readonly List<string> _placedTargets = [];
         private bool _finished;
+        /// <summary>回滚没能把备份全部还原时保留 stage 目录，别把最后一份原件删了</summary>
+        private bool _keepStageDir;
 
         public FancyFileTransaction(string targetDir, ILogger logger)
         {
@@ -972,17 +974,28 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 }
             }
 
+            var failedRestores = new List<(string Target, string BackupPath)>();
             foreach (var (target, backupPath) in _backups)
             {
                 try
                 {
                     if (!System.IO.File.Exists(backupPath)) continue;
                     if (!MoveWithRetry(backupPath, target)) PlatformFile.CopyFile(backupPath, target);
+                    if (!System.IO.File.Exists(target)) failedRestores.Add((target, backupPath));
                 }
                 catch (Exception)
                 {
-                    // 尽力回滚
+                    failedRestores.Add((target, backupPath));
                 }
+            }
+
+            // 还原失败的备份可能就是原文件唯一的副本，这种情况下绝不能把 stage 目录清掉
+            if (failedRestores.Count > 0)
+            {
+                _keepStageDir = true;
+                foreach (var (target, backupPath) in failedRestores)
+                    _logger.LogError("回滚失败，原文件仍在 {backup}，需要还原到 {target}", backupPath, target);
+                return;
             }
 
             DropStageDir();
@@ -991,7 +1004,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         public void Dispose()
         {
             if (!_finished) Rollback();
-            DropStageDir();
+            if (!_keepStageDir) DropStageDir();
         }
 
         private void DropStageDir()
