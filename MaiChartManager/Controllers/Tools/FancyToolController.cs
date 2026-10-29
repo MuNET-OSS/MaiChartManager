@@ -327,13 +327,22 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             // 从单文件切到分屏时，旧单文件一会儿要给另一侧用，先复制一份进 stage（同卷，很便宜）
             var previousSingle = normalizedSide is null ? null : SnapshotSingleMovie(id, tx);
 
-            // 这次会动到的文件先全部挪进 stage 备份，失败时整体还原。
-            // 只换一侧时音频是两边共用的：新视频没有音轨就保留原来的 acb/awb，不跟着视频一起清掉
-            foreach (var path in VideoFilePaths(id))
+            // 只备份真正会被覆盖的文件，失败时整体还原。
+            // 整段替换要连左右分屏的残留一起清掉；只换一侧时另一侧必须原地不动，
+            // 否则下面「对侧不存在就补一份」会把它当成缺失，把这次上传的视频复制过去，两侧就变成同一个了。
+            var filesToBackup = normalizedSide is null
+                ? VideoFilePaths(id)
+                :
+                [
+                    Path.Combine(IntroMovieDir, VideoFileName(id, null)),
+                    Path.Combine(IntroMovieDir, VideoFileName(id, normalizedSide)),
+                ];
+            foreach (var path in filesToBackup)
             {
                 if (!tx.Backup(path)) return new FancyToolResult(false, "file-locked");
             }
 
+            // 音频是两边共用的：只换一侧时新视频没音轨就保留原来的 acb/awb，不跟着视频一起清掉
             if (normalizedSide is null || audio is not null)
             {
                 foreach (var path in AudioFilePaths(id))
@@ -351,7 +360,13 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 // 从单文件切到分屏时，另一侧要用原来那个单文件——否则两边都会变成这次上传的视频。
                 var otherSide = normalizedSide == "L" ? "R" : "L";
                 var otherPath = Path.Combine(IntroMovieDir, VideoFileName(id, otherSide));
-                if (!System.IO.File.Exists(otherPath)) PlatformFile.CopyFile(previousSingle ?? targetPath, otherPath);
+                if (!System.IO.File.Exists(otherPath))
+                {
+                    // 复制也走事务：后面任何一步失败，这份多出来的文件要跟着一起撤掉
+                    var otherStagePath = tx.StagePath("other-side.mp4");
+                    PlatformFile.CopyFile(previousSingle ?? targetPath, otherStagePath);
+                    tx.Place(otherStagePath, otherPath);
+                }
             }
 
             // 整段替换视频时音频必须和视频配套（旧的已经被备份走，提交即删除）；只换一侧时音频保留
