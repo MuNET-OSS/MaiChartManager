@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Threading.Channels;
 using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
@@ -251,37 +252,54 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     {
         Response.Headers.Append("Content-Type", "text/event-stream");
 
+        // 单写者队列：进度回调来自 ffmpeg 的读取线程，直接写 Response 会和请求线程上的收尾事件交错，
+        // 帧的先后顺序也没有保证（HttpResponse 不是线程安全的）
+        var frames = Channel.CreateUnbounded<string>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false,
+        });
+        var writerTask = WriteSseFrames(frames.Reader);
+
         var gate = GetFileGate(id);
         await gate.WaitAsync();
         try
         {
             // 转码占 0-90%，剩下的留给出音频（HCA 编码没有进度回调）
             var result = await SetIntroMovieCore(id, side, file,
-                percent => SendEvent("Progress", (percent * 9 / 10).ToString()));
-            await SendEvent(result.Success ? "Success" : "Error", result.Success ? "ok" : result.Error ?? "write-failed");
+                percent => frames.Writer.TryWrite(SseFrame("Progress", (percent * 9 / 10).ToString())));
+            await frames.Writer.WriteAsync(
+                SseFrame(result.Success ? "Success" : "Error", result.Success ? "ok" : result.Error ?? "write-failed"));
         }
         catch (Exception e)
         {
             logger.LogError(e, "转换开场视频失败: {id}", id);
-            await SendEvent("Error", "convert-failed");
+            await frames.Writer.WriteAsync(SseFrame("Error", "convert-failed"));
         }
         finally
         {
             gate.Release();
+            frames.Writer.TryComplete();
         }
+
+        await writerTask;
     }
 
-    private async Task SendEvent(string eventName, string data)
+    private static string SseFrame(string eventName, string data) => $"event: {eventName}\ndata: {data}\n\n";
+
+    private async Task WriteSseFrames(ChannelReader<string> reader)
     {
-        // 客户端可能中途断开（关窗口），写失败不用管
         try
         {
-            await Response.WriteAsync($"event: {eventName}\ndata: {data}\n\n");
-            await Response.Body.FlushAsync();
+            await foreach (var frame in reader.ReadAllAsync(HttpContext.RequestAborted))
+            {
+                await Response.WriteAsync(frame, HttpContext.RequestAborted);
+                await Response.Body.FlushAsync(HttpContext.RequestAborted);
+            }
         }
         catch (Exception)
         {
-            // 忽略
+            // 客户端可能中途断开（关窗口），写失败不用管
         }
     }
 
