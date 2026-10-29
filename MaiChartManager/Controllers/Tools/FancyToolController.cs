@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using MaiChartManager.Platform;
 using MaiChartManager.Utils;
 using Microsoft.AspNetCore.Mvc;
@@ -884,6 +885,10 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     private sealed class FancyFileTransaction : IDisposable
     {
         private const string StageDirName = ".mcm-tmp";
+        private const string BackupPrefix = "bak_";
+
+        /// <summary>正在跑的事务的 stage 目录，恢复遗留备份时要跳过它们</summary>
+        private static readonly ConcurrentDictionary<string, byte> ActiveStageDirs = new(StringComparer.OrdinalIgnoreCase);
 
         private readonly string _targetDir;
         private readonly ILogger _logger;
@@ -898,6 +903,8 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             _targetDir = targetDir;
             _logger = logger;
             StageDirPath = Path.Combine(targetDir, StageDirName, Guid.NewGuid().ToString("N"));
+            ActiveStageDirs[StageDirPath] = 0;
+            RecoverStaleBackups();
             Directory.CreateDirectory(StageDirPath);
         }
 
@@ -905,6 +912,47 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
 
         /// <summary>新文件的暂存路径（和最终目标同卷）。</summary>
         public string StagePath(string fileName) => Path.Combine(StageDirPath, fileName);
+
+        /// <summary>
+        /// 进程被强杀 / 断电时，旧文件可能还留在上一次事务的 stage 目录里（正式路径上是空的）。
+        /// 备份文件名带着原文件名，这里趁机搬回去——否则用户的开场视频就这么无声无息地没了。
+        /// </summary>
+        private void RecoverStaleBackups()
+        {
+            var parent = Path.Combine(_targetDir, StageDirName);
+            if (!Directory.Exists(parent)) return;
+
+            // 先把目录列出来再动：边删除边枚举同一个父目录在有些文件系统上会抛异常
+            foreach (var stageDir in Directory.EnumerateDirectories(parent).ToList())
+            {
+                if (ActiveStageDirs.ContainsKey(stageDir)) continue;
+
+                foreach (var backupPath in Directory.EnumerateFiles(stageDir, $"{BackupPrefix}*").ToList())
+                {
+                    var target = Path.Combine(_targetDir, Path.GetFileName(backupPath)[BackupPrefix.Length..]);
+                    try
+                    {
+                        // 正式路径上已经有文件，说明那次中断没有造成损失，备份留着不覆盖
+                        if (System.IO.File.Exists(target)) continue;
+                        if (MoveWithRetry(backupPath, target))
+                            _logger.LogWarning("从上次中断的事务里恢复了 {target}", target);
+                    }
+                    catch (Exception e)
+                    {
+                        _logger.LogWarning(e, "恢复上次中断的事务失败: {backup}", backupPath);
+                    }
+                }
+
+                try
+                {
+                    if (!Directory.EnumerateFileSystemEntries(stageDir).Any()) Directory.Delete(stageDir);
+                }
+                catch
+                {
+                    // 忽略清理失败
+                }
+            }
+        }
 
         /// <summary>
         /// 把旧文件 rename 进 stage 当备份。文件不存在时什么都不做。
@@ -915,7 +963,8 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
             if (_backups.Any(entry => string.Equals(entry.Target, path, StringComparison.OrdinalIgnoreCase))) return true;
             if (!System.IO.File.Exists(path)) return true;
 
-            var backupPath = StagePath($"bak_{Guid.NewGuid():N}");
+            // 备份名带上原文件名，进程中途挂掉后下次能照着搬回原位
+            var backupPath = StagePath(BackupPrefix + Path.GetFileName(path));
             if (!MoveWithRetry(path, backupPath)) return false;
 
             _backups.Add((path, backupPath));
@@ -1005,6 +1054,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         {
             if (!_finished) Rollback();
             if (!_keepStageDir) DropStageDir();
+            ActiveStageDirs.TryRemove(StageDirPath, out _);
         }
 
         private void DropStageDir()
