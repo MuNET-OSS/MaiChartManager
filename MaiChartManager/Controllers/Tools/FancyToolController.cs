@@ -383,7 +383,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         catch (Exception e)
         {
             logger.LogError(e, "转换开场视频失败: {id}", id);
-            return new FancyToolResult(false, e is IOException ? "file-locked" : "convert-failed");
+            return new FancyToolResult(false, e is FancyFileLockedException ? "file-locked" : "convert-failed");
         }
         finally
         {
@@ -465,7 +465,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         catch (Exception e)
         {
             logger.LogError(e, "写入开场音频失败: {id}", id);
-            return new FancyToolResult(false, e is IOException ? "file-locked" : "write-failed");
+            return new FancyToolResult(false, e is FancyFileLockedException ? "file-locked" : "write-failed");
         }
         finally
         {
@@ -789,7 +789,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         catch (Exception e)
         {
             logger.LogError(e, "写入曲目伪装封面失败: {id}", id);
-            return new FancyToolResult(false, e is IOException ? "file-locked" : "write-failed");
+            return new FancyToolResult(false, e is FancyFileLockedException ? "file-locked" : "write-failed");
         }
     }
 
@@ -876,6 +876,11 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
 
     #region 文件事务
 
+    /// <summary>文件被别的进程占着（前端预览的句柄没释放），重试之后仍然搬不动。</summary>
+    private sealed class FancyFileLockedException(string message) : IOException(message)
+    {
+    }
+
     /// <summary>
     /// 文件事务：stage 目录就建在目标目录里面，所以所有搬迁都是一次同卷 rename
     /// —— 既不会因为临时目录在别的盘而退化成整文件复制，也不会像「复制备份」那样
@@ -934,7 +939,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                     {
                         // 正式路径上已经有文件，说明那次中断没有造成损失，备份留着不覆盖
                         if (System.IO.File.Exists(target)) continue;
-                        if (MoveWithRetry(backupPath, target))
+                        if (MoveWithRetry(backupPath, target) is null)
                             _logger.LogWarning("从上次中断的事务里恢复了 {target}", target);
                     }
                     catch (Exception e)
@@ -965,7 +970,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
 
             // 备份名带上原文件名，进程中途挂掉后下次能照着搬回原位
             var backupPath = StagePath(BackupPrefix + Path.GetFileName(path));
-            if (!MoveWithRetry(path, backupPath)) return false;
+            if (MoveWithRetry(path, backupPath) is not null) return false;
 
             _backups.Add((path, backupPath));
             return true;
@@ -974,9 +979,18 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
         /// <summary>把 stage 里的新文件放到目标位置（同卷 rename）。</summary>
         public void Place(string stagedPath, string targetPath)
         {
-            if (!MoveWithRetry(stagedPath, targetPath))
-                throw new IOException($"无法写入 {targetPath}");
-            _placedTargets.Add(targetPath);
+            var error = MoveWithRetry(stagedPath, targetPath);
+            if (error is null)
+            {
+                _placedTargets.Add(targetPath);
+                return;
+            }
+
+            // 只有目标确实被别人占着（预览句柄没释放）才提示「文件被占用」，
+            // 磁盘满、权限不足之类报成占用会让用户白关一遍预览
+            if (System.IO.File.Exists(targetPath) && IsFileLocked(targetPath))
+                throw new FancyFileLockedException($"无法写入 {targetPath}");
+            throw new IOException($"无法写入 {targetPath}", error);
         }
 
         /// <summary>
@@ -1029,7 +1043,7 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
                 try
                 {
                     if (!System.IO.File.Exists(backupPath)) continue;
-                    if (!MoveWithRetry(backupPath, target)) PlatformFile.CopyFile(backupPath, target);
+                    if (MoveWithRetry(backupPath, target) is not null) PlatformFile.CopyFile(backupPath, target);
                     if (!System.IO.File.Exists(target)) failedRestores.Add((target, backupPath));
                 }
                 catch (Exception)
@@ -1079,25 +1093,28 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     #region 文件工具
 
     /// <summary>
-    /// 覆盖式移动文件。目标被占用（例如前端还在预览旧文件）时等一会儿再试，最终失败返回 false。
+    /// 覆盖式移动文件。目标被占用（例如前端还在预览旧文件）时等一会儿再试。
+    /// 成功返回 null，失败返回最后一次的异常——调用方要能区分「被占用」和真的写不进去（磁盘满、权限）。
     /// </summary>
-    private static bool MoveWithRetry(string source, string dest)
+    private static Exception? MoveWithRetry(string source, string dest)
     {
         var deadline = DateTime.UtcNow.AddSeconds(3);
+        Exception? lastError = null;
         while (true)
         {
             try
             {
                 PlatformFile.MoveFile(source, dest);
-                return true;
+                return null;
             }
-            catch (Exception) when (DateTime.UtcNow < deadline)
+            catch (Exception e) when (DateTime.UtcNow < deadline)
             {
+                lastError = e;
                 Thread.Sleep(100);
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                return false;
+                return e;
             }
         }
     }
