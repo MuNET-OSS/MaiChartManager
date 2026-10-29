@@ -23,30 +23,47 @@ export default defineComponent({
     const { t } = useI18n();
 
     const busy = ref(false);
+    const loading = ref(false);
     const camouflage = ref(emptyCamouflage());
+    // 表单里现在装的是哪首曲目的数据：切曲目后、数据回来之前不能拿这份表单去保存
+    const loadedId = ref(0);
 
     const load = async () => {
       const id = selectedId.value;
+      loadedId.value = 0;
       if (!id) {
         camouflage.value = emptyCamouflage();
         return;
       }
-      const data: CamouflageInfoDto = (await api.GetCamouflage({ id })).data;
-      // 切曲目后旧请求可能才回来，丢弃过期响应
-      if (id !== selectedId.value) return;
 
-      camouflage.value = {
-        name: data.name ?? '',
-        artist: data.artist ?? '',
-        noteDesigner: data.noteDesigner ?? '',
-        hideNoteDesigner: !!data.hideNoteDesigner,
-        unlockScore: data.unlockScore ?? 0,
-        hasJacket: !!data.hasJacket,
-        jacketPath: data.jacketPath ?? '',
-      };
+      loading.value = true;
+      try {
+        const data: CamouflageInfoDto = (await api.GetCamouflage({ id })).data;
+        // 切曲目后旧请求可能才回来，丢弃过期响应
+        if (id !== selectedId.value) return;
+
+        camouflage.value = {
+          name: data.name ?? '',
+          artist: data.artist ?? '',
+          noteDesigner: data.noteDesigner ?? '',
+          hideNoteDesigner: !!data.hideNoteDesigner,
+          unlockScore: data.unlockScore ?? 0,
+          hasJacket: !!data.hasJacket,
+          jacketPath: data.jacketPath ?? '',
+        };
+        loadedId.value = id;
+      } finally {
+        if (id === selectedId.value) loading.value = false;
+      }
     };
 
+    // 表单内容确实属于当前曲目时才允许改动，否则切换曲目的一瞬间点保存会把上一首的内容写进这一首
+    const ready = computed(() => !!selectedId.value && loadedId.value === selectedId.value);
+    const locked = computed(() => busy.value || loading.value || !ready.value);
+
     watch(selectedId, () => {
+      // 先清空，避免切走之后旧内容还留在表单里
+      camouflage.value = emptyCamouflage();
       if (!selectedId.value) return;
       load().catch(e => globalCapture(e, t('tools.fancy.errorLoad')));
     }, { immediate: true });
@@ -72,7 +89,7 @@ export default defineComponent({
 
     const save = async () => {
       const id = selectedId.value;
-      if (!id) return;
+      if (!id || !ready.value) return;
 
       busy.value = true;
       try {
@@ -91,7 +108,11 @@ export default defineComponent({
         }
 
         addToast({ message: t('tools.fancy.saved'), type: 'success' });
-        await Promise.all([load(), refreshEntries()]);
+        // 刷新失败只是没读到最新数据，文件其实已经写进去了，别报成「写入失败」
+        await Promise.all([
+          load().catch(e => globalCapture(e, t('tools.fancy.errorLoad'))),
+          refreshEntries(),
+        ]);
       } catch (e) {
         globalCapture(e, t('tools.fancy.errorWrite'));
       } finally {
@@ -101,7 +122,7 @@ export default defineComponent({
 
     const uploadJacket = async (file: File) => {
       const id = selectedId.value;
-      if (!id) return;
+      if (!id || !ready.value) return;
 
       busy.value = true;
       try {
@@ -113,7 +134,10 @@ export default defineComponent({
 
         addToast({ message: t('tools.fancy.saved'), type: 'success' });
         // 不要用 load：它会把服务端数据写回表单，冲掉还没保存的填写内容
-        await Promise.all([refreshJacket(), refreshEntries()]);
+        await Promise.all([
+          refreshJacket().catch(e => globalCapture(e, t('tools.fancy.errorLoad'))),
+          refreshEntries(),
+        ]);
       } catch (e) {
         globalCapture(e, t('tools.fancy.errorWrite'));
       } finally {
@@ -146,7 +170,7 @@ export default defineComponent({
 
     const removeJacket = () => {
       const id = selectedId.value;
-      if (!id) return;
+      if (!id || !ready.value) return;
       return confirmThen(t('tools.fancy.camoJacketRemoveConfirm', { id }), async () => {
         const result = (await api.DeleteCamouflageJacket({ id })).data;
         if (!result.success) {
@@ -159,7 +183,7 @@ export default defineComponent({
 
     const removeAll = () => {
       const id = selectedId.value;
-      if (!id) return;
+      if (!id || !ready.value) return;
       return confirmThen(t('tools.fancy.camoRemoveConfirm', { id }), async () => {
         const result = (await api.DeleteCamouflage({ id })).data;
         if (!result.success) {
@@ -193,11 +217,11 @@ export default defineComponent({
                 {t('tools.fancy.noPreview')}
               </div>}
           <div class="flex gap-2">
-            <Button class="px-2! py-1! text-xs" disabled={busy.value} ing={busy.value} onClick={chooseJacket}>
+            <Button class="px-2! py-1! text-xs" disabled={locked.value} ing={busy.value} onClick={chooseJacket}>
               {camouflage.value.hasJacket ? t('tools.fancy.camoJacketReplace') : t('tools.fancy.camoJacketUpload')}
             </Button>
             {camouflage.value.hasJacket &&
-              <Button class="px-2! py-1! text-xs" variant="secondary" disabled={busy.value} onClick={removeJacket}>
+              <Button class="px-2! py-1! text-xs" variant="secondary" disabled={locked.value} onClick={removeJacket}>
                 {t('tools.fancy.camoJacketRemove')}
               </Button>}
           </div>
@@ -206,33 +230,33 @@ export default defineComponent({
         <div class="grow-1 flex flex-col gap-3 min-w-0">
           <div>
             <div class="ml-1 text-sm">{t('tools.fancy.camoName')}</div>
-            <TextInput v-model:value={camouflage.value.name} disabled={busy.value}/>
+            <TextInput v-model:value={camouflage.value.name} disabled={locked.value}/>
           </div>
           <div>
             <div class="ml-1 text-sm">{t('tools.fancy.camoArtist')}</div>
-            <TextInput v-model:value={camouflage.value.artist} disabled={busy.value}/>
+            <TextInput v-model:value={camouflage.value.artist} disabled={locked.value}/>
           </div>
           <div>
             <div class="ml-1 text-sm">{t('tools.fancy.camoNoteDesigner')}</div>
-            <TextInput v-model:value={camouflage.value.noteDesigner} disabled={busy.value}/>
+            <TextInput v-model:value={camouflage.value.noteDesigner} disabled={locked.value}/>
           </div>
-          <CheckBox v-model:value={camouflage.value.hideNoteDesigner} class="m-1" disabled={busy.value}>
+          <CheckBox v-model:value={camouflage.value.hideNoteDesigner} class="m-1" disabled={locked.value}>
             {t('tools.fancy.camoHideNoteDesigner')}
           </CheckBox>
           <div>
             <div class="ml-1 text-sm">{t('tools.fancy.camoUnlockScore')}</div>
             <NumberInput class="w-full" step={0.1} decimal={1} min={0} max={102}
-                         v-model:value={camouflage.value.unlockScore} disabled={busy.value}/>
+                         v-model:value={camouflage.value.unlockScore} disabled={locked.value}/>
             <div class="ml-1 text-xs op-60 ws-normal">{t('tools.fancy.camoUnlockScoreHint')}</div>
           </div>
         </div>
       </div>
 
       <div class="flex gap-2">
-        <Button class="w-0 grow" disabled={busy.value || textMissing.value} ing={busy.value} onClick={save}>
+        <Button class="w-0 grow" disabled={locked.value || textMissing.value} ing={busy.value} onClick={save}>
           {t('tools.fancy.save')}
         </Button>
-        <Button class="w-0 grow" variant="secondary" disabled={busy.value || !hasAny.value} onClick={removeAll}>
+        <Button class="w-0 grow" variant="secondary" disabled={locked.value || !hasAny.value} onClick={removeAll}>
           {t('tools.fancy.camoRemove')}
         </Button>
       </div>
