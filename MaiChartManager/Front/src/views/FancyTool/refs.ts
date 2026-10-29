@@ -85,9 +85,10 @@ export const initFancyTool = async () => {
     genreList.value.length ? Promise.resolve() : updateGenreList(),
     addVersionList.value.length ? Promise.resolve() : updateAddVersionList(),
     refreshEntries(),
-    // 解析 AquaMai.dll 比较慢，不挡首屏
-    loadModFlags(),
   ]);
+
+  // 解析 AquaMai.dll 比较慢，不挡首屏（函数内部已经吞掉异常）
+  loadModFlags();
 
   // 有内容就直接进第一条的编辑界面，没有就停在搜索页
   const first = fancyEntries.value[0];
