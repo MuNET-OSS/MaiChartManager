@@ -66,7 +66,11 @@ public class FancyToolController(ILogger<FancyToolController> logger) : Controll
     public IEnumerable<FancyEntry> GetFancyList()
     {
         var introMovies = ReadIntroMovieEntries().ToDictionary(entry => entry.Id);
-        var camouflages = ReadCamouflageEntries().ToDictionary(entry => entry.Id);
+        // 同一曲目可能有两个只会互相覆盖的文件名（1.toml / 01.toml），
+        // 直接 ToDictionary 会抛异常让整个列表 500，这里取第一条就行
+        var camouflages = ReadCamouflageEntries()
+            .GroupBy(entry => entry.Id)
+            .ToDictionary(group => group.Key, group => group.First());
 
         return introMovies.Keys.Union(camouflages.Keys)
             .OrderBy(id => id)
