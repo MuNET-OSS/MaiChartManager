@@ -135,10 +135,12 @@ export default defineComponent({
         }
 
         addToast({ message: t('tools.fancy.saved'), type: 'success' });
+        // 上传期间用户可能已经切到别的曲目：列表照刷，但不能再动当前表单
+        const sameSong = id === selectedId.value;
+        if (sameSong) camouflage.value.hasJacket = true;
         // 不要用 load：它会把服务端数据写回表单，冲掉还没保存的填写内容
-        camouflage.value.hasJacket = true;
         await Promise.all([
-          refreshJacket().catch(e => globalCapture(e, t('tools.fancy.errorLoad'))),
+          sameSong ? refreshJacket().catch(e => globalCapture(e, t('tools.fancy.errorLoad'))) : null,
           refreshEntries(),
         ]);
       } catch (e) {
@@ -180,11 +182,15 @@ export default defineComponent({
           showFancyError(t, result.error);
           return;
         }
+        const sameSong = id === selectedId.value;
         // 先就地改掉状态：万一接下来的读取失败，界面也不能还显示着一张已经删掉的封面
-        camouflage.value.hasJacket = false;
-        camouflage.value.jacketPath = '';
+        if (sameSong)
+        {
+          camouflage.value.hasJacket = false;
+          camouflage.value.jacketPath = '';
+        }
         await Promise.all([
-          refreshJacket().catch(e => globalCapture(e, t('tools.fancy.errorLoad'))),
+          sameSong ? refreshJacket().catch(e => globalCapture(e, t('tools.fancy.errorLoad'))) : null,
           refreshEntries(),
         ]);
       });
@@ -200,11 +206,12 @@ export default defineComponent({
           return;
         }
         // 删除成功立刻清空表单：万一接下来的读取失败，表单上留着的就是刚删掉的内容，
-        // 用户一按保存又把伪装写回去了
-        camouflage.value = emptyCamouflage();
+        // 用户一按保存又把伪装写回去了。删除期间切走了就别动新曲目的表单
+        const sameSong = id === selectedId.value;
+        if (sameSong) camouflage.value = emptyCamouflage();
         fileToken.value = Date.now();
         await Promise.all([
-          load().catch(e => globalCapture(e, t('tools.fancy.errorLoad'))),
+          sameSong ? load().catch(e => globalCapture(e, t('tools.fancy.errorLoad'))) : null,
           refreshEntries(),
         ]);
       });

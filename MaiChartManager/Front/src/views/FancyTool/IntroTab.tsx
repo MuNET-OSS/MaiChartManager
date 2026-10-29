@@ -208,6 +208,8 @@ export default defineComponent({
         });
 
         await afterChange();
+        // 转码期间可能已经切到别的曲目，这时候提示里的「有没有声音」会是别人家的
+        if (id !== selectedId.value) return;
         // mp4 是静音的，声音来自自动生成的 acb/awb
         addToast({
           message: introInfo.value?.hasAudio
