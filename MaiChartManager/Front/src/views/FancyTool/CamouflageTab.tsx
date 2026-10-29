@@ -28,9 +28,10 @@ export default defineComponent({
     // 表单里现在装的是哪首曲目的数据：切曲目后、数据回来之前不能拿这份表单去保存
     const loadedId = ref(0);
 
+    // 只在切换曲目时重置就绪状态：保存成功后重新读一遍不算「换了一首」，
+    // 这里若也清零，一次读失败就会把表单锁死到下次切曲目
     const load = async () => {
       const id = selectedId.value;
-      loadedId.value = 0;
       if (!id) {
         camouflage.value = emptyCamouflage();
         return;
@@ -62,8 +63,9 @@ export default defineComponent({
     const locked = computed(() => busy.value || loading.value || !ready.value);
 
     watch(selectedId, () => {
-      // 先清空，避免切走之后旧内容还留在表单里
+      // 先清空，避免切走之后旧内容还留在表单里，也顺带把表单锁到读完为止
       camouflage.value = emptyCamouflage();
+      loadedId.value = 0;
       if (!selectedId.value) return;
       load().catch(e => globalCapture(e, t('tools.fancy.errorLoad')));
     }, { immediate: true });
