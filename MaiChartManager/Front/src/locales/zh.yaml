@@ -411,45 +411,40 @@ mod:
     pathDesc: USB 序列号或端口路径，例如 2.2。请使用配置工具中显示的标识。留空则使用第一个检测到的设备作为 1P
 tools:
   fancy:
-    preview: 预览
-    path: 文件路径
-    noPreview: 还没有文件
-    existing: 已有
-    none: 暂无
-    load: 载入
-    delete: 删除
-    introReplace: 更换视频
-    camoJacketShort: 含封面
     label: 开场视频与曲目伪装
-    title: 开场视频与曲目伪装
-    music: 乐曲
-    musicPlaceholder: 输入 ID 或名称搜索
-    musicPick: 选择乐曲
-    pickMusicFirst: 请先选择一首乐曲
+    pickMusic: 选择乐曲
+    filterPlaceholder: 过滤已有曲目
+    noEntries: 还没有做过开场视频或曲目伪装的曲目
+    noMatch: 没有匹配的曲目
+    searchHint: 点击任意一行即可编辑这首乐曲
+    restartHint: 修改后需重启游戏才会生效
+    badgeIntro: 有开场视频
+    badgeCamouflage: 有曲目伪装
+    preview: 预览
+    noPreview: 还没有文件
+    none: 暂无
     introTab: 开场视频
     camouflageTab: 曲目伪装
-    introHint: 在游戏内开始乐曲前播放自定义视频（AquaMai 的 CustomIntroCinematic）。左右屏可以共用一个视频，也可以分开两个。上传后视频会转成静音 mp4，音轨自动提取成 Enter_<id>.acb / .awb，由游戏单独播放。
-    introSingle: 单文件
-    introAudio: 音频
-    introSide: 应用到
+    introModDisabled: AquaMai 的 Fancy.CustomIntroCinematic 没有开启，游戏里不会生效。去「Mod 配置」里打开后再来修改。
     introSame: 左右屏使用同一视频
-    introSameHint: 关闭后左右屏各用一个视频，预览按 1:2 并排播放，可分别替换某一侧；切换开关本身不改动文件，替换视频时才会写入
     introLeft: 替换左侧视频（L）
     introRight: 替换右侧视频（R）
-    introAudioGenerated: 已保存：音轨已生成 acb/awb，游戏里由它发声
-    introAudioSilent: 已保存：视频没有音轨，将静音播放
-    introAudioReplace: 替换音频
-    introAudioAdd: 添加音频
-    introAudioRemove: 删除音频
-    introAudioRemoveConfirm: 确定要删除乐曲 {id} 的开场音频吗？（左右屏共用一组 acb/awb）
-    introAudioShared: 左右屏共用
-    sideBoth: 左右屏同一视频
-    sideLeft: 仅左屏（L）
-    sideRight: 仅右屏（R）
     introUpload: 选择视频
+    introReplace: 更换视频
     introRemove: 删除开场视频
     introRemoveConfirm: 确定要删除乐曲 {id} 的开场视频吗？
-    camouflageHint: 在选曲和开始界面把乐曲显示成别的曲名、曲师和封面（AquaMai 的 TrackCamouflage），适合配合开场视频做伪装演出。
+    introAudio: 音频
+    introAudioYes: 有
+    introAudioNo: 无
+    introAudioAdd: 添加音频
+    introAudioReplace: 替换音频
+    introAudioRemove: 删除音频
+    introAudioRemoveConfirm: 确定要删除乐曲 {id} 的开场音频吗？
+    introAudioGenerated: 已保存：游戏内会有声音
+    introAudioSilent: 已保存：没有音频，将静音播放
+    introEncodingAudio: 正在生成音频…
+    camouflageHint: 在选曲和开始界面把乐曲显示成别的曲名、曲师和封面。
+    camoModDisabled: AquaMai 的 Fancy.TrackCamouflage 没有开启，游戏里不会生效。去「Mod 配置」里打开后再来修改。
     camoName: 伪装后的曲名
     camoArtist: 伪装后的曲师
     camoNoteDesigner: 伪装后的谱师
@@ -458,6 +453,8 @@ tools:
     camoUnlockScoreHint: 0 表示打过一个成绩就不再伪装；填 102 可以永久伪装
     camoJacketUpload: 选择封面（jpg / png）
     camoJacketReplace: 更换封面
+    camoJacketRemove: 删除封面
+    camoJacketRemoveConfirm: 确定要删除乐曲 {id} 的伪装封面吗？曲名等信息会保留
     camoRemove: 清除伪装
     camoRemoveConfirm: 确定要清除乐曲 {id} 的伪装信息和封面吗？
     save: 保存
@@ -468,12 +465,12 @@ tools:
     errorInvalidSide: 视频位置无效
     errorInvalidText: 曲名和曲师不能为空
     errorInvalidImage: 只支持 jpg / png 图片
-    errorLicense: 需要有效的授权才能转换视频
+    errorInvalidAudio: 音频文件无法识别或转换失败
     errorGamePath: 未配置游戏目录
     errorConvert: 视频转换失败
     errorWrite: 写入文件失败
-    errorDeleteLocked: 删除失败：文件仍被占用，请关闭预览后重试
-    errorInvalidAudio: 音频文件无法识别或转换失败
+    errorFileLocked: 文件仍被占用，请关闭预览后重试
+    errorDeleteFailed: 删除文件失败，请关闭预览后重试
   title: 工具
   audioConvert: 音频转换（ACB + AWB）
   videoConvert: 视频转换（DAT）

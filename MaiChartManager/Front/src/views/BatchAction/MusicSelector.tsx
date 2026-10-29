@@ -7,6 +7,7 @@ import JacketBox from "@/components/JacketBox";
 import { GenreOption } from "@/components/GenreInput";
 import { LEVEL_COLOR, LEVELS } from "@/consts";
 import _ from "lodash";
+import { matchMusicKeyword, MusicIdKind, musicIdKind } from "@/utils/musicSearch";
 import { watchDebounced } from "@vueuse/core";
 import { scrollToMusic } from "@/views/Charts/MusicList";
 import { useI18n } from 'vue-i18n';
@@ -24,16 +25,7 @@ export default defineComponent({
     const nameColumn = reactive({
       title: t('music.list.tableTitle'), key: 'name',
       filterOptionValue: null as string | null,
-      filter: (value, row) => {
-        if (!value) return true;
-        value = value.toString().toLowerCase();
-        return row.name!.toLowerCase().includes(value) ||
-          row.artist!.toLowerCase().includes(value) ||
-          row.charts!.some(chart => chart.designer?.toLowerCase().includes(value)) ||
-          row.id!.toString().includes(value) || // match by ID
-          false;
-
-      }
+      filter: (value, row) => matchMusicKeyword(row, value?.toString() ?? ''),
     } satisfies DataTableBaseColumn<MusicXmlWithABJacket>)
     const columns = computed(() => [
       { type: 'selection' },
@@ -43,19 +35,13 @@ export default defineComponent({
         key: 'id',
         width: '7em',
         sorter: 'default',
-        filterOptions: [t('music.list.filterStandard'), t('music.list.filterDX'), t('music.list.filterUtage')].map(it => ({ label: it, value: it })),
-        filter: (value, row) => {
-          switch (value) {
-            case t('music.list.filterStandard'):
-              return row.id! < 1e4;
-            case t('music.list.filterDX'):
-              return row.id! >= 1e4 && row.id! < 1e5;
-            case t('music.list.filterUtage'):
-              return row.id! >= 1e5;
-            default:
-              throw new Error('Invalid filter value');
-          }
-        }
+        filterOptions: [
+          { label: t('music.list.filterStandard'), value: MusicIdKind.Standard },
+          { label: t('music.list.filterDX'), value: MusicIdKind.DX },
+          { label: t('music.list.filterUtage'), value: MusicIdKind.Utage },
+        ],
+        // 顺便修掉之前用翻译后的文案当筛选值来比较的写法
+        filter: (value, row) => musicIdKind(row.id) === value,
       },
       {
         title: t('music.list.tableCover'),

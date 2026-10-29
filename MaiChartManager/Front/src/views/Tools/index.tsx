@@ -1,10 +1,12 @@
 import api from '@/client/api';
+import { LicenseStatus } from '@/client/apiGen';
 import { addToast } from '@munet/ui';
 import { defineComponent, ref } from 'vue';
 import ImageToAbModal from '@/views/Tools/ImageToAbModal';
 import PvConvertDropMenu from '@/views/Tools/PvConvertDropMenu';
 import ResourceJunctionModal from '@/views/Tools/ResourceJunctionModal';
-import IntroCamouflageModal from '@/views/Tools/IntroCamouflageModal';
+import { showNeedPurchaseDialog, version } from '@/store/refs';
+import { openWindow } from '@/utils/openWindow';
 import { useI18n } from 'vue-i18n';
 
 interface ToolCard {
@@ -18,8 +20,22 @@ export default defineComponent({
   setup() {
     const imageToAbRef = ref<{ trigger: () => void }>();
     const resourceJunctionRef = ref<{ trigger: () => void }>();
-    const fancyRef = ref<{ trigger: () => void }>();
     const { t } = useI18n();
+
+    // 开场视频要把上传的视频重新编码，属于付费功能；在打开工具时统一校验，
+    // 工具内部就不再逐个接口判断了
+    const openFancyTool = () => {
+      if (version.value?.license !== LicenseStatus.Active) {
+        showNeedPurchaseDialog.value = true;
+        return;
+      }
+      openWindow({
+        path: '/fancy-tool',
+        title: t('tools.fancy.label'),
+        width: 1280,
+        height: 820,
+      });
+    };
 
     const handleAudioConvert = async () => {
       try {
@@ -53,7 +69,7 @@ export default defineComponent({
       {
         icon: 'i-mdi-movie-open-star',
         labelKey: 'tools.fancy.label',
-        action: () => fancyRef.value?.trigger(),
+        action: openFancyTool,
       },
     ];
 
@@ -86,7 +102,6 @@ export default defineComponent({
         </div>
         <ImageToAbModal ref={imageToAbRef as any} />
         <ResourceJunctionModal ref={resourceJunctionRef as any} />
-        <IntroCamouflageModal ref={fancyRef as any} />
       </div>
     );
   },
