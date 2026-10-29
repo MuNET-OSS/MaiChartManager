@@ -477,6 +477,7 @@ tools:
     errorConvert: 影片轉換失敗
     errorWrite: 寫入檔案失敗
     errorFileLocked: 檔案仍被占用，請關閉預覽後重試
+    errorDeleteFailed: 刪除檔案失敗，請關閉預覽後重試
   title: 工具
   audioConvert: 音訊轉換（ACB + AWB）
   videoConvert: 影片轉換（DAT）

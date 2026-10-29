@@ -514,6 +514,7 @@ tools:
     errorConvert: Video conversion failed
     errorWrite: Failed to write file
     errorFileLocked: The file is still in use, close the preview and try again
+    errorDeleteFailed: Failed to delete the file, close the preview and try again
   title: Tools
   audioConvert: Audio Convert (ACB + AWB)
   videoConvert: Video Convert (DAT)

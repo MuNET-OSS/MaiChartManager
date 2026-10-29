@@ -13,7 +13,7 @@ const errorKeys: Record<string, string> = {
   'convert-failed': 'tools.fancy.errorConvert',
   'write-failed': 'tools.fancy.errorWrite',
   'file-locked': 'tools.fancy.errorFileLocked',
-  'delete-failed': 'tools.fancy.errorFileLocked',
+  'delete-failed': 'tools.fancy.errorDeleteFailed',
 };
 
 /** SSE 的 Error 事件把错误码当消息传过来，用它区分「后端返回的错误码」和「网络/其它异常」 */
