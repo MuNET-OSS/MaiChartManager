@@ -354,7 +354,6 @@ export default defineComponent({
 
     return () => <div class="flex flex-col gap-3 py">
       {renderWarning()}
-      <div class="text-sm op-70 ws-normal">{t('tools.fancy.introHint')}</div>
 
       <div>
         <div class="ml-1 text-sm">{t('tools.fancy.preview')}</div>

@@ -425,7 +425,6 @@ tools:
     none: 暂无
     introTab: 开场视频
     camouflageTab: 曲目伪装
-    introHint: 在游戏内开始乐曲前播放自定义视频。左右屏可以共用一个视频，也可以分开两个。上传后视频会转成静音 mp4，音轨自动编码成 Enter_<id>.acb / .awb，由游戏单独播放。需要在 AquaMai 里开启 Fancy.CustomIntroCinematic。
     introModDisabled: AquaMai 的 Fancy.CustomIntroCinematic 没有开启，游戏里不会生效。去「Mod 配置」里打开后再来修改。
     introSame: 左右屏使用同一视频
     introLeft: 替换左侧视频（L）
@@ -441,10 +440,10 @@ tools:
     introAudioReplace: 替换音频
     introAudioRemove: 删除音频
     introAudioRemoveConfirm: 确定要删除乐曲 {id} 的开场音频吗？
-    introAudioGenerated: 已保存：游戏里由 acb/awb 发声
+    introAudioGenerated: 已保存：游戏内会有声音
     introAudioSilent: 已保存：没有音频，将静音播放
     introEncodingAudio: 正在生成音频…
-    camouflageHint: 在选曲和开始界面把乐曲显示成别的曲名、曲师和封面，适合配合开场视频做伪装演出。需要在 AquaMai 里开启 Fancy.TrackCamouflage。
+    camouflageHint: 在选曲和开始界面把乐曲显示成别的曲名、曲师和封面。
     camoModDisabled: AquaMai 的 Fancy.TrackCamouflage 没有开启，游戏里不会生效。去「Mod 配置」里打开后再来修改。
     camoName: 伪装后的曲名
     camoArtist: 伪装后的曲师
