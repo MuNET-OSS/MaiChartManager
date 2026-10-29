@@ -108,6 +108,7 @@ public static class VideoConvert
 
         /// <summary>
         /// 高画质。硬件编码器的默认参数通常很糊，这里按编码器给显式的画质参数。
+        /// 注意只有 H264 编码器有这套参数表：走 VP9 时这个档位会被忽略，实际还是编码器默认质量。
         /// </summary>
         High,
     }
