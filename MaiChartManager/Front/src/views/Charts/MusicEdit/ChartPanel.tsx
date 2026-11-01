@@ -32,7 +32,8 @@ export default defineComponent({
     })
 
     const sync = (key: keyof Chart, method: Function) => async () => {
-      if (disableSync.value || !props.chart) return;
+      // A000 只读：这里目前靠输入组件的 disabled 注入挡住，入口处再拦一层，和保存 / 删除的口径一致
+      if (disableSync.value || isReadOnlyDir.value || !props.chart) return;
       selectedMusic.value!.modified = true;
       await method(props.songId, props.chartIndex, selectedADir.value, props.chart[key]!);
     }
