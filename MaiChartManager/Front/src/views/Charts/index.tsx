@@ -1,4 +1,4 @@
-import { computed, defineComponent, ref, Transition, watch } from 'vue';
+import { defineComponent, ref, Transition, watch } from 'vue';
 import MusicList from './MusicList';
 import MusicEdit from './MusicEdit';
 import MusicSelectedTopRightToolbar from './MusicSelectedTopRightToolbar';
@@ -8,17 +8,14 @@ import CopyToButton from './CopyToButton';
 import MemoBox from './AssetDirsManager/MemoBox';
 import TransitionOpacity from '@/components/TransitionOpacity';
 import { useI18n } from 'vue-i18n';
-import { selectedADir, selectedMusic } from '@/store/refs';
-import { leftPanel, rightPanel } from './refs';
+import { isReadOnlyDir, selectedMusic } from '@/store/refs';
+import { leftPanel, musicDrawerOpen, rightPanel } from './refs';
 import styles from './index.module.sass';
 
 export default defineComponent({
   setup() {
     const { t } = useI18n();
-    const mobileShowMenu = ref(false);
     const isForward = ref(true);
-    // A000 是游戏本体目录，只读：按钮保留但禁用，下面用灰字说明原因
-    const isA000 = computed(() => selectedADir.value === 'A000');
     watch(leftPanel, (val) => {
       isForward.value = val === 'assetDirs';
     });
@@ -32,7 +29,7 @@ export default defineComponent({
         'max-[1439px]:absolute max-[1439px]:left-16 max-[1439px]:w-40em max-[1439px]:max-w-[calc(100dvw-64px)] max-[1439px]:z-10 transition-transform duration-300',
         'max-[1439px]:bg-white max-[1439px]:border-r-solid max-[1439px]:border-r-1 max-[1439px]:border-r-gray-200',
         'max-[767px]:left-0 max-[767px]:max-w-100dvw',
-        mobileShowMenu.value ? 'max-[1439px]:translate-x-0' : 'max-[1439px]:translate-x-[-100%]',
+        musicDrawerOpen.value ? 'max-[1439px]:translate-x-0' : 'max-[1439px]:translate-x-[-100%]',
       ]}>
         <div class="relative h-full of-hidden">
           <Transition
@@ -42,17 +39,17 @@ export default defineComponent({
             leaveToClass={isForward.value ? styles.forwardLeaveTo : styles.backwardLeaveTo}
           >
             {leftPanel.value === 'musicList'
-              ? <MusicList toggleMenu={() => (mobileShowMenu.value = false)} key="musicList" />
+              ? <MusicList toggleMenu={() => (musicDrawerOpen.value = false)} key="musicList" />
               : <AssetDirsManager key="assetDirs" />
             }
           </Transition>
         </div>
       </div>
       <TransitionOpacity>
-        {mobileShowMenu.value && (
+        {musicDrawerOpen.value && (
           <div
             class="min-[1440px]:hidden absolute-full z-5 bg-white/70 backdrop-blur-sm"
-            onClick={() => (mobileShowMenu.value = false)}
+            onClick={() => (musicDrawerOpen.value = false)}
           />
         )}
       </TransitionOpacity>
@@ -65,7 +62,7 @@ export default defineComponent({
         ) : (
           <div class="flex flex-col gap-4 p-y h-full">
             <div class="flex flex-wrap items-center gap-2 shrink-0 px">
-              <button onClick={() => (mobileShowMenu.value = true)} class="min-[1440px]:hidden">
+              <button onClick={() => (musicDrawerOpen.value = true)} class="min-[1440px]:hidden">
                 <span class="i-ic-baseline-menu text-lg" />
               </button>
               <div class="grow-1" />
@@ -73,12 +70,12 @@ export default defineComponent({
                 <div class="flex flex-wrap items-center justify-end gap-2 max-[639px]:w-full">
                   {!!selectedMusic.value && <div class="shrink-0"><CopyToButton /></div>}
                   {/* A000 是游戏本体目录，不允许编辑：按钮保留但禁用，下面用灰字说明原因 */}
-                  <div class={['flex flex-wrap items-center justify-end gap-2', isA000.value && 'pointer-events-none op-50']}>
+                  <div class={['flex flex-wrap items-center justify-end gap-2', isReadOnlyDir.value && 'pointer-events-none op-50']}>
                     <div class="flex gap-2 shrink-0"><MusicSelectedTopRightToolbar /></div>
                     <div class="shrink-0"><ImportCreateChartButton /></div>
                   </div>
                 </div>
-                {isA000.value && <div class="text-xs c-gray-5">{t('assetDir.selectNonA000')}</div>}
+                {isReadOnlyDir.value && <div class="text-xs c-gray-5">{t('assetDir.selectNonA000')}</div>}
               </div>
             </div>
             <div class="of-y-auto cst grow-1 px">

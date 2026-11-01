@@ -4,7 +4,7 @@ import { Button, Select, TextInput, theme } from "@munet/ui";
 import { VList } from 'virtua/vue';
 import MusicEntry from "@/views/Charts/MusicList/MusicEntry";
 import { assetDirs, musicList, musicSortMode, MusicSortMode, selectedADir, selectMusicId } from "@/store/refs";
-import { leftPanel } from "@/views/Charts/refs";
+import { leftPanel, musicDrawerOpen } from "@/views/Charts/refs";
 import { matchMusicKeyword } from "@/utils/musicSearch";
 import { useI18n } from 'vue-i18n';
 
@@ -36,8 +36,10 @@ export const scrollToMusic = async (musicId: number) => {
   // 目标必须在当前 A-dir 里。跨目录不是这里处理的：调用方（批量页跳转）会先把 selectedADir 切到目标所在目录
   if (!musicList.value.some(m => m.id === musicId)) return;
 
-  // 跳转的含义是「回到曲目列表并看到这首歌」：左侧停在目录管理时也要切回列表
+  // 跳转的含义是「回到曲目列表并看到这首歌」：左侧停在目录管理时也要切回列表；
+  // 窄屏下列表是抽屉，不拉开的话用户只看到右边，等于没跳
   if (leftPanel.value !== 'musicList') leftPanel.value = 'musicList';
+  musicDrawerOpen.value = true;
 
   // 搜索词把目标挡住了就先清掉，否则 scrollToIndex 找不到它
   if (keyword.value && !displayedMusic.value.some(m => m.id === musicId)) {
@@ -128,7 +130,12 @@ export default defineComponent({
         <div class="relative flex-1 min-h-0">
           <VList ref={musicListRef} class="h-full cst" data={displayedMusic.value}>
             {({item}: {item: MusicXmlWithABJacket}) => (
-              <MusicEntry music={item} selected={selectMusicId.value === item.id} onClick={() => selectMusicId.value = item.id!} key={item.id} />
+              <MusicEntry music={item} selected={selectMusicId.value === item.id} key={item.id}
+                onClick={() => {
+                  // 用户自己点了别的曲目，之前那次还没执行的跳转就不再作数了
+                  cancelPendingJump();
+                  selectMusicId.value = item.id!;
+                }} />
             )}
           </VList>
           {keyword.value && !displayedMusic.value.length &&

@@ -23,8 +23,12 @@ export const matchMusicKeyword = (music: MusicXmlWithABJacket, keyword: string) 
   const value = keyword.trim().toLowerCase();
   if (!value) return true;
 
+  // 列表里的 ID 按 6 位补零显示（000123），所以补零形式也要能搜到
+  const rawId = (music.id ?? 0).toString();
+
   return (music.name ?? '').toLowerCase().includes(value)
     || (music.artist ?? '').toLowerCase().includes(value)
-    || (music.id ?? 0).toString().includes(value)
+    || rawId.includes(value)
+    || rawId.padStart(6, '0').includes(value)
     || (music.charts ?? []).some(chart => chart.designer?.toLowerCase().includes(value));
 };
