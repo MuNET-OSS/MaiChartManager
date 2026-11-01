@@ -4,6 +4,7 @@ import { Button, Modal, Radio, showTransactionalDialog, addToast } from '@munet/
 import { computed, defineComponent, ref, shallowRef } from 'vue';
 import JacketBox from '../JacketBox';
 import { DIFFICULTY } from '@/consts';
+import { isReadOnlyDir } from "@/store/refs";
 import api from '@/client/api';
 import CheckingModal from "@/views/Charts/ImportCreateChartButton/ImportChartButton/CheckingModal";
 import LevelTagsDisplay from "@/components/LevelTagsDisplay";
@@ -40,6 +41,8 @@ export default defineComponent({
 
     // 注：本功能的逻辑是，如果选择的是ma2文件，则只替换指定难度的谱面；如果选择的是maidata，则替换整首歌的所有难度。
     prepareReplaceChart = async (fHandle?: FileSystemFileHandle, side?: ChartSide) => {
+      // A000 只读：替换谱面是写操作，入口处直接挡掉
+      if (isReadOnlyDir.value) return;
       targetSide.value = side;
       let selectedFile: File;
       if (!fHandle) {

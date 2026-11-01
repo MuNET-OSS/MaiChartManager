@@ -4,7 +4,7 @@ import SelectFileTypeTip from "./SelectFileTypeTip";
 import { LicenseStatus, MessageLevel } from "@/client/apiGen";
 import CheckingModal from "./CheckingModal";
 import api, { getUrl } from "@/client/api";
-import { globalCapture, selectedADir, selectMusicId, updateMusicList, version as appVersion } from "@/store/refs";
+import { globalCapture, isReadOnlyDir, selectedADir, selectMusicId, updateMusicList, version as appVersion } from "@/store/refs";
 import { appSettings } from "@/store/settings";
 import ErrorDisplayIdInput from "./ErrorDisplayIdInput";
 import ImportStepDisplay from "./ImportStepDisplay";
@@ -226,6 +226,8 @@ export default defineComponent({
     }
 
     startProcess = async (dir?: ImportDirectory | ImportDirectory[]) => {
+      // A000 只读：拖拽进来的导入也要挡住，不只是点按钮
+      if (isReadOnlyDir.value) return;
       let id = getNextUnusedMusicId();
       const usedIds = [] as number[];
       errors.value = [];
@@ -305,7 +307,7 @@ export default defineComponent({
       }
     }
 
-    return () => <Button onClick={() => startProcess()} variant="secondary">
+    return () => <Button onClick={() => startProcess()} disabled={isReadOnlyDir.value} variant="secondary">
       {t('chart.import.title')}
       <SelectFileTypeTip show={step.value === STEP.selectFile} closeModal={closeModal} />
       <CheckingModal title={t('chart.import.checkingTitle')} show={step.value === STEP.checking} closeModal={closeModal} />

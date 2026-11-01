@@ -2,7 +2,7 @@ import { computed, defineComponent, PropType, ref } from "vue";
 import noJacket from "@/assets/noJacket.webp";
 import api, { getUrl } from "@/client/api";
 import { showTransactionalDialog } from "@munet/ui";
-import { globalCapture, selectedADir, selectedMusic } from "@/store/refs";
+import { globalCapture, isReadOnlyDir, selectedADir, selectedMusic } from "@/store/refs";
 import { MusicXmlWithABJacket } from "@/client/apiGen";
 import { useI18n } from 'vue-i18n';
 import { pickFile } from "@/utils/pickFile";
@@ -24,6 +24,8 @@ export default defineComponent({
     if (props.upload)
       upload = async (fileHandle?: FileSystemFileHandle) => {
         if (!props.upload) return;
+        // A000 只读：点封面或拖拽换图都会走到这里
+        if (isReadOnlyDir.value) return;
         try {
           let file: File;
           if (!fileHandle) {

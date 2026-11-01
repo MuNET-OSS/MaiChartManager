@@ -8,6 +8,7 @@ import PreviewChartButton from "@/views/Charts/MusicEdit/PreviewChartButton";
 import { useI18n } from 'vue-i18n';
 import { Button, CheckBox, NumberInput, Select, TextInput } from "@munet/ui";
 import { prepareReplaceChart } from "@/components/DragDropDispatcher/ReplaceChartModal";
+import { isReadOnlyDir } from "@/store/refs";
 import type { ChartSide } from "@/views/Charts/MusicEdit/PreviewChartButton";
 import styles from './index.module.sass';
 
@@ -46,7 +47,7 @@ export default defineComponent({
     const sideRow = (side: ChartSide, label: string) => <div class="flex flex-wrap items-center gap-2">
       <span class="text-sm font-500">{label}</span>
       <PreviewChartButton songId={props.songId} level={props.chartIndex} side={side}/>
-      <Button onClick={() => prepareReplaceChart(undefined, side)}>
+      <Button onClick={() => prepareReplaceChart(undefined, side)} disabled={isReadOnlyDir.value}>
         {t('music.edit.replaceChart')}
       </Button>
     </div>;
@@ -54,7 +55,7 @@ export default defineComponent({
     return () => <div class="flex flex-col gap-2">
         {!props.doublePlayer && <div class="absolute right-0 top-0 m-xy mt-2 z-2 flex gap-2">
           <PreviewChartButton songId={props.songId} level={props.chartIndex}/>
-          <Button onClick={() => prepareReplaceChart()}>
+          <Button onClick={() => prepareReplaceChart()} disabled={isReadOnlyDir.value}>
             {t('music.edit.replaceChart')}
           </Button>
         </div>}

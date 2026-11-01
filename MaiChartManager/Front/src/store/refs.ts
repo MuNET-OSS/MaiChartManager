@@ -77,6 +77,10 @@ export const musicList = computed(() =>
 export const selectedMusic = computed(() => musicList.value.find(m => m.id === selectMusicId.value));
 export const selectedLevel = ref(0);
 
+// A000 是游戏本体目录，只读。所有写入入口（保存/删除/导入/创建/替换谱面）都要先看它，
+// 只靠禁用样式挡不住键盘和 Ctrl+S 这类快捷操作。
+export const isReadOnlyDir = computed(() => selectedADir.value === 'A000');
+
 // 如ReplaceChart等后端接口可能会涉及对MusicXml中的信息进行修改后保存。此时前端updateMusicList时会发现相关数据出现变更，触发了MusicEdit/ChartPanel中的watch，造成发送多余的edit请求、同时modified也被错误设置为true。
 // 因此，对于涉及内部对xml进行修改后会自动保存的后端接口，可以在updateMusicList期间打开本选项，以阻止MusicEdit/ChartPanel中的sync动作。
 export const disableSync = ref(false);
