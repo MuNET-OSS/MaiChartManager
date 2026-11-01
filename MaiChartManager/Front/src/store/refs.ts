@@ -90,8 +90,10 @@ export { aquaMaiConfig } from "@/views/ModManager/refs";
 export const saveMusicIfNeeded = async (id: number) => {
   if (!id) return;
   const music = musicListAll.value.find(m => m.id === id);
-  if (!music?.modified) return;
-  await api.SaveMusic(id, selectedADir.value);
+  // 写入用曲目自己的 assetDir：这里是被失焦 / 切歌自动触发的，那一刻 selectedADir 可能已经变了，
+  // 切到只读的 A000 时更不能把待保存的内容写进去
+  if (!music?.modified || !music.assetDir || music.assetDir === 'A000') return;
+  await api.SaveMusic(id, music.assetDir);
   await updateMusicList();
 }
 
