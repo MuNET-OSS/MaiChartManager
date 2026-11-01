@@ -81,6 +81,7 @@ music:
     sortByName: 名称
     sortByVersion: 更新时间
   edit:
+    selectHint: 请选择谱面以编辑
     name: 名称
     artist: 作者
     bpm: BPM

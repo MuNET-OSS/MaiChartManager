@@ -82,7 +82,9 @@ export default defineComponent({
               </div>
             </div>
             <div class="of-y-auto cst grow-1 px">
-              <MusicEdit />
+              {selectedMusic.value
+                ? <MusicEdit />
+                : <div class="h-full flex items-center justify-center text-2xl op-50 select-none">{t('music.edit.selectHint')}</div>}
             </div>
           </div>
         )}
