@@ -17,6 +17,8 @@ export default defineComponent({
     const { t } = useI18n();
     const mobileShowMenu = ref(false);
     const isForward = ref(true);
+    // A000 是游戏本体目录，只读：按钮保留但禁用，下面用灰字说明原因
+    const isA000 = computed(() => selectedADir.value === 'A000');
     watch(leftPanel, (val) => {
       isForward.value = val === 'assetDirs';
     });
@@ -67,16 +69,16 @@ export default defineComponent({
                 <span class="i-ic-baseline-menu text-lg" />
               </button>
               <div class="grow-1" />
-              <div class="flex flex-wrap items-center justify-end gap-2 max-[639px]:w-full">
-                {!!selectedMusic.value && <div class="shrink-0"><CopyToButton /></div>}
-                {selectedADir.value === 'A000' ? (
-                  t('assetDir.selectNonA000')
-                ) : (
-                  <>
+              <div class="flex flex-col items-end gap-1 max-[639px]:w-full">
+                <div class="flex flex-wrap items-center justify-end gap-2 max-[639px]:w-full">
+                  {!!selectedMusic.value && <div class="shrink-0"><CopyToButton /></div>}
+                  {/* A000 是游戏本体目录，不允许编辑：按钮保留但禁用，下面用灰字说明原因 */}
+                  <div class={['flex flex-wrap items-center justify-end gap-2', isA000.value && 'pointer-events-none op-50']}>
                     <div class="flex gap-2 shrink-0"><MusicSelectedTopRightToolbar /></div>
                     <div class="shrink-0"><ImportCreateChartButton /></div>
-                  </>
-                )}
+                  </div>
+                </div>
+                {isA000.value && <div class="text-xs c-gray-5">{t('assetDir.selectNonA000')}</div>}
               </div>
             </div>
             <div class="of-y-auto cst grow-1 px">
