@@ -126,6 +126,8 @@ export default defineComponent({
               // `button:hover { transform: scale(1.02) }` 特异性更高，会把 translate 整条顶掉，悬停时按钮往下掉半个高度
               class="absolute right-2 top-0 bottom-0 my-auto w-7 h-7 p-0 flex items-center justify-center rounded-full border-none bg-transparent c-gray-4 hover:c-gray-6 cursor-pointer"
               title={t('music.list.clearSearch')}
+              // 阻止 mousedown 把焦点挪到按钮上：清空后还能接着打字，不用再点一次输入框
+              onMousedown={(e: MouseEvent) => e.preventDefault()}
               onClick={clearSearch}
             >
               <span class="i-mdi:close-circle text-lg" />
