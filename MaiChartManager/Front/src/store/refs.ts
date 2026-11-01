@@ -89,10 +89,12 @@ export { aquaMaiConfig } from "@/views/ModManager/refs";
 
 export const saveMusicIfNeeded = async (id: number) => {
   if (!id) return;
-  const music = musicListAll.value.find(m => m.id === id);
+  // 同 ID 曲目可能同时存在于多个目录（A000 与用户目录），按 id 单独取会命中别目录那条、
+  // 因它的 modified 是 false 而误判成「不用保存」。modified 只会标在正在编辑的曲目上，拿它定位即可。
+  const music = musicListAll.value.find(m => m.id === id && m.modified);
   // 写入用曲目自己的 assetDir：这里是被失焦 / 切歌自动触发的，那一刻 selectedADir 可能已经变了，
   // 切到只读的 A000 时更不能把待保存的内容写进去
-  if (!music?.modified || !music.assetDir || music.assetDir === 'A000') return;
+  if (!music?.assetDir || music.assetDir === 'A000') return;
   await api.SaveMusic(id, music.assetDir);
   await updateMusicList();
 }
