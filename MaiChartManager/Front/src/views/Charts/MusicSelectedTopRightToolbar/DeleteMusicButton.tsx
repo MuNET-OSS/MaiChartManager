@@ -1,6 +1,6 @@
 import { defineComponent, ref } from "vue";
 import api from "@/client/api";
-import { globalCapture, selectedADir, selectMusicId, updateMusicList } from "@/store/refs";
+import { globalCapture, isReadOnlyDir, selectedADir, selectMusicId, updateMusicList } from "@/store/refs";
 import { Button, showTransactionalDialog } from "@munet/ui";
 import { useI18n } from 'vue-i18n';
 
@@ -11,6 +11,8 @@ export default defineComponent({
     const { t } = useI18n();
 
     const del = async () => {
+      // A000 只读：按钮已禁用，这里再兜一层，防止键盘/程序化触发
+      if (isReadOnlyDir.value) return;
       if (!deleteConfirm.value) {
         deleteConfirm.value = true;
         return;
@@ -32,7 +34,7 @@ export default defineComponent({
     }
 
 
-    return () => <Button onClick={del} ing={deleteLoading.value} class={deleteConfirm.value && 'bg-red-300!'}
+    return () => <Button onClick={del} disabled={isReadOnlyDir.value} ing={deleteLoading.value} class={deleteConfirm.value && 'bg-red-300!'}
                           onMouseleave={() => deleteConfirm.value = false}>
       {deleteConfirm.value ? t('music.delete.confirm') : t('common.delete')}
     </Button>;

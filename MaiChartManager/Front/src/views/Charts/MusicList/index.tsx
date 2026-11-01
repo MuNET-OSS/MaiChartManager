@@ -1,19 +1,71 @@
-import { computed, defineComponent, ref } from "vue";
+import { computed, defineComponent, nextTick, ref } from "vue";
 import { MusicXmlWithABJacket } from "@/client/apiGen";
-import { Button, Select, theme } from "@munet/ui";
+import { Button, Select, TextInput, theme } from "@munet/ui";
 import { VList } from 'virtua/vue';
 import MusicEntry from "@/views/Charts/MusicList/MusicEntry";
 import { assetDirs, musicList, musicSortMode, MusicSortMode, selectedADir, selectMusicId } from "@/store/refs";
-import { leftPanel } from "@/views/Charts/refs";
+import { leftPanel, musicDrawerOpen } from "@/views/Charts/refs";
+import { matchMusicKeyword } from "@/utils/musicSearch";
 import { useI18n } from 'vue-i18n';
 
 
 export const musicListRef = ref<InstanceType<typeof VList> | null>(null);
 
-export const scrollToMusic = (musicId: number) => {
-  const idx = musicList.value.findIndex(m => m.id === musicId);
-  if (idx === -1 || !musicListRef.value) return;
-  musicListRef.value.scrollToIndex(idx, { align: 'center', smooth: true });
+// 左侧列表的搜索词。放在模块作用域，因为跳转逻辑（scrollToMusic）要在组件之外读它。
+// 切 A-dir 时刻意不清空：列表上方的搜索框会把当前词显示出来，保留它可以比较不同目录下的同一首。
+export const musicSearchKeyword = ref('');
+// 过滤、空态、清空按钮都用 trim 后的值，免得只输入空格时三处口径不一致
+const keyword = computed(() => musicSearchKeyword.value.trim());
+
+const clearMusicSearch = () => (musicSearchKeyword.value = '');
+
+// 实际渲染的曲目。搜索词为空时就是当前 A-dir 的全量。
+// 不能直接过滤 musicList：selectedMusic 由它派生，把列表过滤掉会让右侧编辑面板跟着变空。
+export const displayedMusic = computed(() =>
+  keyword.value ? musicList.value.filter(m => matchMusicKeyword(m, keyword.value)) : musicList.value
+);
+
+// 连续跳转时只让最后一次生效，避免前一次的等待把列表滚到旧位置
+let lastJump = 0;
+// 用户手动切到目录管理时，之前那次跳转已经不作数了
+const cancelPendingJump = () => { lastJump++; };
+
+export const scrollToMusic = async (musicId: number) => {
+  const jump = ++lastJump;
+
+  // 目标必须在当前 A-dir 里。跨目录不是这里处理的：调用方（批量页跳转）会先把 selectedADir 切到目标所在目录
+  if (!musicList.value.some(m => m.id === musicId)) return;
+
+  // 跳转的含义是「回到曲目列表并看到这首歌」：左侧停在目录管理时也要切回列表；
+  // 窄屏下列表是抽屉，不拉开的话用户只看到右边，等于没跳
+  if (leftPanel.value !== 'musicList') leftPanel.value = 'musicList';
+  musicDrawerOpen.value = true;
+
+  // 搜索词把目标挡住了就先清掉，否则 scrollToIndex 找不到它
+  if (keyword.value && !displayedMusic.value.some(m => m.id === musicId)) {
+    clearMusicSearch();
+  }
+  await nextTick();
+  if (jump !== lastJump) return;
+
+  const list = await waitForMusicList();
+  if (!list || jump !== lastJump) return;
+
+  // 等 VList 挂载的这段时间里列表可能已经变了，下标要按最新数据重算
+  const idx = displayedMusic.value.findIndex(m => m.id === musicId);
+  if (idx === -1) return;
+  list.scrollToIndex(idx, { align: 'center', smooth: true });
+};
+
+// 从批量操作跳过来时这个页面还在做 0.3s 的过渡，VList 尚未挂载，而调用方只等 100ms。
+// 用 setTimeout 轮询而不是 requestAnimationFrame：页面在后台时 rAF 不触发，循环会一直卡住。
+// 注意：改 Index.module.sass 的 tab 过渡时长、或 Charts/index.tsx 的左侧面板切换方式时，要回来确认这个超时还够。
+const waitForMusicList = async (timeout = 2000) => {
+  const start = Date.now();
+  while (!musicListRef.value && Date.now() - start < timeout) {
+    await new Promise(resolve => setTimeout(resolve, 30));
+  }
+  return musicListRef.value;
 };
 
 export default defineComponent({
@@ -33,6 +85,8 @@ export default defineComponent({
       return <>{dir.dirName}<span class="op-70">{dir.version ? ` (Ver.${dir.version})` : ''}</span></>;
     };
 
+    const clearSearch = clearMusicSearch;
+
     return () => (
       <div class="flex flex-col gap-3 h-full p-xy">
         <div class="flex items-center gap-2">
@@ -41,7 +95,7 @@ export default defineComponent({
           </Button>
           <div
             class={["grow w-0 flex items-center gap-1 px-3 py-1.5 rounded-12px transition-colors text-left truncate cursor-pointer border-none h-48px", theme.value.listItem, theme.value.listItemHover]}
-            onClick={() => leftPanel.value = 'assetDirs'}
+            onClick={() => { cancelPendingJump(); leftPanel.value = 'assetDirs'; }}
           >
             <span class="truncate">{selectedDirLabel()}</span>
           </div>
@@ -51,11 +105,48 @@ export default defineComponent({
             class="w-40! shrink-0"
           />
         </div>
-        <VList ref={musicListRef} class="flex-1 cst" data={musicList.value}>
-          {({item}: {item: MusicXmlWithABJacket}) => (
-            <MusicEntry music={item} selected={selectMusicId.value === item.id} onClick={() => selectMusicId.value = item.id!} key={item.id} />
-          )}
-        </VList>
+        <div
+          class="relative"
+          onKeydown={(e: KeyboardEvent) => {
+            // 输入法组词时按 Esc 是取消候选，不该顺手清空搜索框
+            if (e.isComposing) return;
+            if (e.key === 'Escape') clearSearch();
+          }}
+        >
+          <TextInput
+            v-model:value={musicSearchKeyword.value}
+            placeholder={t('music.list.searchPlaceholder')}
+            // pr-10 要用 !：TextInput 自己的 `.wrapper input { padding: .6em 1.2em }` 是 0,1,1，
+            // 普通工具类 0,1,0 压不过，右侧会让清空按钮盖住长关键词的尾部
+            innerClass="min-h-12 cst pr-10!"
+          />
+          {keyword.value &&
+            <button
+              // 用 top-0 bottom-0 + my-auto 居中，不用 -translate-y-1/2：@munet/ui 的全局
+              // `button:hover { transform: scale(1.02) }` 特异性更高，会把 translate 整条顶掉，悬停时按钮往下掉半个高度
+              class="absolute right-2 top-0 bottom-0 my-auto w-7 h-7 p-0 flex items-center justify-center rounded-full border-none bg-transparent c-gray-4 hover:c-gray-6 cursor-pointer"
+              title={t('music.list.clearSearch')}
+              // 阻止 mousedown 把焦点挪到按钮上：清空后还能接着打字，不用再点一次输入框
+              onMousedown={(e: MouseEvent) => e.preventDefault()}
+              onClick={clearSearch}
+            >
+              <span class="i-mdi:close-circle text-lg" />
+            </button>}
+        </div>
+        <div class="relative flex-1 min-h-0">
+          <VList ref={musicListRef} class="h-full cst" data={displayedMusic.value}>
+            {({item}: {item: MusicXmlWithABJacket}) => (
+              <MusicEntry music={item} selected={selectMusicId.value === item.id} key={item.id}
+                onClick={() => {
+                  // 用户自己点了别的曲目，之前那次还没执行的跳转就不再作数了
+                  cancelPendingJump();
+                  selectMusicId.value = item.id!;
+                }} />
+            )}
+          </VList>
+          {keyword.value && !displayedMusic.value.length &&
+            <div class="absolute inset-0 flex items-center justify-center c-gray-5 pointer-events-none">{t('music.list.noMatch')}</div>}
+        </div>
       </div>
     )
   }

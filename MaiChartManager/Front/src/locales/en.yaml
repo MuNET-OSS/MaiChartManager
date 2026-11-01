@@ -60,7 +60,7 @@ assetDir:
 music:
   list:
     title: Chart List
-    searchPlaceholder: Search title / composer / charter / alias / ID
+    searchPlaceholder: Search title / composer / charter / ID
     tableTitle: Title
     tableCover: Cover
     tableVersion: Version
@@ -71,6 +71,8 @@ music:
     filterStandard: Standard
     filterDX: DX
     filterUtage: Utage
+    noMatch: No matching songs
+    clearSearch: Clear search
     unknown: Unknown
     filterBasic: Basic
     filterMaster: Master
@@ -81,6 +83,7 @@ music:
     sortByName: Name
     sortByVersion: Release
   edit:
+    selectHint: Select a chart to edit
     name: Song Title
     artist: Artist
     bpm: BPM

@@ -1,6 +1,6 @@
 import { computed, defineComponent, ref, watch } from "vue";
 import { Button, Modal, NumberInput, Radio } from "@munet/ui";
-import { assetDirs, musicList, selectedADir, selectMusicId, updateMusicList } from "@/store/refs";
+import { assetDirs, isReadOnlyDir, musicList, selectedADir, selectMusicId, updateMusicList } from "@/store/refs";
 import dxIcon from "@/assets/dxIcon.png";
 import stdIcon from "@/assets/stdIcon.png";
 import api from "@/client/api";
@@ -35,6 +35,8 @@ export default defineComponent({
     })
 
     const save = async () => {
+      // 对话框打开期间目录可能被切到只读的 A000，保存前重新判一次
+      if (isReadOnlyDir.value) return;
       show.value = false;
       await api.AddMusic(id.value, selectedADir.value);
       await updateMusicList();

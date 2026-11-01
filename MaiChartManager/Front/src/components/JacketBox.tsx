@@ -2,7 +2,7 @@ import { computed, defineComponent, PropType, ref } from "vue";
 import noJacket from "@/assets/noJacket.webp";
 import api, { getUrl } from "@/client/api";
 import { showTransactionalDialog } from "@munet/ui";
-import { globalCapture, selectedADir, selectedMusic } from "@/store/refs";
+import { globalCapture, isReadOnlyDir, selectedADir, selectedMusic } from "@/store/refs";
 import { MusicXmlWithABJacket } from "@/client/apiGen";
 import { useI18n } from 'vue-i18n';
 import { pickFile } from "@/utils/pickFile";
@@ -24,6 +24,8 @@ export default defineComponent({
     if (props.upload)
       upload = async (fileHandle?: FileSystemFileHandle) => {
         if (!props.upload) return;
+        // A000 只读：点封面或拖拽换图都会走到这里
+        if (isReadOnlyDir.value) return;
         try {
           let file: File;
           if (!fileHandle) {
@@ -35,7 +37,8 @@ export default defineComponent({
             file = await fileHandle.getFile();
           }
 
-          const res = await api.SetMusicJacket(props.info.id!, selectedADir.value, { file });
+          // 用曲目自己的 assetDir：选文件是异步的，期间目录可能被切走/切到 A000
+          const res = await api.SetMusicJacket(props.info.id!, props.info.assetDir ?? selectedADir.value, { file });
           if (res.error) {
             const error = res.error as any;
             await showTransactionalDialog(t('jacket.setFailed'), error.message || error, undefined, true);
@@ -56,6 +59,7 @@ export default defineComponent({
         }
       }
 
-    return () => <img src={jacketUrl.value} class={`object-fill rounded-lg ${props.upload && 'cursor-pointer'}`} onClick={props.upload ? () => upload() : undefined} />
+    const canUpload = computed(() => props.upload && !isReadOnlyDir.value);
+    return () => <img src={jacketUrl.value} class={`object-fill rounded-lg ${canUpload.value && 'cursor-pointer'}`} onClick={canUpload.value ? () => upload() : undefined} />
   }
 })
