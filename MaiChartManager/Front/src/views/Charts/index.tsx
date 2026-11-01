@@ -1,4 +1,4 @@
-import { defineComponent, ref, Transition, watch } from 'vue';
+import { defineComponent, onUnmounted, ref, Transition, watch } from 'vue';
 import MusicList from './MusicList';
 import MusicEdit from './MusicEdit';
 import MusicSelectedTopRightToolbar from './MusicSelectedTopRightToolbar';
@@ -19,6 +19,9 @@ export default defineComponent({
     watch(leftPanel, (val) => {
       isForward.value = val === 'assetDirs';
     });
+
+    // 抽屉状态是模块级的，切到别的侧栏页再回来不该还开着
+    onUnmounted(() => (musicDrawerOpen.value = false));
 
     // 抽屉布局用 max-[1439px]：抽屉与下面的 min-[1440px]:hidden（汉堡按钮）必须以 1440 为界、
     // 不能互相重叠。之前两边都写 1440，窗口宽度正好 1440（例如 1440 宽的屏幕最大化）时

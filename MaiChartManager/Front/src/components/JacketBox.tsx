@@ -37,7 +37,8 @@ export default defineComponent({
             file = await fileHandle.getFile();
           }
 
-          const res = await api.SetMusicJacket(props.info.id!, selectedADir.value, { file });
+          // 用曲目自己的 assetDir：选文件是异步的，期间目录可能被切走/切到 A000
+          const res = await api.SetMusicJacket(props.info.id!, props.info.assetDir ?? selectedADir.value, { file });
           if (res.error) {
             const error = res.error as any;
             await showTransactionalDialog(t('jacket.setFailed'), error.message || error, undefined, true);
@@ -58,6 +59,7 @@ export default defineComponent({
         }
       }
 
-    return () => <img src={jacketUrl.value} class={`object-fill rounded-lg ${props.upload && 'cursor-pointer'}`} onClick={props.upload ? () => upload() : undefined} />
+    const canUpload = computed(() => props.upload && !isReadOnlyDir.value);
+    return () => <img src={jacketUrl.value} class={`object-fill rounded-lg ${canUpload.value && 'cursor-pointer'}`} onClick={canUpload.value ? () => upload() : undefined} />
   }
 })
