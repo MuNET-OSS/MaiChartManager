@@ -58,7 +58,7 @@ assetDir:
 music:
   list:
     title: 谱面列表
-    searchPlaceholder: 搜索名称 / 作曲 / 谱师 / 别名 / ID
+    searchPlaceholder: 搜索名称 / 作曲 / 谱师 / ID
     tableTitle: 标题
     tableCover: 封面
     tableVersion: 版本
@@ -69,6 +69,8 @@ music:
     filterStandard: 标准
     filterDX: DX
     filterUtage: 宴会场
+    noMatch: 没有匹配的曲目
+    clearSearch: 清空搜索
     unknown: 未知
     filterBasic: 绿
     filterMaster: 紫
