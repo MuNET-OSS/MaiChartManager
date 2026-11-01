@@ -24,6 +24,10 @@ export let prepareReplaceChart = async (fileHandle?: FileSystemFileHandle, side?
 export default defineComponent({
   setup() {
 
+    // 替换一旦开始就把目标目录固定下来，确认时不能再读 selectedADir：
+    // 期间切到只读的 A000 会把写操作带偏
+    let replaceDir = selectedADir.value;
+
     const checking = ref(false);
     const file = shallowRef<File | null>(null);
     const show = ref<"" | "ma2" | "maidata" | "failed">("");
@@ -43,6 +47,7 @@ export default defineComponent({
     prepareReplaceChart = async (fHandle?: FileSystemFileHandle, side?: ChartSide) => {
       // A000 只读：替换谱面是写操作，入口处直接挡掉
       if (isReadOnlyDir.value) return;
+      replaceDir = selectedADir.value;
       targetSide.value = side;
       let selectedFile: File;
       if (!fHandle) {
@@ -89,7 +94,7 @@ export default defineComponent({
         const level = replacingMaidata ? -1 : selectedLevel.value;
         const side = replacingMaidata ? undefined : targetSide.value;
         show.value = "";
-        const result = (await api.ReplaceChart(selectMusicId.value, level, selectedADir.value, {
+        const result = (await api.ReplaceChart(selectMusicId.value, level, replaceDir, {
           file: uploadFile,
           shift: tempOption.value.shift,
           side,

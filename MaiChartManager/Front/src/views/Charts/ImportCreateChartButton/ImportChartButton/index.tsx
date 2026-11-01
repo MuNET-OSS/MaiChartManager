@@ -97,6 +97,10 @@ export default defineComponent({
       return !reject;
     }
 
+    // 导入一旦开始就把目标目录固定下来：中途切目录（尤其是切到只读的 A000）
+    // 也不能把写操作带偏，所有写入都用这个快照
+    let importDir = selectedADir.value;
+
     const uploadMovie = (id: number, movie: File, offset: number) => new Promise<void>((resolve, reject) => {
       currentMovieProgress.value = 0;
       const body = new FormData();
@@ -104,7 +108,7 @@ export default defineComponent({
       body.append('file', movie);
       body.append('file', movie);
       const controller = new AbortController();
-      fetchEventSource(getUrl(`SetMovieApi/${selectedADir.value}/${id}`), {
+      fetchEventSource(getUrl(`SetMovieApi/${importDir}/${id}`), {
         signal: controller.signal,
         method: 'PUT',
         body,
@@ -144,7 +148,7 @@ export default defineComponent({
       try {
         music.importStep = IMPORT_STEP.create;
 
-        const createRet = (await api.AddMusic(music.id, selectedADir.value)).data;
+        const createRet = (await api.AddMusic(music.id, importDir)).data;
         if (createRet) throw new Error(createRet);
 
         music.importStep = IMPORT_STEP.chart;
@@ -163,13 +167,13 @@ export default defineComponent({
             utageRightLevel: music.utageMapping.rightLevel,
           } : {}),
           debug: import.meta.env.DEV,
-          assetDir: selectedADir.value,
+          assetDir: importDir,
         })).data;
 
         errors.value.push(...res.errors!.map(it => ({ ...it, name: music.name })));
         if (res.fatal) {
           try {
-            await api.DeleteMusic(music.id, selectedADir.value);
+            await api.DeleteMusic(music.id, importDir);
           } catch {
           }
           return;
@@ -181,14 +185,14 @@ export default defineComponent({
         // 音频上应该应用的延迟audioPadding = 谱面上应用的延迟chartPadding - &first
         let audioPadding = chartPadding - music.first;
 
-        await api.SetAudio(music.id, selectedADir.value, { file: music.track, padding: audioPadding, ignoreGapless: !!tempOptions.value.ignoreGapless });
+        await api.SetAudio(music.id, importDir, { file: music.track, padding: audioPadding, ignoreGapless: !!tempOptions.value.ignoreGapless });
         if (music.previewTime) {
           // 因为&demo_seek和&demo_len都是相对于原始音源的，所以这里的时间必须要扣掉上面SetAudio时应用的padding。
           // 根据SetAudioApi的定义，padding为正表示歌曲前面被加了空白，因此原本的预览段在新的裁剪后的音频中的位置也要相应后移；padding为负反之。
           // 因此，直接给startTime和endTime都加上audioPadding即可。
           music.previewTime.startTime! += audioPadding;
           music.previewTime.endTime! += audioPadding
-          await api.SetAudioPreview(music.id, selectedADir.value, music.previewTime);
+          await api.SetAudioPreview(music.id, importDir, music.previewTime);
         }
 
         if (music.movie && !tempOptions.value.disableBga) {
@@ -202,7 +206,7 @@ export default defineComponent({
         }
 
         music.importStep = IMPORT_STEP.jacket;
-        if (music.bg) await api.SetMusicJacket(music.id, selectedADir.value, { file: music.bg });
+        if (music.bg) await api.SetMusicJacket(music.id, importDir, { file: music.bg });
 
         music.importStep = IMPORT_STEP.finish;
       } catch (e) {
@@ -218,7 +222,7 @@ export default defineComponent({
           // 如果是在创建乐曲这步就挂了，说明乐曲XML没有创建成功，则不需要删除乐曲。
           // 否则，在ID冲突的情况下，会把原本的乐曲给删除掉，见 https://github.com/MuNET-OSS/MaiChartManager/issues/34
           try {
-            await api.DeleteMusic(music.id, selectedADir.value);
+            await api.DeleteMusic(music.id, importDir);
           } catch {
           }
         }
@@ -228,6 +232,7 @@ export default defineComponent({
     startProcess = async (dir?: ImportDirectory | ImportDirectory[]) => {
       // A000 只读：拖拽进来的导入也要挡住，不只是点按钮
       if (isReadOnlyDir.value) return;
+      importDir = selectedADir.value;
       let id = getNextUnusedMusicId();
       const usedIds = [] as number[];
       errors.value = [];
