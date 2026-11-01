@@ -116,7 +116,9 @@ export default defineComponent({
           <TextInput
             v-model:value={musicSearchKeyword.value}
             placeholder={t('music.list.searchPlaceholder')}
-            innerClass="min-h-12 cst pr-10"
+            // pr-10 要用 !：TextInput 自己的 `.wrapper input { padding: .6em 1.2em }` 是 0,1,1，
+            // 普通工具类 0,1,0 压不过，右侧会让清空按钮盖住长关键词的尾部
+            innerClass="min-h-12 cst pr-10!"
           />
           {keyword.value &&
             <button
