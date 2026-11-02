@@ -61,10 +61,9 @@ export default defineComponent({
         <ImportAlert errors={props.errors} tempOptions={props.tempOptions}></ImportAlert>
         {!!props.meta.length && <>
             <div>{t('chart.import.assignId')}</div>
-            <div class="of-y-auto cst max-h-[50dvh]">
-                <div class="flex flex-col gap-3">
-                  {props.meta.map((meta, i) => <MusicIdInput key={i} meta={meta} utage={props.savedOptions.genreId === UTAGE_GENRE}/>)}
-                </div>
+            {/* 高度交给 Modal 的 content 区统一滚动，这里不再单独限高，否则大窗口下也被压成半屏 */}
+            <div class="flex flex-col gap-3">
+              {props.meta.map((meta, i) => <MusicIdInput key={i} meta={meta} utage={props.savedOptions.genreId === UTAGE_GENRE}/>)}
             </div>
             <div>
               <div class="ml-1 text-sm">{t('music.edit.genre')}</div>

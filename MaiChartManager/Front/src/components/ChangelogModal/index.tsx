@@ -51,7 +51,7 @@ export default defineComponent({
       title={`${t('about.changelogTitle')} - v${changelogTargetVersion.value}`}
       v-model:show={showChangelogModal.value}
     >
-      <div class={[style.mdContent, 'cst of-y-auto of-x-hidden max-h-[80vh]']}>
+      <div class={[style.mdContent, 'cst of-x-hidden']}>
         {changelogContent.value
           ? <VueMarkdownIt source={changelogContent.value} />
           : <div class="text-center py-4 op-60">{t('common.loading')}</div>

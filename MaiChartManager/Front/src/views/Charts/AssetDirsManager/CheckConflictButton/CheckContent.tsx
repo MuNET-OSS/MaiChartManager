@@ -60,7 +60,7 @@ export default defineComponent({
       <Button onClick={requestDelete} disabled={!selectedIds.value.length}>{t('assetDir.conflict.deleteSelected')}</Button>
       {load.value ? <div class="c-neutral text-center p-4">Loading...</div> :
         data.value.length === 0 ? <div class="c-neutral text-center p-4">{t('assetDir.conflict.noConflict')}</div> :
-        <div class="of-y-auto max-h-70vh">
+        <div>
           <table class="w-full text-sm border-collapse">
             <thead>
               <tr class="border-b border-neutral/20">

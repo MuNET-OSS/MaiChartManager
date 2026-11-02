@@ -29,7 +29,7 @@ export default defineComponent({
       v-model:show={show.value}
       class="bg-#FCEEEE!"
     >
-      <div class="flex flex-col gap-2 max-h-70vh overflow-y-auto">
+      <div class="flex flex-col gap-2">
         <div class="flex flex-col gap-1">
           {errors.data.value?.data?.map((error) => {
             return <div>

@@ -22,8 +22,8 @@ export default defineComponent({
     })
 
     return () => <>
-      <div class="of-y-auto cst max-h-20vh">
-        <div class="flex flex-col gap-2">
+      {/* 不再单独限高，交给 Modal 的 content 区统一滚动，避免弹窗内套两层滚动条 */}
+      <div class="flex flex-col gap-2">
         {
           props.errors.map((error, i) => {
             if ('first' in error) {
@@ -86,7 +86,6 @@ export default defineComponent({
             </div>
           })
         }
-        </div>
       </div>
       <Modal
         width="min(70vw,70em)"
@@ -94,7 +93,7 @@ export default defineComponent({
         show={!!detail.value}
         onUpdateShow={() => detail.value = undefined}
       >
-        <pre class="max-h-60vh of-auto cst whitespace-pre-wrap break-words text-xs font-mono">{detail.value}</pre>
+        <pre class="whitespace-pre-wrap break-words text-xs font-mono">{detail.value}</pre>
       </Modal>
     </>
   }
