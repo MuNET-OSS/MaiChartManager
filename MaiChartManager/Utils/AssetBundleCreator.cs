@@ -12,6 +12,14 @@ public static class AssetBundleCreator
 {
     private const int TextureFormatRgba32 = 4;
 
+    /// <summary>
+    /// 大封面（jacket）允许的最大边长。游戏内官方封面是 400×400 的 BC7，
+    /// 显示区域也用不到更大尺寸；而自制封面如果按原图尺寸写进 AB，
+    /// 3000×3000 的 RGBA32 一张就是 34 MB 显存、18 MB 文件，
+    /// 选歌/结算时同步加载会造成明显掉帧，所以在打包时钳制到这个尺寸。
+    /// </summary>
+    public const int MaxJacketDimension = 400;
+
     private static string TemplateAbPath =>
         Path.Combine(StaticSettings.StreamingAssets, "A000", "AssetBundleImages", "jacket", "ui_jacket_000000.ab");
 
@@ -22,11 +30,13 @@ public static class AssetBundleCreator
         string containerPath,
         string abName,
         int? resizeWidth = null,
-        int? resizeHeight = null)
+        int? resizeHeight = null,
+        int? maxDimension = null)
     {
         if (!File.Exists(imagePath))
             throw new FileNotFoundException($"Image file not found: {imagePath}", imagePath);
-        CreateTextureAssetBundle(File.ReadAllBytes(imagePath), outputAbPath, assetName, containerPath, abName, resizeWidth, resizeHeight);
+        CreateTextureAssetBundle(File.ReadAllBytes(imagePath), outputAbPath, assetName, containerPath, abName, resizeWidth, resizeHeight,
+            maxDimension);
     }
 
     public static void CreateTextureAssetBundle(
@@ -36,11 +46,20 @@ public static class AssetBundleCreator
         string containerPath,
         string abName,
         int? resizeWidth = null,
-        int? resizeHeight = null)
+        int? resizeHeight = null,
+        int? maxDimension = null)
     {
         using var image = SixLabors.ImageSharp.Image.Load<Rgba32>(pngImageData);
         if (resizeWidth.HasValue && resizeHeight.HasValue)
             image.Mutate(x => x.Resize(resizeWidth.Value, resizeHeight.Value));
+        else if (maxDimension is > 0 && (image.Width > maxDimension.Value || image.Height > maxDimension.Value))
+            // 等比缩到长边不超过上限，只缩不放，避免改变原本的宽高比
+            image.Mutate(x => x.Resize(new ResizeOptions
+            {
+                Size = new SixLabors.ImageSharp.Size(maxDimension.Value, maxDimension.Value),
+                Mode = ResizeMode.Max,
+                Sampler = KnownResamplers.Lanczos3,
+            }));
 
         image.Mutate(x => x.Flip(FlipMode.Vertical));
 
@@ -170,7 +189,8 @@ public static class AssetBundleCreator
             Path.Combine(abiDir, $"{key.ToLowerInvariant()}.ab"),
             key,
             $"assets/assetbundle/jacket/{key.ToLowerInvariant()}.png",
-            $"jacket/{key.ToLowerInvariant()}.ab");
+            $"jacket/{key.ToLowerInvariant()}.ab",
+            maxDimension: MaxJacketDimension);
 
         CreateTextureAssetBundle(
             pngImageData,
@@ -193,7 +213,8 @@ public static class AssetBundleCreator
         string outputAbPath,
         string assetName,
         string containerPath,
-        string abName)
+        string abName,
+        int? maxDimension = null)
     {
         if (!File.Exists(inputAbPath))
             throw new FileNotFoundException($"Input AB not found: {inputAbPath}", inputAbPath);
@@ -201,7 +222,7 @@ public static class AssetBundleCreator
         var pngBytes = ImageConvert.GetTextureAsPngData(inputAbPath);
         if (pngBytes is null || pngBytes.Length == 0)
             throw new InvalidOperationException($"Could not decode jacket texture to PNG from: {inputAbPath}");
-        CreateTextureAssetBundle(pngBytes, outputAbPath, assetName, containerPath, abName);
+        CreateTextureAssetBundle(pngBytes, outputAbPath, assetName, containerPath, abName, maxDimension: maxDimension);
     }
 
     private static void WriteUncompressedBundle(byte[] assetsData, string cabName, Stream output)

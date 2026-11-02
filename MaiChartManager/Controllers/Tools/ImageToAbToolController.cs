@@ -108,7 +108,8 @@ public partial class ImageToAbToolController(StaticSettings settings, ILogger<Im
                     fullAbPath,
                     $"UI_Jacket_{id}",
                     $"assets/assetbundle/jacket/ui_jacket_{id}.png",
-                    $"jacket/ui_jacket_{id}.ab");
+                    $"jacket/ui_jacket_{id}.ab",
+                    maxDimension: AssetBundleCreator.MaxJacketDimension);
 
                 var smallAbPath = Path.Combine(jacketSmallDir, $"ui_jacket_{id}_s.ab");
                 AssetBundleCreator.CreateTextureAssetBundle(
