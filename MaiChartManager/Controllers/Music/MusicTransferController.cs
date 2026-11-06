@@ -526,7 +526,8 @@ public partial class MusicTransferController(
                 abJacketTarget,
                 $"UI_Jacket_{idPad}",
                 $"assets/assetbundle/jacket/ui_jacket_{idPad}.png",
-                $"jacket/ui_jacket_{idPad}.ab");
+                $"jacket/ui_jacket_{idPad}.ab",
+                maxDimension: AssetBundleCreator.MaxJacketDimension);
             
             // 对小jacket：如果存在，重打包；如果不存在，则从png重新缩放，重新CreateTextureAssetBundle
             if (oldSmallAb is not null && System.IO.File.Exists(oldSmallAb))

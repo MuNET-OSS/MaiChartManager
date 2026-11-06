@@ -92,7 +92,8 @@ public partial class MakeAbCommand : AsyncCommand<MakeAbCommand.Settings>
                                 Path.Combine(jacketDir, $"ui_jacket_{id}.ab"),
                                 $"UI_Jacket_{id}",
                                 $"assets/assetbundle/jacket/ui_jacket_{id}.png",
-                                $"jacket/ui_jacket_{id}.ab");
+                                $"jacket/ui_jacket_{id}.ab",
+                                maxDimension: AssetBundleCreator.MaxJacketDimension);
 
                             AssetBundleCreator.CreateTextureAssetBundle(
                                 path!,
