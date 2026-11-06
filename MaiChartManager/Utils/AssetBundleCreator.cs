@@ -46,7 +46,7 @@ public static class AssetBundleCreator
     /// <param name="resizeHeight">显式目标高度</param>
     /// <param name="maxDimension">
     /// 长边上限，超出时等比缩小（只缩不放、不裁剪）。
-    /// 仅在没给显式尺寸时生效：显式尺寸优先，两者同时给出时本参数被忽略。
+    /// 无论是否给了显式尺寸都会生效：显式尺寸先应用，之后仍按上限钳制。
     /// </param>
     public static void CreateTextureAssetBundle(
         ReadOnlySpan<byte> pngImageData,
@@ -59,9 +59,25 @@ public static class AssetBundleCreator
         int? maxDimension = null)
     {
         using var image = SixLabors.ImageSharp.Image.Load<Rgba32>(pngImageData);
-        var resize = GetResizeOptions(image.Width, image.Height, resizeWidth, resizeHeight, maxDimension);
-        if (resize is not null)
-            image.Mutate(x => x.Resize(resize));
+
+        if (resizeWidth is > 0 && resizeHeight is > 0)
+            // 显式尺寸按拉伸处理，和原来的 x.Resize(w, h) 一致；ResizeOptions 默认 Mode 是 Crop，必须显式写 Stretch
+            image.Mutate(x => x.Resize(new ResizeOptions
+            {
+                Size = new Size(resizeWidth.Value, resizeHeight.Value),
+                Mode = ResizeMode.Stretch,
+                Sampler = KnownResamplers.Bicubic,
+            }));
+
+        // 上限独立判断，不是 else if：任何调用组合都不该写出超过上限的纹理
+        if (maxDimension is > 0 && (image.Width > maxDimension.Value || image.Height > maxDimension.Value))
+            // 等比缩到长边不超过上限，只缩不放，避免改变原本的宽高比
+            image.Mutate(x => x.Resize(new ResizeOptions
+            {
+                Size = new Size(maxDimension.Value, maxDimension.Value),
+                Mode = ResizeMode.Max,
+                Sampler = KnownResamplers.Lanczos3,
+            }));
 
         image.Mutate(x => x.Flip(FlipMode.Vertical));
 
@@ -71,33 +87,6 @@ public static class AssetBundleCreator
         image.CopyPixelDataTo(rgbaData);
         
         CreateTextureAssetBundle(rgbaData, width, height, outputAbPath, assetName, containerPath, abName);
-    }
-
-    /// <summary>
-    /// 算出这张图要缩放到多大，返回 null 表示不需要缩放。
-    /// 显式尺寸优先于长边上限，避免两套缩放规则互相覆盖时行为变得不可预测。
-    /// </summary>
-    private static ResizeOptions? GetResizeOptions(int width, int height, int? resizeWidth, int? resizeHeight, int? maxDimension)
-    {
-        if (resizeWidth is > 0 && resizeHeight is > 0)
-            // Stretch 才是原来 x.Resize(w, h) 的行为；ResizeOptions 的默认值是 Crop，不显式指定会变成裁剪
-            return new ResizeOptions
-            {
-                Size = new Size(resizeWidth.Value, resizeHeight.Value),
-                Mode = ResizeMode.Stretch,
-                Sampler = KnownResamplers.Bicubic,
-            };
-
-        if (maxDimension is > 0 && (width > maxDimension.Value || height > maxDimension.Value))
-            // 等比缩到长边不超过上限，只缩不放，避免改变原本的宽高比
-            return new ResizeOptions
-            {
-                Size = new Size(maxDimension.Value, maxDimension.Value),
-                Mode = ResizeMode.Max,
-                Sampler = KnownResamplers.Lanczos3,
-            };
-
-        return null;
     }
 
     private static void CreateTextureAssetBundle(
