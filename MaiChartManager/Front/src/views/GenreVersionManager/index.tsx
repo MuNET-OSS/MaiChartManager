@@ -40,7 +40,7 @@ export default defineComponent({
 
 
     return () => (
-      <div class="flex flex-col p-xy h-100dvh">
+      <div class="flex flex-col p-xy h-full min-h-0">
         <div class="flex gap-2 items-center mb-2">
           <WhateverNaviBar items={naviItems.value} />
           <div class="grow-1" />

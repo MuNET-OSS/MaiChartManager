@@ -120,23 +120,29 @@ export default defineComponent({
       })),
     });
 
-    return () => <div class="flex flex-col gap-3 h-full">
+    return () => <div class="flex flex-col gap-3 h-full min-h-0">
       {/*<NFlex>*/}
       {/*  <NButton onClick={() => {*/}
       {/*    emit('update:selectedMusicIds', musicListAll.value.filter(it => !props.selectedMusicIds!.includes(it)));*/}
       {/*  }}>反选</NButton>*/}
       {/*</NFlex>*/}
-      <TextInput placeholder={t('music.list.searchPlaceholder')} v-model:value={filter.value}/>
+      <TextInput class="shrink-0" placeholder={t('music.list.searchPlaceholder')} v-model:value={filter.value}/>
+      {/* 高度必须由 flex 分配，不能写死 calc(100dvh - N)：窗口变窄时表头文字换行、滚动条出现，
+          表格实际高度会超过预留值，把下面的继续按钮顶出屏幕 */}
+      {/* scrollX 给表格一个最小宽度：不加的话窄屏下各列会被压到一两个字宽，行内容撑破虚拟滚动
+          的固定行高互相重叠，整张表看起来比屏幕还高 */}
       <NDataTable
+        class="flex-1 min-h-0"
+        flexHeight
+        scrollX={1200}
         columns={columns.value}
         data={musicListAll.value}
         virtualScroll
-        maxHeight="calc(100dvh - 12rem)"
         minRowHeight={104}
         rowKey={row => `${row.assetDir}:${row.id}`}
         v-model:checkedRowKeys={selectedMusicIds.value}
       />
-      <div class="flex justify-end gap-2">
+      <div class="flex justify-end gap-2 shrink-0">
         <Button onClick={() => props.continue()} disabled={!selectedMusicIds.value.length}>{t('purchase.continue')}</Button>
       </div>
     </div>;

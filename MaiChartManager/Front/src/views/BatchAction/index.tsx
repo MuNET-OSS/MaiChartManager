@@ -25,7 +25,7 @@ export default defineComponent({
       selectedMusic.value = [];
     });
 
-    return () => <div class="flex flex-col h-100dvh pxy">
+    return () => <div class="flex flex-col h-full p-xy">
       {step.value === STEP.Select && <MusicSelector v-model:selectedMusicIds={selectedMusic.value} continue={() => step.value = STEP.ChooseAction} cancel={() => { step.value = STEP.Select; selectedMusic.value = []; }}/>}
       {step.value === STEP.ChooseAction && <ChooseAction selectedMusic={selectedMusic.value} continue={(action: STEP) => step.value = action}/>}
       {step.value === STEP.EditProps && <EditProps selectedMusicIds={selectedMusic.value} closeModal={() => { step.value = STEP.Select; selectedMusic.value = []; }}/>}

@@ -97,7 +97,9 @@ export default defineComponent({
         <ChangelogModal ready={loaded.value} />
         <div class={['grid cols-1 pb-14 md:pb-0 md:cols-[auto_1fr]']}>
           <Sidebar v-model:active={sidebarActive.value} />
-          <div class="h-100dvh min-w-0 of-hidden">
+          {/* 窄屏下底部导航是 fixed 的 3.5rem（grid 的 pb-14 正好让出这块），
+              内容区必须去掉它，否则页面底部 3.5rem 永远被导航条盖住 */}
+          <div class="h-[calc(100dvh-3.5rem)] md:h-100dvh min-w-0 of-hidden">
             <Transition name={transitionName.value} mode="out-in">
               <div key={sidebarActive.value} class={styles.page}>
                 <activeView.value />

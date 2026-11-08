@@ -91,7 +91,7 @@ export default defineComponent({
     );
 
     return () => (
-      <div class="flex flex-col h-100dvh p-6 overflow-auto">
+      <div class="flex flex-col h-full p-6 overflow-auto">
         <h2 class="text-2xl font-bold mb-6">{t('tools.title')}</h2>
         <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {renderToolCard(tools[0])}

@@ -7,7 +7,7 @@ import AquaMaiSection from "./AquaMaiSection";
 export default defineComponent({
   setup() {
     return () => (
-      <div class="p-xy h-100dvh of-y-auto cst">
+      <div class="p-xy h-full of-y-auto cst">
         <AppearanceSection />
         <GameDirectorySection />
         <ImportOptionsSection />
