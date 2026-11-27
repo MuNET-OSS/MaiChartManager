@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 #if WINDOWS
 using System.IO.Ports;
+using System.Runtime.InteropServices;
 using HidSharp;
 using MaiChartManager.Services.HardwareBridge;
 #endif
@@ -105,7 +106,9 @@ public class HardwareBridgeController(
             {
                 DtrEnable = true,
                 RtsEnable = true,
-                ReadTimeout = SerialPort.InfiniteTimeout,
+                // CH340 (CH341SER) 驱动下 BaseStream.ReadAsync 会触发 ERROR_OPERATION_ABORTED 或立即返回 0，
+                // 需配合有限 ReadTimeout 使用同步 SerialPort.Read/Write
+                ReadTimeout = 200,
                 WriteTimeout = 1000,
             };
             serialPort.Open();
@@ -125,17 +128,17 @@ public class HardwareBridgeController(
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var token = linkedCts.Token;
 
-            var readTask = Task.Run(async () =>
+            var readTask = Task.Factory.StartNew(() =>
             {
                 var buf = new byte[1024];
                 try
                 {
-                    while (!token.IsCancellationRequested && ws.State == WebSocketState.Open)
+                    while (!token.IsCancellationRequested && ws.State == WebSocketState.Open && serialPort.IsOpen)
                     {
                         int read;
                         try
                         {
-                            read = await serialPort.BaseStream.ReadAsync(buf, token);
+                            read = serialPort.Read(buf, 0, buf.Length);
                         }
                         catch (TimeoutException)
                         {
@@ -143,33 +146,48 @@ public class HardwareBridgeController(
                         }
                         if (read <= 0)
                         {
-                            await SendJsonAsync(ws, sendLock, new { type = "disconnected" }, CancellationToken.None);
-                            break;
+                            if (!serialPort.IsOpen)
+                            {
+                                SendJsonAsync(ws, sendLock, new { type = "disconnected" }, CancellationToken.None).GetAwaiter().GetResult();
+                                break;
+                            }
+                            continue;
                         }
-                        await SendBinaryAsync(ws, sendLock, buf.AsMemory(0, read), token);
+                        SendBinaryAsync(ws, sendLock, buf.AsMemory(0, read), token).GetAwaiter().GetResult();
                     }
                 }
                 catch (OperationCanceledException)
                 {
                 }
-                catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException)
+                catch (WebSocketException)
+                {
+                }
+                catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException or UnauthorizedAccessException)
                 {
                     if (!token.IsCancellationRequested)
                     {
                         logger.LogDebug(ex, "串口读取断开: {Port}", portName);
-                        await SendJsonAsync(ws, sendLock, new { type = "disconnected" }, CancellationToken.None);
+                        SendJsonAsync(ws, sendLock, new { type = "disconnected" }, CancellationToken.None).GetAwaiter().GetResult();
                     }
                 }
                 finally
                 {
                     linkedCts.Cancel();
                 }
-            }, CancellationToken.None);
+            }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default);
 
-            var writeTask = ReceiveWsLoopAsync(ws, async data =>
+            var writeTask = ReceiveWsLoopAsync(ws, data =>
             {
-                await serialPort.BaseStream.WriteAsync(data, token);
-                await serialPort.BaseStream.FlushAsync(token);
+                if (MemoryMarshal.TryGetArray(data, out var segment) && segment.Array != null)
+                {
+                    serialPort.Write(segment.Array, segment.Offset, segment.Count);
+                }
+                else
+                {
+                    var arr = data.ToArray();
+                    serialPort.Write(arr, 0, arr.Length);
+                }
+                return Task.CompletedTask;
             }, linkedCts, token);
 
             await Task.WhenAny(readTask, writeTask);
