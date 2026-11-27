@@ -84,6 +84,7 @@ export default defineComponent({
             title: t('tools.touchTest.label'),
             width: 1120,
             height: 820,
+            maximized: true,
           });
         },
       },

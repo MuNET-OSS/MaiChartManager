@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 #if WINDOWS
+using System.Collections.Concurrent;
 using System.IO.Ports;
 using System.Runtime.InteropServices;
 using HidSharp;
@@ -17,6 +18,7 @@ namespace MaiChartManager.Controllers.Tools;
 public class HardwareBridgeController(
 #if WINDOWS
     HardwareDiscoveryService discoveryService,
+    AquaMaiHardwareHintsReader hintsReader,
     ILogger<HardwareBridgeController> logger
 #endif
 ) : ControllerBase
@@ -37,6 +39,9 @@ public class HardwareBridgeController(
     }
 
 #if WINDOWS
+    private static readonly ConcurrentDictionary<string, ActiveSerialSession> ActiveSerialSessions =
+        new(StringComparer.OrdinalIgnoreCase);
+
     [HttpGet]
     public ActionResult<DiscoveryResult> HardwareBridgeDiscover()
     {
@@ -57,7 +62,19 @@ public class HardwareBridgeController(
         if (string.IsNullOrWhiteSpace(portName))
             return BadRequest("portName is required");
 
-        var result = await SerialPortEnumerator.ProbePortAsync(portName.Trim(), ct);
+        var trimmedPort = portName.Trim();
+        if (ActiveSerialSessions.TryGetValue(trimmedPort, out var active))
+        {
+            return Ok(active.ObservedKind switch
+            {
+                "touch" => new SerialProbeResult("touch", "当前已连接，检测到触摸屏数据帧"),
+                "led" => new SerialProbeResult("led", "当前已连接，检测到灯板应答"),
+                _ => new SerialProbeResult("unknown", "端口当前已连接，未收到协议应答"),
+            });
+        }
+
+        var hints = hintsReader.ReadHints();
+        var result = await SerialPortEnumerator.ProbePortAsync(trimmedPort, ct, hints?.TouchBaudRate);
         return Ok(result);
     }
 
@@ -91,6 +108,7 @@ public class HardwareBridgeController(
             return;
         }
 
+        var trimmedPort = portName.Trim();
         SerialPort? serialPort = null;
         try
         {
@@ -102,7 +120,7 @@ public class HardwareBridgeController(
             };
             var resolvedStopBits = stopBits == 2 ? StopBits.Two : StopBits.One;
 
-            serialPort = new SerialPort(portName.Trim(), baudRate, resolvedParity, dataBits, resolvedStopBits)
+            serialPort = new SerialPort(trimmedPort, baudRate, resolvedParity, dataBits, resolvedStopBits)
             {
                 DtrEnable = true,
                 RtsEnable = true,
@@ -120,6 +138,9 @@ public class HardwareBridgeController(
             await SendErrorAndCloseAsync(ws, sendLock, DescribeOpenError(ex, $"串口 {portName}"));
             return;
         }
+
+        var session = new ActiveSerialSession();
+        ActiveSerialSessions[trimmedPort] = session;
 
         try
         {
@@ -153,6 +174,7 @@ public class HardwareBridgeController(
                             }
                             continue;
                         }
+                        session.Feed(buf.AsSpan(0, read));
                         SendBinaryAsync(ws, sendLock, buf.AsMemory(0, read), token).GetAwaiter().GetResult();
                     }
                 }
@@ -197,8 +219,99 @@ public class HardwareBridgeController(
         }
         finally
         {
+            ActiveSerialSessions.TryRemove(new KeyValuePair<string, ActiveSerialSession>(trimmedPort, session));
             serialPort.Dispose();
             await CloseWebSocketQuietlyAsync(ws);
+        }
+    }
+
+    private sealed class ActiveSerialSession
+    {
+        private readonly object _lock = new();
+        private volatile string? _observedKind;
+        private int _touchFrameLen = -1;
+        private readonly List<byte> _ledBuf = new(64);
+        private bool _ledEscape;
+        private bool _ledSynced;
+
+        public string? ObservedKind => _observedKind;
+
+        public void Feed(ReadOnlySpan<byte> data)
+        {
+            if (_observedKind != null) return;
+
+            lock (_lock)
+            {
+                if (_observedKind != null) return;
+
+                foreach (var raw in data)
+                {
+                    // Touch frame: '(' + 7 bytes + ')'
+                    if (raw == (byte)'(')
+                    {
+                        _touchFrameLen = 0;
+                    }
+                    else if (raw == (byte)')')
+                    {
+                        if (_touchFrameLen == 7)
+                        {
+                            _observedKind = "touch";
+                            return;
+                        }
+                        _touchFrameLen = -1;
+                    }
+                    else if (_touchFrameLen >= 0)
+                    {
+                        _touchFrameLen++;
+                        if (_touchFrameLen > 16) _touchFrameLen = -1;
+                    }
+
+                    // SEGA LED frame: 0xE0 ... checksum
+                    if (raw == 0xE0)
+                    {
+                        _ledBuf.Clear();
+                        _ledEscape = false;
+                        _ledSynced = true;
+                        continue;
+                    }
+                    if (!_ledSynced) continue;
+
+                    var b = raw;
+                    if (b == 0xD0)
+                    {
+                        _ledEscape = true;
+                        continue;
+                    }
+                    if (_ledEscape)
+                    {
+                        b++;
+                        _ledEscape = false;
+                    }
+                    _ledBuf.Add(b);
+                    if (_ledBuf.Count >= 4)
+                    {
+                        var expectedLen = _ledBuf[2] + 3;
+                        if (_ledBuf.Count == expectedLen + 1)
+                        {
+                            var sum = 0;
+                            for (var j = 0; j < expectedLen; j++)
+                                sum = (sum + _ledBuf[j]) & 0xFF;
+                            if (sum == _ledBuf[expectedLen])
+                            {
+                                _observedKind = "led";
+                                return;
+                            }
+                            _ledBuf.Clear();
+                            _ledSynced = false;
+                        }
+                        else if (_ledBuf.Count > 128)
+                        {
+                            _ledBuf.Clear();
+                            _ledSynced = false;
+                        }
+                    }
+                }
+            }
         }
     }
 

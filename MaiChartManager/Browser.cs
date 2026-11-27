@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.Web.WebView2.Core;
 
 namespace MaiChartManager;
@@ -125,18 +126,26 @@ public sealed partial class Browser : Form
         var deferral = e.GetDeferral();
         try
         {
+            var query = QueryHelpers.ParseQuery(targetUri.Query);
+            var customTitle = query.TryGetValue("_mcmTitle", out var titleVal) && !string.IsNullOrWhiteSpace(titleVal.ToString())
+                ? titleVal.ToString()
+                : null;
+            var isTouchTest = targetUri.AbsolutePath.StartsWith("/touch-test", StringComparison.OrdinalIgnoreCase);
+            var startMaximized = isTouchTest || (query.TryGetValue("_mcmMaximized", out var maxVal) && maxVal.ToString() == "1");
+
             var features = e.WindowFeatures;
             var dpiScale = DeviceDpi / 96.0;
             var width = (int)((features.HasSize ? features.Width : 960) * dpiScale);
             var height = (int)((features.HasSize ? features.Height : 640) * dpiScale);
             var form = new Form
             {
-                Text = "MaiChartManager",
+                Text = customTitle ?? "MaiChartManager",
                 Icon = Icon,
                 Width = width,
                 Height = height,
                 StartPosition = FormStartPosition.Manual,
                 Location = WebViewHelper.CalculatePosition(width, height),
+                WindowState = startMaximized ? FormWindowState.Maximized : FormWindowState.Normal,
             };
             var webView = new Microsoft.Web.WebView2.WinForms.WebView2 { Dock = DockStyle.Fill };
             form.Controls.Add(webView);
@@ -145,7 +154,10 @@ public sealed partial class Browser : Form
             WebViewHelper.SetupCoreWebView2(webView.CoreWebView2, loopbackUrl);
             webView.CoreWebView2.PermissionRequested += WebViewHelper.OnPermissionRequested;
             e.NewWindow = webView.CoreWebView2;
-            webView.CoreWebView2.DocumentTitleChanged += (_, _) => form.Text = webView.CoreWebView2.DocumentTitle;
+            if (customTitle == null)
+            {
+                webView.CoreWebView2.DocumentTitleChanged += (_, _) => form.Text = webView.CoreWebView2.DocumentTitle;
+            }
 
             var prevBorderStyle = form.FormBorderStyle;
             var prevWindowState = form.WindowState;
@@ -172,7 +184,7 @@ public sealed partial class Browser : Form
             };
 
             form.FormClosed += (_, _) => webView.Dispose();
-            webView.ZoomFactor = targetUri.AbsolutePath.StartsWith("/touch-test", StringComparison.OrdinalIgnoreCase)
+            webView.ZoomFactor = isTouchTest
                 ? 1.0
                 : _currentZoomFactor;
         }

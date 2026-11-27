@@ -128,25 +128,35 @@ public static class SerialPortEnumerator
             .ToList();
     }
 
-    public static async Task<SerialProbeResult> ProbePortAsync(string portName, CancellationToken ct)
+    public static async Task<SerialProbeResult> ProbePortAsync(
+        string portName,
+        CancellationToken ct,
+        int? touchBaudRate = null)
     {
-        try
-        {
-            if (await ProbeTouchAsync(portName, ct))
-            {
-                return new SerialProbeResult("touch", "检测到 9600 波特率触摸屏数据帧");
-            }
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return new SerialProbeResult("unknown", "端口被占用");
-        }
-        catch (Exception ex) when (ex is IOException or InvalidOperationException)
-        {
-            return new SerialProbeResult("unknown", ex.Message);
-        }
+        int[] touchBauds = touchBaudRate is > 0 and not 9600
+            ? [touchBaudRate.Value, 9600]
+            : [9600];
 
-        await Task.Delay(50, ct);
+        foreach (var baud in touchBauds)
+        {
+            try
+            {
+                if (await ProbeTouchAsync(portName, baud, ct))
+                {
+                    return new SerialProbeResult("touch", $"检测到 {baud} 波特率触摸屏数据帧");
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return new SerialProbeResult("unknown", "端口被占用");
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException)
+            {
+                return new SerialProbeResult("unknown", ex.Message);
+            }
+
+            await Task.Delay(50, ct);
+        }
 
         try
         {
@@ -167,9 +177,9 @@ public static class SerialPortEnumerator
         return new SerialProbeResult("unknown", "未收到触摸或灯板协议应答");
     }
 
-    private static async Task<bool> ProbeTouchAsync(string portName, CancellationToken ct)
+    private static async Task<bool> ProbeTouchAsync(string portName, int baudRate, CancellationToken ct)
     {
-        using var port = new SerialPort(portName, 9600, Parity.None, 8, StopBits.One)
+        using var port = new SerialPort(portName, baudRate, Parity.None, 8, StopBits.One)
         {
             DtrEnable = true,
             RtsEnable = true,
@@ -181,23 +191,36 @@ public static class SerialPortEnumerator
         try
         {
             port.DiscardInBuffer();
-            var cmd = "{HALT}{RSET}{STAT}"u8.ToArray();
-            await port.BaseStream.WriteAsync(cmd, ct);
-            await port.BaseStream.FlushAsync(ct);
+            // ADX 等 MCU 串口需要分包且间隔发送 {HALT}/{RSET}/{STAT}，连发会被忽略
+            byte[][] initCmds =
+            [
+                "{HALT}"u8.ToArray(),
+                "{RSET}"u8.ToArray(),
+                "{STAT}"u8.ToArray(),
+            ];
+            for (var i = 0; i < initCmds.Length; i++)
+            {
+                port.Write(initCmds[i], 0, initCmds[i].Length);
+                if (i < initCmds.Length - 1)
+                    await Task.Delay(30, ct);
+            }
 
             var buf = new byte[128];
             var frameLen = -1;
-            var deadline = Environment.TickCount64 + 400;
+            var deadline = Environment.TickCount64 + 450;
 
             while (Environment.TickCount64 < deadline && !ct.IsCancellationRequested)
             {
-                if (port.BytesToRead <= 0)
+                int read;
+                try
                 {
-                    await Task.Delay(20, ct);
+                    read = port.Read(buf, 0, buf.Length);
+                }
+                catch (TimeoutException)
+                {
                     continue;
                 }
 
-                var read = port.Read(buf, 0, Math.Min(buf.Length, port.BytesToRead));
                 for (var i = 0; i < read; i++)
                 {
                     var b = buf[i];
@@ -235,22 +258,23 @@ public static class SerialPortEnumerator
         }
     }
 
-    private static async Task<bool> ProbeLedAsync(string portName, CancellationToken ct)
+    private static Task<bool> ProbeLedAsync(string portName, CancellationToken ct)
     {
         using var port = new SerialPort(portName, 115200, Parity.None, 8, StopBits.One)
         {
             DtrEnable = true,
             RtsEnable = true,
-            ReadTimeout = 100,
+            ReadTimeout = 80,
             WriteTimeout = 500,
         };
         port.Open();
         port.DiscardInBuffer();
 
-        // SEGA BD15070_4 GetBoardInfo (0xF0) & fallback Update (0x3C)
+        // SEGA BD15070_4 GetBoardInfo (0xF0), GetProtocolVersion (0xF3), Update (0x3C)
         byte[][] probes =
         [
             [0xE0, 0x11, 0x01, 0x01, 0xF0, 0x03],
+            [0xE0, 0x11, 0x01, 0x01, 0xF3, 0x06],
             [0xE0, 0x11, 0x01, 0x01, 0x3C, 0x4F],
         ];
 
@@ -261,19 +285,22 @@ public static class SerialPortEnumerator
 
         foreach (var pkt in probes)
         {
-            await port.BaseStream.WriteAsync(pkt, ct);
-            await port.BaseStream.FlushAsync(ct);
+            ct.ThrowIfCancellationRequested();
+            port.Write(pkt, 0, pkt.Length);
 
             var deadline = Environment.TickCount64 + 220;
             while (Environment.TickCount64 < deadline && !ct.IsCancellationRequested)
             {
-                if (port.BytesToRead <= 0)
+                int read;
+                try
                 {
-                    await Task.Delay(20, ct);
+                    read = port.Read(readBuf, 0, readBuf.Length);
+                }
+                catch (TimeoutException)
+                {
                     continue;
                 }
 
-                var read = port.Read(readBuf, 0, Math.Min(readBuf.Length, port.BytesToRead));
                 for (var i = 0; i < read; i++)
                 {
                     var b = readBuf[i];
@@ -305,7 +332,7 @@ public static class SerialPortEnumerator
                             for (var j = 0; j < expectedLen; j++)
                                 sum = (sum + recvBuf[j]) & 0xFF;
                             if (sum == recvBuf[expectedLen])
-                                return true;
+                                return Task.FromResult(true);
 
                             recvBuf.Clear();
                             synced = false;
@@ -320,7 +347,7 @@ public static class SerialPortEnumerator
             }
         }
 
-        return false;
+        return Task.FromResult(false);
     }
 
     private static string? ReadPortName(IntPtr set, ref SP_DEVINFO_DATA info)

@@ -9,6 +9,7 @@ export interface OpenWindowOptions {
   title: string;
   width: number;
   height: number;
+  maximized?: boolean;
 }
 
 /**
@@ -16,15 +17,26 @@ export interface OpenWindowOptions {
  * WebView2 宿主会走 NewWindowRequested 开一个新的 webview 窗口；
  * WebKitGTK(Photino) 不支持 window.open 弹新窗口，改为通知宿主开内置子窗口。
  */
-export const openWindow = ({ path, urlPath, query, title, width, height }: OpenWindowOptions) => {
+export const openWindow = ({ path, urlPath, query, title, width, height, maximized }: OpenWindowOptions) => {
   const url = urlPath ? new URL(urlPath, location.origin) : new URL(location.href);
   if (urlPath) {
     if (query) {
       url.search = new URLSearchParams(query).toString();
     }
+    if (!isPhotino) {
+      if (title) {
+        url.searchParams.set('_mcmTitle', title);
+      }
+      if (maximized) {
+        url.searchParams.set('_mcmMaximized', '1');
+      }
+    }
   } else {
     const hashPath = path ?? '/';
     url.hash = query ? `${hashPath}?${new URLSearchParams(query).toString()}` : hashPath;
+    if (!isPhotino && maximized) {
+      url.searchParams.set('_mcmMaximized', '1');
+    }
   }
 
   if (isPhotino) {
@@ -34,6 +46,7 @@ export const openWindow = ({ path, urlPath, query, title, width, height }: OpenW
       title,
       width,
       height,
+      maximized,
     }));
     return;
   }
