@@ -64,7 +64,7 @@ public static class AssetBundleCreator
             // 显式尺寸按拉伸处理，和原来的 x.Resize(w, h) 一致；ResizeOptions 默认 Mode 是 Crop，必须显式写 Stretch
             image.Mutate(x => x.Resize(new ResizeOptions
             {
-                Size = new Size(resizeWidth.Value, resizeHeight.Value),
+                Size = new SixLabors.ImageSharp.Size(resizeWidth.Value, resizeHeight.Value),
                 Mode = ResizeMode.Stretch,
                 Sampler = KnownResamplers.Bicubic,
             }));
@@ -74,7 +74,7 @@ public static class AssetBundleCreator
             // 等比缩到长边不超过上限，只缩不放，避免改变原本的宽高比
             image.Mutate(x => x.Resize(new ResizeOptions
             {
-                Size = new Size(maxDimension.Value, maxDimension.Value),
+                Size = new SixLabors.ImageSharp.Size(maxDimension.Value, maxDimension.Value),
                 Mode = ResizeMode.Max,
                 Sampler = KnownResamplers.Lanczos3,
             }));
