@@ -1,9 +1,14 @@
+using System.Text.RegularExpressions;
+
 namespace MaiChartManager.Services.HardwareBridge;
 
 public class HardwareDiscoveryService(
     AquaMaiHardwareHintsReader hintsReader,
     ILogger<HardwareDiscoveryService> logger)
 {
+    private static readonly Regex TouchNameRegex = new(@"\btouch\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex LedNameRegex = new(@"\bled\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     public DiscoveryResult Discover()
     {
         var hints = hintsReader.ReadHints();
@@ -74,6 +79,21 @@ public class HardwareDiscoveryService(
                 reasons.Add("默认 2P 灯板串口");
             }
 
+            var nameSource = p.BusReportedDescription ?? p.FriendlyName;
+            if (!string.IsNullOrEmpty(nameSource))
+            {
+                if (!roles.Contains("touch") && TouchNameRegex.IsMatch(nameSource))
+                {
+                    roles.Add("touch");
+                    reasons.Add("设备名称匹配触摸屏");
+                }
+                if (!roles.Contains("led") && LedNameRegex.IsMatch(nameSource))
+                {
+                    roles.Add("led");
+                    reasons.Add("设备名称匹配灯板");
+                }
+            }
+
             list.Add(new SerialDeviceCandidate(
                 Id: p.PortName,
                 PortName: p.PortName,
@@ -95,14 +115,39 @@ public class HardwareDiscoveryService(
     {
         var candidates = new List<(int Score, RecommendedSetup Setup)>();
 
-        string? FindSerial(string? preferred1, string fallback)
+        string? FindSerial(string? preferred1, string fallback, string role, int? preferVid = null, int? preferPid = null)
         {
             if (!string.IsNullOrEmpty(preferred1))
             {
                 var match = serialPorts.FirstOrDefault(p => string.Equals(p.PortName, preferred1, StringComparison.OrdinalIgnoreCase));
                 if (match != null) return match.Id;
             }
-            return serialPorts.FirstOrDefault(p => string.Equals(p.PortName, fallback, StringComparison.OrdinalIgnoreCase))?.Id;
+
+            var oppositeCom = fallback.ToUpperInvariant() switch
+            {
+                "COM3" => "COM4",
+                "COM4" => "COM3",
+                "COM21" => "COM23",
+                "COM23" => "COM21",
+                _ => null,
+            };
+
+            if (preferVid.HasValue)
+            {
+                var devMatch = serialPorts.FirstOrDefault(p =>
+                    p.VendorId == preferVid &&
+                    (!preferPid.HasValue || p.ProductId == preferPid) &&
+                    p.RecommendedFor.Contains(role) &&
+                    !string.Equals(p.PortName, oppositeCom, StringComparison.OrdinalIgnoreCase));
+                if (devMatch != null) return devMatch.Id;
+            }
+
+            var fallbackMatch = serialPorts.FirstOrDefault(p => string.Equals(p.PortName, fallback, StringComparison.OrdinalIgnoreCase));
+            if (fallbackMatch != null) return fallbackMatch.Id;
+
+            return serialPorts.FirstOrDefault(p =>
+                p.RecommendedFor.Contains(role) &&
+                !string.Equals(p.PortName, oppositeCom, StringComparison.OrdinalIgnoreCase))?.Id;
         }
 
         // 1. NPro WinUSB
@@ -149,8 +194,8 @@ public class HardwareDiscoveryService(
             var side = pdx.PlayerSide ?? "1P";
             var io4 = hidDevices.FirstOrDefault(d => d.DeviceKind == "io4");
             var ledId = side == "2P"
-                ? FindSerial(hints?.LedPort2p, "COM23")
-                : FindSerial(hints?.LedPort1p, "COM21");
+                ? FindSerial(hints?.LedPort2p, "COM23", "led", io4?.VendorId, io4?.ProductId)
+                : FindSerial(hints?.LedPort1p, "COM21", "led", io4?.VendorId, io4?.ProductId);
             var score = hints?.PdxTouchEnabled == true ? 115 : 60;
             if (side == "1P") score += 5;
             candidates.Add((score, new RecommendedSetup(
@@ -171,11 +216,11 @@ public class HardwareDiscoveryService(
         {
             var side = adx.PlayerSide ?? "1P";
             var touchId = side == "2P"
-                ? FindSerial(hints?.TouchPort2p, "COM4")
-                : FindSerial(hints?.TouchPort1p, "COM3");
+                ? FindSerial(hints?.TouchPort2p, "COM4", "touch", adx.VendorId, adx.ProductId)
+                : FindSerial(hints?.TouchPort1p, "COM3", "touch", adx.VendorId, adx.ProductId);
             var ledId = side == "2P"
-                ? FindSerial(hints?.LedPort2p, "COM23")
-                : FindSerial(hints?.LedPort1p, "COM21");
+                ? FindSerial(hints?.LedPort2p, "COM23", "led", adx.VendorId, adx.ProductId)
+                : FindSerial(hints?.LedPort1p, "COM21", "led", adx.VendorId, adx.ProductId);
             var score = 95;
             if (hints?.AdxHidEnabled == true) score += 15;
             if (side == "1P") score += 5;
@@ -195,8 +240,8 @@ public class HardwareDiscoveryService(
         // 5. IO4 HID
         foreach (var io4 in hidDevices.Where(d => d.DeviceKind == "io4"))
         {
-            var touchId = FindSerial(hints?.TouchPort1p, "COM3");
-            var ledId = FindSerial(hints?.LedPort1p, "COM21");
+            var touchId = FindSerial(hints?.TouchPort1p, "COM3", "touch", io4.VendorId, io4.ProductId);
+            var ledId = FindSerial(hints?.LedPort1p, "COM21", "led", io4.VendorId, io4.ProductId);
             candidates.Add((90, new RecommendedSetup(
                 Mode: "io4",
                 Confidence: "high",
@@ -213,8 +258,8 @@ public class HardwareDiscoveryService(
         // 6. Fallback: serial-only default / AquaMai ports when no HID/USB controller detected
         if (candidates.Count == 0)
         {
-            var touch1 = FindSerial(hints?.TouchPort1p, "COM3");
-            var led1 = FindSerial(hints?.LedPort1p, "COM21");
+            var touch1 = FindSerial(hints?.TouchPort1p, "COM3", "touch");
+            var led1 = FindSerial(hints?.LedPort1p, "COM21", "led");
             if (touch1 != null || led1 != null)
             {
                 candidates.Add((40, new RecommendedSetup(

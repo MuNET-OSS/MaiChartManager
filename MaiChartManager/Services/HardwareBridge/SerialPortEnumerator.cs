@@ -17,6 +17,7 @@ public static class SerialPortEnumerator
     private const uint SPDRP_HARDWAREID = 0x00000001;
     private const uint SPDRP_FRIENDLYNAME = 0x0000000C;
     private const uint SPDRP_LOCATION_PATHS = 0x00000023;
+    private const uint DEVPROP_TYPE_STRING = 0x00000012;
     private const int ERROR_SUCCESS = 0;
     private const int ERROR_INSUFFICIENT_BUFFER = 122;
     private const int ERROR_MORE_DATA = 234;
@@ -34,6 +35,20 @@ public static class SerialPortEnumerator
         public IntPtr Reserved;
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct DEVPROPKEY
+    {
+        public Guid fmtid;
+        public uint pid;
+    }
+
+    // DEVPKEY_Device_BusReportedDeviceDesc: USB 描述符上报的接口/设备名称
+    private static readonly DEVPROPKEY DevpkeyBusReportedDeviceDesc = new()
+    {
+        fmtid = new Guid("540b947e-8b40-45bc-a8a2-6a0b894cbda2"),
+        pid = 4,
+    };
+
     [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
     private static extern IntPtr SetupDiGetClassDevsW(ref Guid classGuid, string? enumerator, IntPtr hwndParent, uint flags);
 
@@ -44,6 +59,11 @@ public static class SerialPortEnumerator
     private static extern bool SetupDiGetDeviceRegistryPropertyW(
         IntPtr deviceInfoSet, ref SP_DEVINFO_DATA deviceInfoData, uint property, out uint propertyRegDataType,
         byte[]? propertyBuffer, int propertyBufferSize, out int requiredSize);
+
+    [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
+    private static extern bool SetupDiGetDevicePropertyW(
+        IntPtr deviceInfoSet, ref SP_DEVINFO_DATA deviceInfoData, ref DEVPROPKEY propertyKey, out uint propertyType,
+        byte[]? propertyBuffer, int propertyBufferSize, out int requiredSize, uint flags);
 
     [DllImport("setupapi.dll", CharSet = CharSet.Unicode, SetLastError = true, ExactSpelling = true)]
     private static extern IntPtr SetupDiOpenDevRegKey(
@@ -64,7 +84,8 @@ public static class SerialPortEnumerator
         string FriendlyName,
         int? VendorId,
         int? ProductId,
-        string? Location);
+        string? Location,
+        string? BusReportedDescription = null);
 
     public static List<RawPortInfo> EnumeratePorts(ILogger logger)
     {
@@ -84,12 +105,14 @@ public static class SerialPortEnumerator
                         var portName = ReadPortName(set, ref info);
                         if (string.IsNullOrWhiteSpace(portName)) continue;
 
-                        var friendlyName = ReadStringProperty(set, ref info, SPDRP_FRIENDLYNAME) ?? portName;
+                        var busDesc = ReadDevicePropertyString(set, ref info, DevpkeyBusReportedDeviceDesc);
+                        var regFriendly = ReadStringProperty(set, ref info, SPDRP_FRIENDLYNAME);
+                        var friendlyName = !string.IsNullOrEmpty(busDesc) ? busDesc : (regFriendly ?? portName);
                         var hardwareIds = ReadStringArrayProperty(set, ref info, SPDRP_HARDWAREID);
                         var (vid, pid) = ParseVidPid(hardwareIds);
                         var location = ExtractPortChain(ReadStringArrayProperty(set, ref info, SPDRP_LOCATION_PATHS));
 
-                        byPort[portName] = new RawPortInfo(portName, friendlyName, vid, pid, location);
+                        byPort[portName] = new RawPortInfo(portName, friendlyName, vid, pid, location, busDesc);
                     }
                 }
                 finally
@@ -408,6 +431,23 @@ public static class SerialPortEnumerator
             if (SetupDiGetDeviceRegistryPropertyW(set, ref info, property, out _, buffer, buffer.Length, out var requiredSize))
             {
                 return Encoding.Unicode.GetString(buffer, 0, requiredSize).TrimEnd('\0');
+            }
+            if (Marshal.GetLastWin32Error() != ERROR_INSUFFICIENT_BUFFER || requiredSize <= buffer.Length) return null;
+            buffer = new byte[requiredSize];
+        }
+        return null;
+    }
+
+    private static string? ReadDevicePropertyString(IntPtr set, ref SP_DEVINFO_DATA info, DEVPROPKEY propertyKey)
+    {
+        var buffer = new byte[1024];
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            if (SetupDiGetDevicePropertyW(set, ref info, ref propertyKey, out var propertyType, buffer, buffer.Length, out var requiredSize, 0))
+            {
+                if (propertyType != DEVPROP_TYPE_STRING || requiredSize <= 0) return null;
+                var text = Encoding.Unicode.GetString(buffer, 0, requiredSize).TrimEnd('\0').Trim();
+                return string.IsNullOrEmpty(text) ? null : text;
             }
             if (Marshal.GetLastWin32Error() != ERROR_INSUFFICIENT_BUFFER || requiredSize <= buffer.Length) return null;
             buffer = new byte[requiredSize];
