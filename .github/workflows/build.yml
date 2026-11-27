@@ -31,6 +31,14 @@ jobs:
         pnpm install
         pnpm build
 
+    - name: Install and Build Mai2-TouchTest
+      working-directory: Mai2-TouchTest
+      run: |
+        pnpm install --frozen-lockfile
+        pnpm --filter @mai2-touchtest/webtest build
+        rm -rf ../MaiChartManager/wwwroot/touch-test
+        cp -r apps/webtest/dist ../MaiChartManager/wwwroot/touch-test
+
     - name: Upload wwwroot
       uses: actions/upload-artifact@v4
       with:

@@ -475,6 +475,8 @@ tools:
     errorFileLocked: 文件仍被占用，请关闭预览后重试
     errorDeleteFailed: 删除文件失败，请关闭预览后重试
   title: 工具
+  touchTest:
+    label: 手台 / 机台测试
   audioConvert: 音频转换（ACB + AWB）
   videoConvert: 视频转换（DAT）
   converting: 正在转换…

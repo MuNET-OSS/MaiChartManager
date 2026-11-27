@@ -13,3 +13,6 @@
 [submodule "MuConvert"]
 	path = MuConvert
 	url = https://github.com/MuNET-OSS/MuConvert.git
+[submodule "Mai2-TouchTest"]
+	path = Mai2-TouchTest
+	url = https://github.com/MuNET-OSS/Mai2-TouchTest.git

@@ -72,6 +72,12 @@ EOF
   cd "$root/MaiChartManager/Front"
   pnpm run build
 
+  cd "$root/Mai2-TouchTest"
+  pnpm install --frozen-lockfile
+  pnpm --filter @mai2-touchtest/webtest build
+  rm -rf "$root/MaiChartManager/wwwroot/touch-test"
+  cp -r apps/webtest/dist "$root/MaiChartManager/wwwroot/touch-test"
+
   # 2) 框架依赖发布到 srcdir/out（不打包运行时，依赖系统 aspnet-runtime）。
   #    发布 CLI 项目即可：它引用主项目，产物是超集——同时含 GUI 主程序 apphost
   #    (MaiChartManager)、CLI (MaiChartManager.CLI)、MuConvert、wwwroot 与全部共享 dll。

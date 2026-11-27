@@ -54,3 +54,8 @@ jobs:
     # 注意它只跑 tsc、不跑 vite build，打包坏掉要等 build.yml 在 main 上才发现。
     - name: Typecheck
       run: pnpm typecheck
+
+    - name: Typecheck Mai2-TouchTest
+      run: |
+        pnpm --dir Mai2-TouchTest install --frozen-lockfile
+        pnpm --dir Mai2-TouchTest --filter @mai2-touchtest/webtest typecheck

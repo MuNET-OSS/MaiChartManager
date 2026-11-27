@@ -83,6 +83,15 @@ if ($Mode -ne "Canary" -or -not (Test-Path "$ProjectRoot\MaiChartManager\wwwroot
         if ($LASTEXITCODE -ne 0) { throw "pnpm install failed with exit code $LASTEXITCODE" }
         pnpm --filter mcm-frontend build
         if ($LASTEXITCODE -ne 0) { throw "Frontend build failed with exit code $LASTEXITCODE" }
+
+        Write-Host "Building Mai2-TouchTest..." -ForegroundColor Cyan
+        pnpm --dir Mai2-TouchTest install --frozen-lockfile
+        if ($LASTEXITCODE -ne 0) { throw "Mai2-TouchTest install failed with exit code $LASTEXITCODE" }
+        pnpm --dir Mai2-TouchTest --filter @mai2-touchtest/webtest build
+        if ($LASTEXITCODE -ne 0) { throw "Mai2-TouchTest build failed with exit code $LASTEXITCODE" }
+        $TouchTestOut = "$ProjectRoot\MaiChartManager\wwwroot\touch-test"
+        if (Test-Path $TouchTestOut) { Remove-Item $TouchTestOut -Recurse -Force }
+        Copy-Item "$ProjectRoot\Mai2-TouchTest\apps\webtest\dist" $TouchTestOut -Recurse -Force
     } finally {
         Pop-Location
     }

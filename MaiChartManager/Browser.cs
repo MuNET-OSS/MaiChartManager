@@ -115,7 +115,8 @@ public sealed partial class Browser : Form
 
     private async void CoreWebView2_NewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
     {
-        if (new Uri(e.Uri).Host != "mcm.invalid")
+        var targetUri = new Uri(e.Uri);
+        if (targetUri.Host != "mcm.invalid")
         {
             e.Handled = true;
             Process.Start(new ProcessStartInfo(e.Uri) { UseShellExecute = true });
@@ -142,10 +143,38 @@ public sealed partial class Browser : Form
             form.Show();
             await webView.EnsureCoreWebView2Async(webView21.CoreWebView2.Environment);
             WebViewHelper.SetupCoreWebView2(webView.CoreWebView2, loopbackUrl);
+            webView.CoreWebView2.PermissionRequested += WebViewHelper.OnPermissionRequested;
             e.NewWindow = webView.CoreWebView2;
             webView.CoreWebView2.DocumentTitleChanged += (_, _) => form.Text = webView.CoreWebView2.DocumentTitle;
+
+            var prevBorderStyle = form.FormBorderStyle;
+            var prevWindowState = form.WindowState;
+            var prevBounds = form.Bounds;
+            webView.CoreWebView2.ContainsFullScreenElementChanged += (_, _) =>
+            {
+                if (webView.CoreWebView2.ContainsFullScreenElement)
+                {
+                    prevBorderStyle = form.FormBorderStyle;
+                    prevWindowState = form.WindowState;
+                    prevBounds = form.Bounds;
+                    if (form.WindowState == FormWindowState.Maximized)
+                        form.WindowState = FormWindowState.Normal;
+                    form.FormBorderStyle = FormBorderStyle.None;
+                    form.WindowState = FormWindowState.Maximized;
+                }
+                else
+                {
+                    form.FormBorderStyle = prevBorderStyle;
+                    form.WindowState = prevWindowState;
+                    if (prevWindowState == FormWindowState.Normal)
+                        form.Bounds = prevBounds;
+                }
+            };
+
             form.FormClosed += (_, _) => webView.Dispose();
-            webView.ZoomFactor = _currentZoomFactor;
+            webView.ZoomFactor = targetUri.AbsolutePath.StartsWith("/touch-test", StringComparison.OrdinalIgnoreCase)
+                ? 1.0
+                : _currentZoomFactor;
         }
         finally
         {

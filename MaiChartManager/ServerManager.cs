@@ -136,6 +136,8 @@ public static class ServerManager
         builder.Services.AddSingleton<MaiChartManager.Platform.IShellService, MaiChartManager.Platform.Windows.WindowsShellService>();
         builder.Services.AddSingleton<MaiChartManager.Platform.IAppShell, MaiChartManager.Platform.Windows.WindowsAppShell>();
         builder.Services.AddSingleton<MaiChartManager.Platform.IProgressController, MaiChartManager.Platform.Windows.WindowsProgressController>();
+        builder.Services.AddSingleton<MaiChartManager.Services.HardwareBridge.AquaMaiHardwareHintsReader>();
+        builder.Services.AddSingleton<MaiChartManager.Services.HardwareBridge.HardwareDiscoveryService>();
 #else
         // 使用 Photino 原生对话框（替换原 HeadlessDialogService 占位实现），让 OOBE 选目录可用。
         builder.Services.AddSingleton<MaiChartManager.Platform.IDesktopDialogService, MaiChartManager.Platform.Linux.PhotinoDialogService>();
@@ -212,6 +214,10 @@ public static class ServerManager
             {
                 FileProvider = new PhysicalFileProvider(StaticSettings.wwwroot),
             });
+        app.UseWebSockets(new WebSocketOptions
+        {
+            KeepAliveInterval = TimeSpan.FromSeconds(30)
+        });
         app.MapControllers();
         return Task.Run(app.Run);
     }

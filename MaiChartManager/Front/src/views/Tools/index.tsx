@@ -1,4 +1,4 @@
-import api from '@/client/api';
+import api, { isPhotino } from '@/client/api';
 import { LicenseStatus } from '@/client/apiGen';
 import { addToast } from '@munet/ui';
 import { defineComponent, ref } from 'vue';
@@ -71,6 +71,22 @@ export default defineComponent({
         labelKey: 'tools.fancy.label',
         action: openFancyTool,
       },
+      {
+        icon: 'i-mdi-gesture-tap-button',
+        labelKey: 'tools.touchTest.label',
+        action: () => {
+          if (isPhotino) {
+            void api.OpenExternalUrl({ url: new URL('/touch-test/', location.origin).toString() });
+            return;
+          }
+          openWindow({
+            urlPath: '/touch-test/index.html',
+            title: t('tools.touchTest.label'),
+            width: 1120,
+            height: 820,
+          });
+        },
+      },
     ];
 
     const renderToolCard = (tool: ToolCard) => (
@@ -99,6 +115,7 @@ export default defineComponent({
           {renderToolCard(tools[1])}
           {renderToolCard(tools[2])}
           {renderToolCard(tools[3])}
+          {renderToolCard(tools[4])}
         </div>
         <ImageToAbModal ref={imageToAbRef as any} />
         <ResourceJunctionModal ref={resourceJunctionRef as any} />
