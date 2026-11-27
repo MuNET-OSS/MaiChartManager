@@ -151,6 +151,15 @@ public sealed partial class Browser : Form
             form.Controls.Add(webView);
             form.Show();
             await webView.EnsureCoreWebView2Async(webView21.CoreWebView2.Environment);
+            if (IsRunningAsUwp())
+            {
+                webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+                webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+            }
+            if (isTouchTest)
+            {
+                webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+            }
             WebViewHelper.SetupCoreWebView2(webView.CoreWebView2, loopbackUrl);
             webView.CoreWebView2.PermissionRequested += WebViewHelper.OnPermissionRequested;
             e.NewWindow = webView.CoreWebView2;
